@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "ResumeIQ",
+  "version": "1.0",
+  "description": "Extract job descriptions and match with your ATS resume using AI.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "http://localhost:5173/*",
+    "https://*.linkedin.com/*",
+    "https://*.naukri.com/*",
+    "https://*.indeed.com/*",
+    "https://*.internshala.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.linkedin.com/jobs/*",
+        "*://*.naukri.com/job-listings-*",
+        "*://*.indeed.com/viewjob*",
+        "*://internshala.com/job/*",
+        "*://internshala.com/internship/*"
+      ],
+      "js": ["content.js"]
+    },
+    {
+      "matches": ["http://localhost:5173/*"],
+      "js": ["auth-sync.js"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

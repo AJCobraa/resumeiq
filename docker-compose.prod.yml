@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    # In production, we don't map local codebase volumes. The container uses the code it was built with.
+    environment:
+      - FRONTEND_URL=https://resumeiq-production.com # Replace with real domain
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_BACKEND_URL=https://api.resumeiq-production.com # Replace with real backend URL
+    ports:
+      - "80:80"

@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+firebase-admin
+pdfplumber
+google-genai
+numpy
+python-multipart
+python-dotenv
+pydantic
+aiofiles
