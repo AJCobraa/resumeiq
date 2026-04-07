@@ -1,0 +1,31 @@
+# Credentials — NEVER commit these
+backend/.env
+frontend/.env.local
+extension/config.js
+*.serviceAccountKey.json
+firebase-adminsdk*.json
+ 
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+ 
+# Build output
+frontend/dist/
+frontend/.vite/
+backend/__pycache__/
+ 
+# OS files
+.DS_Store
+Thumbs.db
+ 
+# Logs
+*.log
+npm-debug.log*
+ 
+# Temp PDF files
+/tmp/*.pdf
+/tmp/*.html
