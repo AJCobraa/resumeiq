@@ -1,0 +1,188 @@
+:root {
+  --bg-primary: #0F172A;
+  --bg-secondary: #1E293B;
+  --text-primary: #F8FAFC;
+  --text-muted: #94A3B8;
+  --border-color: #334155;
+  --accent-blue: #3B82F6;
+  --accent-blue-hover: #2563EB;
+  --color-green: #10B981;
+  --color-orange: #F59E0B;
+  --color-red: #EF4444;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  width: 320px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 400px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.logo svg {
+  width: 20px;
+  height: 20px;
+  color: var(--accent-blue);
+}
+
+.status-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 99px;
+  background: var(--border-color);
+}
+.status-badge.connected { background: rgba(16, 185, 129, 0.2); color: var(--color-green); }
+
+.state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+}
+
+.hidden { display: none !important; }
+
+/* Text Utils */
+.text-red { color: var(--color-red) !important; }
+.text-orange { color: var(--color-orange) !important; }
+.text-blue { color: var(--accent-blue) !important; }
+.mt-2 { margin-top: 0.5rem; }
+
+/* Center States */
+#state-login, #state-no-job, #state-analyzing {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.icon-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-color);
+}
+
+h2 {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Forms & Cards */
+.job-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+.job-card .title { font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.job-card .company { font-size: 12px; color: var(--text-muted); }
+
+.form-group {
+  margin-bottom: 16px;
+}
+.form-group label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+}
+select {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+select:focus { border-color: var(--accent-blue); }
+
+/* Buttons */
+.btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  border: none;
+  transition: all 0.2s;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--accent-blue); color: white; }
+.btn-primary:not(:disabled):hover { background: var(--accent-blue-hover); }
+.btn-outline { background: transparent; border: 1px solid var(--border-color); color: var(--text-primary); }
+.btn-outline:hover { background: var(--border-color); }
+
+/* UI Updates for state 3 */
+#error-msg { margin-top: 8px; font-size: 11px; text-align: center; }
+
+/* Analyzing State */
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(59, 130, 246, 0.3);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Results State */
+.result-score {
+  text-align: center;
+  background: var(--bg-secondary);
+  padding: 24px 0;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 16px;
+}
+.result-score p { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+.result-score h1 { font-size: 48px; font-family: monospace; margin-top: 8px; }
+
+.reco-text { text-align: center; margin-bottom: 16px; font-weight: 500; color: var(--text-primary); }

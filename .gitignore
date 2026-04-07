@@ -4,6 +4,8 @@ frontend/.env.local
 extension/config.js
 *.serviceAccountKey.json
 firebase-adminsdk*.json
+.env
+.firebaserc
  
 # Dependencies
 node_modules/

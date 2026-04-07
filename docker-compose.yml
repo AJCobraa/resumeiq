@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      # Exclude certain local directories from overriding container ones
+      - /app/venv
+      - /app/scripts/node_modules
+      - /app/__pycache__
+    env_file:
+      - ./backend/.env
+    environment:
+      # In dev, we might want to allow CORS for localhost:5173
+      - FRONTEND_URL=http://localhost:5173
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_BACKEND_URL=http://localhost:8000
+    ports:
+      - "5173:80"
+    # When developing locally, we typically don't mount React into the Nginx container,
+    # but run 'npm run dev' locally. If using docker for frontend dev, an override is needed.
+    # We will just expose the built production-like bundle in dev compose for easy testing.
