@@ -115,7 +115,7 @@ export default function Admin() {
         <div className="w-px h-10 bg-border-default" />
         <div>
           <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-1">Models Used</p>
-          <p className="text-sm text-text-primary">gemma-4-31b-it · text-embedding-004</p>
+          <p className="text-sm text-text-primary"> gemma-4-31b-it · gemini-embedding-001 </p>
         </div>
       </Card>
 
@@ -143,12 +143,12 @@ export default function Admin() {
                       <span className="font-medium text-text-primary">
                         {OPERATION_LABELS[op] || op}
                       </span>
-                      <span className="ml-2 text-xs text-text-muted font-mono">{data.model}</span>
+                      <span className="ml-2 text-xs text-text-muted font-mono"> {data.model} </span>
                     </td>
-                    <td className="py-3 pr-4 text-right">{data.calls.toLocaleString()}</td>
-                    <td className="py-3 pr-4 text-right text-accent-blue">{data.inputTokens.toLocaleString()}</td>
-                    <td className="py-3 pr-4 text-right text-purple-400">{data.outputTokens.toLocaleString()}</td>
-                    <td className="py-3 text-right text-text-muted">{data.avgLatencyMs} ms</td>
+                    <td className="py-3 pr-4 text-right"> {data.calls.toLocaleString()} </td>
+                    <td className="py-3 pr-4 text-right text-accent-blue"> {data.inputTokens.toLocaleString()} </td>
+                    <td className="py-3 pr-4 text-right text-purple-400"> {data.outputTokens.toLocaleString()} </td>
+                    <td className="py-3 text-right text-text-muted"> {data.avgLatencyMs} ms </td>
                   </tr>
                 ))}
               </tbody>

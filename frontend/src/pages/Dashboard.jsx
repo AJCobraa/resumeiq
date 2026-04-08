@@ -337,6 +337,7 @@ export default function Dashboard() {
    ────────────────────────────────────────────────────── */
 function JobDetailPanel({ job, onStatusChange, onRecommendation, onReanalyze, isReanalyzing }) {
   const showDebug = import.meta.env.DEV && job?.debug
+  const [showDetails, setShowDetails] = useState(false)
 
   return (
     <div className="space-y-6 max-h-[70vh] overflow-y-auto">
@@ -395,6 +396,77 @@ function JobDetailPanel({ job, onStatusChange, onRecommendation, onReanalyze, is
         </Card>
       </div>
 
+      <div className="flex justify-end -mt-2">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => setShowDetails(!showDetails)}
+          className="text-xs text-accent-blue"
+        >
+          {showDetails ? 'Hide Detail View' : 'Show Detail View'}
+        </Button>
+      </div>
+
+      {showDetails && (
+        <Card className="border border-accent-blue/30 bg-accent-blue/5">
+          <p className="text-sm font-semibold text-accent-blue mb-4 uppercase tracking-wider">Match Details</p>
+          
+          <div className="space-y-6">
+            <div>
+              <p className="text-xs font-semibold text-text-muted uppercase mb-2">ATS Keyword Match</p>
+              <div className="flex flex-wrap gap-1.5">
+                {job.strongMatches?.map((kw, i) => (
+                  <span key={`match-${i}`} className="px-2 py-0.5 text-xs bg-green/10 text-green rounded border border-green/20">
+                    ✓ {kw}
+                  </span>
+                ))}
+                {job.missingKeywords?.map((kw, i) => (
+                  <span key={`miss-${i}`} className="px-2 py-0.5 text-xs bg-red/10 text-red rounded border border-red/20">
+                    ✕ {kw}
+                  </span>
+                ))}
+                {(!job.strongMatches?.length && !job.missingKeywords?.length) && (
+                  <span className="text-xs text-text-muted">No keyword details available.</span>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold text-text-muted uppercase mb-2">Semantic JD Match (Line by Line)</p>
+              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+                {job.semanticDetails?.length > 0 ? (
+                  job.semanticDetails.map((detail, i) => {
+                    let colorClass = "text-text-muted border-border-default/50"
+                    let badgeClass = "bg-bg-elevated text-text-muted"
+                    if (detail.score >= 65) {
+                      colorClass = "text-green border-green/20"
+                      badgeClass = "bg-green/10 text-green"
+                    } else if (detail.score >= 40) {
+                      colorClass = "text-orange border-orange/20"
+                      badgeClass = "bg-orange/10 text-orange"
+                    } else {
+                      colorClass = "text-red border-red/20"
+                      badgeClass = "bg-red/10 text-red"
+                    }
+
+                    return (
+                      <div key={i} className={`text-xs p-2 rounded border ${colorClass} bg-bg-elevated/50 flex gap-3 items-start`}>
+                        <span className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-bold ${badgeClass} shrink-0`}>
+                          {detail.score}%
+                        </span>
+                        <span className="leading-snug">{detail.text}</span>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <span className="text-xs text-text-muted">No semantic details available. Try re-analyzing.</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Dev-only cache diagnostics */}
       {showDebug && (
         <Card>
@@ -441,19 +513,7 @@ function JobDetailPanel({ job, onStatusChange, onRecommendation, onReanalyze, is
         </Card>
       )}
 
-      {/* Missing Keywords */}
-      {job.missingKeywords?.length > 0 && (
-        <Card>
-          <p className="text-xs font-semibold text-text-muted uppercase mb-2">Missing Keywords</p>
-          <div className="flex flex-wrap gap-1.5">
-            {job.missingKeywords.map((kw, i) => (
-              <span key={i} className="px-2 py-0.5 text-xs bg-red/10 text-red rounded">
-                {kw}
-              </span>
-            ))}
-          </div>
-        </Card>
-      )}
+
 
       {/* Recommendations */}
       {job.recommendations?.length > 0 && (
