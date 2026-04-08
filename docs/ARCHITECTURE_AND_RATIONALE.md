@@ -33,7 +33,9 @@ ResumeIQ is a 3-part SaaS application:
 9. Extension triggers the analysis pipeline via `POST /api/analyze`
 10. Pipeline uses cached resume embeddings + fresh JD embeddings for semantic matching
 11. Gemma 4 rewrites resume bullets to address missing keywords
-12. Results are stored in Firestore and displayed in the web app dashboard
+13. /api/jobs/{jobId}/interview-prep analyzes resume gaps vs JD requirements
+14. Model predicts likely interview questions and coached answers based on company tier
+15. Results are displayed in the dashboard's Interview Prep panel
 
 ---
 
@@ -108,6 +110,7 @@ ResumeIQ is a 3-part SaaS application:
 | GET | `/api/jobs/{id}` | Full job with recs | 5 |
 | PATCH | `/api/jobs/{id}/status` | Update status | 5 |
 | PATCH | `/api/jobs/{id}/recommendation` | Approve/edit/dismiss | 5 |
+| POST | `/api/jobs/{id}/interview-prep` | Generate/retrieve AI interview prep | 6 |
 | DELETE | `/api/jobs/{id}` | Delete job | 5 |
 
 ---
@@ -183,7 +186,8 @@ ResumeIQ is a 3-part SaaS application:
 | `src/components/editor/SectionEditor.jsx` | All section type editors (exp/edu/skills/projects) |
 | `src/components/templates/CobraTemplate.jsx` | ATS-safe resume template (Arial, inline styles) |
 | `src/pages/Landing.jsx` | Landing page with ATS ring |
-| `src/pages/Dashboard.jsx` | Job dashboard (stub) |
+| `src/pages/Dashboard.jsx` | Job dashboard with detailed analysis and prep |
+| `src/components/dashboard/InterviewPrepPanel.jsx` | Interview question & coached answer predictor |
 | `src/pages/MyResumes.jsx` | Resume list with CRUD modals |
 | `src/pages/ResumeEditor.jsx` | Two-panel editor with live preview |
 | `src/pages/Settings.jsx` | Account settings |
@@ -416,3 +420,23 @@ ResumeIQ is a 3-part SaaS application:
 - `extension/popup.css`: Added compact action button styling (`.jd-actions`, `.btn-small`).
 
 **Why this works:** Recommendation quality depends heavily on clean JD context. Failing fast on low-quality extraction is safer than generating poor rewrites from polluted text, and canonical job URLs keep cache matching stable.
+
+---
+
+## Section 25 — Interview Weakness Predictor & Company Tiering
+
+**Problem:** Users need more than just a matching resume; they need to prepare for the specific interview bar set by different types of tech companies, especially for roles where they have skill gaps.
+
+**Decision:** Implement a rule-based company classification system and a tier-aware interview prep generator.
+
+**Implementation:**
+- **Tier Classification (`gemma_service.py`):** Pure string matching against curated lists of FAANG, Big Tech, and Unicorns. 
+  - `faang`: Google, Meta, Amazon, Microsoft, etc. (Expert depth, system design at scale).
+  - `unicorn`: Stripe, Uber, Airbnb, Flipkart, etc. (Senior bar, delivery/impact focus).
+  - `standard`: Mid-market tech / startups (Practical skills, learning ability).
+- **Prep Generator (`gemma_service.py`):** Generates questions and "strategic coached answers" specifically addressing the top 3 missing keywords identified during analysis.
+- **Backend Endpoint (`routers/jobs.py`):** `POST /api/jobs/{id}/interview-prep` handles generation and persistence.
+- **Caching Mechanism:** Results are cached in the job document (`interviewPrep`) and tied to the `resumeId`. Changing the resume invalidates the prep cache.
+- **Frontend UI (`InterviewPrepPanel.jsx`):** A dedicated panel in the job details modal that displays questions with difficulty badges and expandable coached answers.
+
+**Why rule-based tiering?** FAANG and Unicorn bars are distinct and relatively stable. Using a local lookup instead of an LLM call for classification reduces latency and cost while maintaining high accuracy for known top-tier targets.

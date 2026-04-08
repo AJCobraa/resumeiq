@@ -27,6 +27,23 @@ class AnalyzeRequest(BaseModel):
     jobId: Optional[str] = None
 
 
+class InterviewPrepItem(BaseModel):
+    gap: str
+    question: str
+    strategicAnswer: str
+    difficulty: str
+    companyTier: Optional[str] = "standard"
+    companyLabel: Optional[str] = "Tech Company"
+
+
+class InterviewPrepResponse(BaseModel):
+    interviewPrep: list[InterviewPrepItem]
+    cached: bool
+    generatedAt: Optional[str] = None
+    companyTier: Optional[str] = "standard"
+    companyLabel: Optional[str] = "Tech Company"
+
+
 class UpdateJobStatusRequest(BaseModel):
     status: str  # saved | applied | interview | offer | rejected
 
