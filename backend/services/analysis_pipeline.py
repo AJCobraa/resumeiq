@@ -14,6 +14,21 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def _split_jd_into_sentences(text: str) -> list[str]:
+    lines = re.split(r'\n+', text or "")
+    sentences = []
+    for line in lines:
+        line = line.strip()
+        parts = re.split(r'(?<=[.!?•▪️►➢])\s+', line)
+        for p in parts:
+            p = p.strip()
+            # Filter out very short phrasing/headings to keep token counts & details focused.
+            if len(p) > 25:
+                sentences.append(p)
+    return sentences[:50]  # Max 50 chunks for performance/limits
+
+
+
 def _md5(text: str) -> str:
     return hashlib.md5(text.encode("utf-8")).hexdigest()
 
@@ -176,28 +191,41 @@ async def analyze_resume_vs_jd(
         chunks = await embedding_service.compute_embeddings(resume, user_id=user_id)
         resume_embeddings_computed_on_demand = True
 
-    jd_embedding = None
-    req_embeddings = []
     jd_embedding_computed = False
+    cached_reqs = []
+    
     if is_jd_cache_hit:
         cached_reqs = cached_jd["jdEmbeddingsCache"].get("requirements", [])
-        req_embeddings = [r.get("embedding") for r in cached_reqs if r.get("embedding")]
-    else:
-        jd_embedding = await embedding_service.get_jd_embedding(jd_text, user_id=user_id)
-        jd_embedding_computed = True
-        if jd_embedding:
-            req_embeddings = [jd_embedding]
+    
+    if is_jd_cache_hit and not cached_reqs:
+        # Fallback if cache is somehow invalid
+        is_jd_cache_hit = False
 
-    if is_jd_cache_hit and not req_embeddings:
-        jd_embedding = await embedding_service.get_jd_embedding(jd_text, user_id=user_id)
+    if not is_jd_cache_hit:
+        sentences = _split_jd_into_sentences(jd_text)
+        if not sentences:
+            # Fallback if no valid sentences found
+            sentences = [jd_text[:1000]]
+            
+        sentence_embeddings = await embedding_service.get_jd_sentence_embeddings(sentences, user_id=user_id)
         jd_embedding_computed = True
-        if jd_embedding:
-            req_embeddings = [jd_embedding]
-            is_jd_cache_hit = False
+        
+        cached_reqs = []
+        for i, emb in enumerate(sentence_embeddings):
+            if emb:
+                cached_reqs.append({
+                    "text": sentences[i],
+                    "embedding": emb
+                })
 
-    if chunks and req_embeddings:
+    semanticDetails = []    
+    if chunks and cached_reqs:
         all_best_scores = []
-        for req_emb in req_embeddings:
+        for req in cached_reqs:
+            req_emb = req.get("embedding")
+            if not req_emb:
+                continue
+                
             best_score = -1.0
             for chunk in chunks:
                 emb = chunk.get("embedding", [])
@@ -205,8 +233,16 @@ async def analyze_resume_vs_jd(
                     sim = _cosine_similarity(emb, req_emb)
                     if sim > best_score:
                         best_score = sim
-            all_best_scores.append(max(0.0, best_score))
-        semantic_score = int(round((sum(all_best_scores) / len(all_best_scores)) * 100))
+            
+            score_clamped = max(0.0, best_score)
+            all_best_scores.append(score_clamped)
+            
+            semanticDetails.append({
+                "text": req.get("text", ""),
+                "score": int(round(score_clamped * 100))
+            })
+            
+        semantic_score = int(round((sum(all_best_scores) / len(all_best_scores)) * 100)) if all_best_scores else 0
 
     ats_result = await gemma_service.score_ats(resume_text, jd_text, user_id=user_id)
     ats_score = ats_result.get("atsScore", 0)
@@ -236,10 +272,10 @@ async def analyze_resume_vs_jd(
         })
 
     jd_embeddings_cache = None
-    if jd_embedding:
+    if jd_embedding_computed:
         jd_embeddings_cache = {
             "computedAt": _now(),
-            "requirements": [{"text": jd_text[:500], "embedding": jd_embedding}],
+            "requirements": cached_reqs,
         }
     elif cached_jd:
         jd_embeddings_cache = cached_jd.get("jdEmbeddingsCache")
@@ -268,6 +304,7 @@ async def analyze_resume_vs_jd(
         "isCacheHit": is_jd_cache_hit,
         "atsScore": ats_score,
         "semanticScore": semantic_score,
+        "semanticDetails": semanticDetails,
         "breakdown": breakdown,
         "missingKeywords": missing_keywords,
         "strongMatches": strong_matches,

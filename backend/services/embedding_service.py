@@ -224,3 +224,39 @@ async def get_jd_embedding(text: str, user_id: str = "") -> list[float]:
                 time.sleep(2)
             else:
                 raise
+
+
+async def get_jd_sentence_embeddings(texts: list[str], user_id: str = "") -> list[list[float]]:
+    """
+    Compute embeddings for a list of job description sentences.
+    Used in the analysis pipeline for line-by-line similarity.
+
+    Retries once with 2s sleep on failure.
+    """
+    if not texts:
+        return []
+
+    client = _get_client()
+
+    for attempt in range(2):
+        try:
+            t0 = time.monotonic()
+            result = await asyncio.to_thread(
+                client.models.embed_content,
+                model=EMBEDDING_MODEL,
+                contents=texts,
+            )
+            latency_ms = (time.monotonic() - t0) * 1000
+
+            # Log usage
+            if user_id:
+                est_tokens = sum(len(t) // 4 for t in texts)
+                _fire_embed_log(user_id, "embed_jd_sentences", est_tokens, latency_ms)
+
+            return [e.values for e in result.embeddings]
+        except Exception:
+            if attempt == 0:
+                time.sleep(2)
+            else:
+                raise
+
