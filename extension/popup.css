@@ -140,6 +140,44 @@ select {
 }
 select:focus { border-color: var(--accent-blue); }
 
+.jd-textarea {
+  width: 100%;
+  min-height: 110px;
+  max-height: 180px;
+  resize: vertical;
+  padding: 8px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  outline: none;
+}
+
+.jd-textarea:focus {
+  border-color: var(--accent-blue);
+}
+
+.jd-meta {
+  font-size: 10px;
+  margin-top: 4px;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.jd-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
+}
+
+.btn-small {
+  width: auto;
+  padding: 5px 8px;
+  font-size: 11px;
+}
+
 /* Buttons */
 .btn {
   width: 100%;

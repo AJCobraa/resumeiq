@@ -28,7 +28,7 @@ ResumeIQ is a 3-part SaaS application:
 4. Backend verifies the token via Firebase Admin SDK
 5. User creates/edits resumes through the web app
 6. Resume data is stored in Firestore under `users/{userId}/resumes/{resumeId}`
-7. On resume save, embeddings are computed via `text-embedding-004` and cached
+7. On resume save, embeddings are computed via `gemini-embedding-001` and cached
 8. Chrome Extension detects job descriptions on LinkedIn/Naukri/Indeed/Internshala
 9. Extension triggers the analysis pipeline via `POST /api/analyze`
 10. Pipeline uses cached resume embeddings + fresh JD embeddings for semantic matching
@@ -52,9 +52,10 @@ ResumeIQ is a 3-part SaaS application:
 - Good enough for resume rewriting tasks
 - Same API as other Google models — easy to swap later
 
-### Why `text-embedding-004`?
-- Completely free, no rate limits that affect our scale
-- 768-dimensional vectors — good balance of quality and storage
+### Why `gemini-embedding-001`?
+- Supported text embedding model for the `google-genai` SDK
+- Completely free via AI Studio
+- 3072-dimensional vectors — excellent semantic matching quality
 - Same `google-genai` SDK as Gemma — single dependency
 
 ### Why Puppeteer (not html2canvas)?
@@ -78,7 +79,7 @@ ResumeIQ is a 3-part SaaS application:
 - Trade-off: max ~55 sections (well within Firestore's 1MB limit)
 
 ### Embedding Cache in Firestore (not Redis)
-- ~55 units × 768 floats × 4 bytes ≈ 170KB — well under 1MB limit
+- ~55 units × 3072 floats × 4 bytes ≈ 675KB — well under 1MB limit
 - Firestore reads take 20-50ms — fast enough for our use case
 - No extra infrastructure, no extra credentials, no extra cost
 - Cache is recomputed only when resume content changes
@@ -256,6 +257,162 @@ ResumeIQ is a 3-part SaaS application:
 
 **Fix (Backend — `analysis_pipeline.py`):** When building recommendations, `_find_bullet_ids()` scans the resume to find the `sectionId` and `bulletId` corresponding to `currentText`. These IDs are embedded into each recommendation object at generation time.
 
-**Fix (Backend — `routers/jobs.py`):** `_apply_recommendation_to_resume` now uses **ID-based targeting** (Strategy 1). Text matching remains as Strategy 2 fallback for backwards compatibility with old recommendation objects that pre-date this fix.
-
 **Fix (Frontend — `Dashboard.jsx`):** After any `approve/dismiss/edit` action, the full job detail is **re-fetched from the backend** instead of optimistically updating local state. This ensures the UI always reflects persisted Firestore state, eliminating stale state divergence.
+
+---
+
+## Section 20 — Template, UI, and Export Fixes
+
+### 20.1 Duplicate Section Headers in Template
+**Problem:** `CobraTemplate.jsx` rendered a separate "EXPERIENCE" header for every job entry.
+**Decision:** Group entries by section `type`. Render one header per type, then map through the items.
+**Implementation:** Grouped the `experience` array by checking standard mapping loops in `CobraTemplate` rather than scattering headers across objects.
+
+### 20.2 PDF Export Formatting Overlaps
+**Problem:** Long bullet points bled into page margins or other columns.
+**Decision:** Restrict the widths of dynamically loaded lists using standard CSS metrics rather than relative sizing inside Puppeteer runs.
+**Implementation:** `CobraTemplate.jsx` injected specific inline `w-full max-w-[some px]` controls, and `puppeteer` export script was updated to strictly enforce page `width`/`height` bounding boxes.
+
+### 20.3 React State Re-Rendering Glitches
+**Problem:** The right panel preview wasn't smoothly matching the left panel state due to complex debouncing clashing with layout calls.
+**Decision:** Standardized the dependency array in `useEffect` and normalized internal wrapper boundaries to prevent reflow loops.
+
+---
+
+## Section 21 — Caching, Scoring, UI, and Skills Fixes
+
+### 21.1 Robust JD Cache Keying
+**Problem:** Scraping URL tracking params or extra whitespace defeated the `jdHash` MD5 matching.
+**Decision:** Aggressively normalize text and URLs before cache checks.
+**Implementation:**
+- Strip tracking params using `urllib.parse` inside both `/api/jobs/check` and `analysis_pipeline.py`.
+- Strip line breaks and sequential whitespaces using `re.sub(r'\s+', ' ', jd_text).strip()` prior to hashing `jdHash`.
+
+### 21.2 Semantic Score Thresholding
+**Problem:** Semantic Score was 0% because irrelevant content (like personal info or short bullets) diluted the average chunk similarity calculation.
+**Decision:** Only calculate averages against highly relevant matched chunks.
+**Implementation:** Added a threshold filter `[score for score in raw_scores if score >= 0.5]` when mapping resume chunks against JD embeddings to create an accurate 'best matched features' percentage.
+
+### 21.3 Dynamic Extension Editing
+**Problem:** Job boards structure titles natively, but the extension failed gracefully and left them uneditable as "Unknown Position."
+**Decision:** Expose extracted properties via editable inputs right in the extension popup before it hits the backend.
+**Implementation:** Converted `<p>` nodes to `<input>` fields in `popup.html` and bound `UI.jobTitle.value` dynamically in `popup.js`.
+
+### 21.4 Skill Array Mutation for Recommendations
+**Problem:** Approving a skill recommendation broke because skills are stored as nested text inside `[{categoryId, items: [string]}]` rather than isolated `bulletId` objects.
+**Decision:** Trap any `type == "skills"` arrays in the updater pipeline and manipulate the values using index-based tracking.
+**Implementation:** `_apply_recommendation_to_resume` iterates into the list, grabs `index(current_text)` natively, and injects `new_text` in Python specifically when traversing a matched `categoryId`.
+
+---
+
+## Section 22 — URL Normalization and Upsert Strategy
+**Problem:** Standard "Insert Always" caching meant analyzing identical jobs on LinkedIn (which append dynamic tracking `?refId=...` parameters) continually created new duplicate Jobs in Firestore, wasting space and blowing up UI tracking.
+**Decision:** Adopt a strict "Upsert by Cleaned URL" model to ensure job instances remain completely singular per user per application point.
+**Implementation:**
+- URLs strictly undergo `urllib.parse` unparsing to trim queries.
+- `POST /api/analyze` stops inserting `uuid.uuid4()` blindly. It runs a global URL search loop `_check_jd_cache(user_id, jd_url_clean)`.
+- If an identity matches, it recycles the `jobId` and `createdAt` dates.
+- We run `.set(job_doc)` against the matching ID natively within Firestore to inherently **OVERWRITE/UPSERT** analysis metrics, bypassing DB bloat entirely.
+- Added explicit `[CACHE]` logs in the FastAPI worker to enforce absolute visibility over routing hit rates.
+
+## Section 23 — In-App Re-Analyze UX Loop
+**Problem:** Users would approve multiple granular AI fixes inside the Job Detail Drawer, but the overall ATS score and Semantic Score wouldn't adapt live without backing completely out of the app, finding the extension again, and re-invoking the external content-script payload.
+**Decision:** Construct a high-speed internal refresh circuit explicitly bypassing URL validation limits.
+**Implementation:**
+- Expose the exact tracking identifier via standard API requests: `jobId` passed natively inside the HTTP POST body.
+- When `jobId` is parsed, the backend entirely skips hash mapping and URL lookup, reading the `job_id` document string natively off disk.
+- Automatically refreshes the UI Modal with the new return payload containing shrunken recommendation arrays and the freshly computed ATS metrics.
+
+---
+
+## Section 24 — Analysis Cache + Semantic Reliability Fix
+**Problem:** Three issues were linked: (1) repeated analysis of the same JD sometimes missed cache, (2) semantic score showed `0%` too often, and (3) same JD could create duplicate job docs.
+
+**Root Cause:** JD embedding creation and JD cache write were implicitly coupled to resume embedding availability. If resume embeddings were missing/stale (common right after edits), semantic computation short-circuited and JD cache was never persisted. Later runs then had no JD cache to reuse and could create new rows.
+
+**Decision:** Decouple JD cache generation from semantic scoring, and make job identity resolution deterministic (`jobId` > `jdHash` > cleaned `jdUrl`).
+
+**Implementation (`backend/services/analysis_pipeline.py`):**
+- Normalize JD content before hashing (`re.sub(r"\s+", " ", jd_text).strip()`), then hash normalized text for stable `jdHash`.
+- Normalize URL before lookup (strip tracking query params) and use it only as fallback identity.
+- Resolve existing jobs in this order: explicit `jobId` (re-analyze), then `jdHash`, then cleaned `jdUrl`.
+- Compute JD embedding whenever cache is absent (even if resume chunks are empty), so `jdEmbeddingsCache` always gets written for future runs.
+- If resume cache chunks are missing, compute embeddings on-demand for this analysis instead of returning semantic `0` by default.
+- Upsert using resolved job id to overwrite existing records instead of blindly creating a new UUID.
+- Adds a `debug` object in analysis responses for runtime verification without DB inspection:
+  - `cacheLookupSource` (`jobId` | `jdHash` | `jdUrl` | `none`)
+  - `resolvedJobId`
+  - `matchedExistingJob`
+  - `hasJdEmbeddingsCache`
+  - `jdEmbeddingComputed`
+  - `resumeEmbeddingsComputedOnDemand`
+- Frontend `Dashboard` job detail modal renders these diagnostics only in dev mode (`import.meta.env.DEV`) so production users do not see internal pipeline metadata.
+
+**Why this works:** Cache write is now guaranteed independent of resume cache timing, semantic scoring has a fallback path, and duplicate prevention uses stable identifiers instead of best-effort URL matching only.
+
+### 24.1 Extension Error Transparency
+**Problem:** The extension popup always showed "backend not running" for any `/api/analyze` failure, masking real causes (validation errors, extraction issues, auth failures, model errors).
+
+**Decision:** Surface backend error details directly in the popup and block obviously invalid analyze requests early.
+
+**Implementation (`extension/popup.js`):**
+- Validate extracted JD text before API call (minimum non-empty length threshold).
+- Parse error responses from `/api/analyze` as JSON and display `detail` when present.
+- Fallback to raw response text / HTTP status if JSON detail is unavailable.
+- Keep the generic state flow but display a precise error message to the user.
+
+### 24.2 LinkedIn Extraction Hardening
+**Problem:** LinkedIn UI variations caused title extraction to fall back to `Unknown Position`, URL capture to store generic search links, and JD extraction to include noisy container/page text. This degraded recommendation quality and cache identity.
+
+**Decision:** Harden LinkedIn extraction around canonical job identity and strict JD quality checks.
+
+**Implementation (`extension/content.js`):**
+- Added robust selector sets for job title/company across old and new LinkedIn job layouts.
+- Infer canonical JD URL as `https://www.linkedin.com/jobs/view/{jobId}/` whenever a job id can be found from active list items or job links.
+- Stop falling back to entire page/container text for JD extraction on LinkedIn.
+- Enforce minimum JD content quality (length threshold); if too short, return empty JD so popup shows extraction failure instead of sending noisy prompt context to the model.
+- Adjusted extension message success criteria: if LinkedIn job context exists (title/company/url) but JD is still loading, popup enters "job detected" state and defers strict JD validation to Analyze click.
+
+### 24.3 LinkedIn Compatibility Rollback-Hybrid
+**Problem:** Strict JD-length gating caused false negatives on valid LinkedIn jobs where the right pane content was partially loaded, leading to "No Job Found" / "not enough text" despite visible job details.
+
+**Decision:** Keep improved URL/title resilience, but restore permissive fallback extraction behavior from the original implementation.
+
+**Implementation:**
+- Reintroduced right-panel/body-text fallback for LinkedIn JD extraction.
+- Removed hard minimum-length gating from extraction phase.
+- Popup now blocks only when JD text is actually empty.
+- Retained canonical `jobs/view/{id}` URL inference and improved error detail messaging.
+
+### 24.4 Extension JD Review/Edit Control
+**Problem:** Users had no way to verify or correct extracted JD text before analysis, which made debugging extractor issues difficult and could hurt recommendation quality.
+
+**Decision:** Add an explicit JD review/edit input in the extension popup so users can inspect extraction output and fix it before model calls.
+
+**Implementation:**
+- `extension/popup.html`: added a `textarea` (`#jd-text`) under resume selection.
+- `extension/popup.js`: auto-populates `#jd-text` from extracted `jobDetails.jdText`, updates a live character counter, and sends textarea content as `jdText` in `/api/analyze`.
+- `extension/popup.css`: added styles for textarea and metadata counter.
+
+### 24.5 LinkedIn JD De-noising
+**Problem:** LinkedIn extraction could include search rail/feed text (multiple jobs, promoted results, footer UI copy), which diluted model prompts and produced irrelevant recommendations.
+
+**Decision:** Add a text-cleaning pass before sending JD to backend.
+
+**Implementation (`extension/content.js`):**
+- Strip common LinkedIn UI/marketing boilerplate tails (Premium prompts, footer/legal/help blocks, alerts widgets).
+- Prefer slicing from JD anchors (`About the job`, `Key Responsibilities`, `Requirements`, `Tech Stack`) when present.
+- If feed text appears before the selected job title, trim to the selected title occurrence.
+- Final normalized cleaned text is used as `jdText`.
+
+### 24.6 One-Click JD Cleanup in Popup
+**Problem:** Even with extractor fixes, users need a manual fallback to sanitize JD text before analyzing when LinkedIn ships DOM changes.
+
+**Decision:** Add an explicit "Auto-clean JD" action in popup.
+
+**Implementation:**
+- `extension/popup.html`: Added `#btn-clean-jd` beside JD textarea.
+- `extension/popup.js`: Added `autoCleanJdText()` to strip LinkedIn boilerplate and trim around JD anchors/title; button applies cleaning in-place.
+- `extension/popup.css`: Added compact action button styling (`.jd-actions`, `.btn-small`).
+
+**Why this works:** Recommendation quality depends heavily on clean JD context. Failing fast on low-quality extraction is safer than generating poor rewrites from polluted text, and canonical job URLs keep cache matching stable.

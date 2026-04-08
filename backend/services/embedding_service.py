@@ -17,8 +17,8 @@ from firebase_admin import firestore as fs
 # Lazy-init client
 _client = None
 
-EMBEDDING_MODEL = "text-embedding-004"
-EMBEDDING_DIM = 768  # 768-dimensional vectors
+EMBEDDING_MODEL = "gemini-embedding-001"
+EMBEDDING_DIM = 3072  # 3072-dimensional vectors for gemini-embedding-001
 
 
 def _get_client():

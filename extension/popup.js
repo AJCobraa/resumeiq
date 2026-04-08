@@ -12,9 +12,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnDashboard: document.getElementById('btn-dashboard'),
     btnReset: document.getElementById('btn-reset'),
     btnForceRetry: document.getElementById('btn-force-retry'),
+    btnCleanJd: document.getElementById('btn-clean-jd'),
     
     jobTitle: document.getElementById('job-title'),
     jobCompany: document.getElementById('job-company'),
+    jdText: document.getElementById('jd-text'),
+    jdMeta: document.getElementById('jd-meta'),
     resumeSelect: document.getElementById('resume-select'),
     errorMsg: document.getElementById('error-msg'),
     
@@ -35,6 +38,57 @@ document.addEventListener('DOMContentLoaded', async () => {
   function showState(stateEl) {
     [UI.stateLogin, UI.stateNoJob, UI.stateJob, UI.stateAnalyzing, UI.stateResults].forEach(el => el.classList.add('hidden'));
     stateEl.classList.remove('hidden');
+  }
+
+  function updateJdMeta() {
+    const text = (UI.jdText?.value || '').trim();
+    if (UI.jdMeta) {
+      UI.jdMeta.textContent = `${text.length} characters`;
+    }
+  }
+
+  function autoCleanJdText(rawText, selectedTitle = '') {
+    let cleaned = (rawText || '').trim();
+    if (!cleaned) return '';
+
+    const tailPatterns = [
+      /Get job alerts for this search[\s\S]*$/i,
+      /Are these results helpful\?[\s\S]*$/i,
+      /About Accessibility Help Center Privacy[\s\S]*$/i,
+      /LinkedIn Corporation © \d{4}[\s\S]*$/i,
+      /Reactivate Premium[\s\S]*$/i,
+      /Job search faster with Premium[\s\S]*$/i,
+      /Interested in working with us in the future\?[\s\S]*$/i,
+    ];
+
+    for (const pattern of tailPatterns) {
+      cleaned = cleaned.replace(pattern, '').trim();
+    }
+
+    const anchors = ['About the job', 'What Do We Do', 'Key Responsibilities', 'Requirements', 'Tech Stack'];
+    let anchorIndex = -1;
+    for (const anchor of anchors) {
+      const idx = cleaned.toLowerCase().indexOf(anchor.toLowerCase());
+      if (idx !== -1 && (anchorIndex === -1 || idx < anchorIndex)) {
+        anchorIndex = idx;
+      }
+    }
+    if (anchorIndex > 0) {
+      cleaned = cleaned.slice(anchorIndex).trim();
+    }
+
+    const title = (selectedTitle || '').trim();
+    if (title) {
+      const titleIdx = cleaned.toLowerCase().indexOf(title.toLowerCase());
+      if (titleIdx > 0) {
+        const before = cleaned.slice(0, titleIdx);
+        if (/99\+\s+results|promoted jobs are ranked|Viewed · Posted on|Easy Apply/i.test(before)) {
+          cleaned = cleaned.slice(titleIdx).trim();
+        }
+      }
+    }
+
+    return cleaned.replace(/\s+/g, ' ').trim();
   }
 
   // 1. Get Token from Background
@@ -61,12 +115,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       const tabId = tabs[0].id;
       
       chrome.tabs.sendMessage(tabId, { action: 'EXTRACT_JOB' }, async (response) => {
+        if (chrome.runtime.lastError) {
+          console.log("Content script not active on this tab.");
+          showState(UI.stateNoJob);
+          return;
+        }
         if (!response || !response.success) {
           showState(UI.stateNoJob);
         } else {
           jobDetails = response.data;
-          UI.jobTitle.textContent = jobDetails.jobTitle || 'Unknown Position';
-          UI.jobCompany.textContent = jobDetails.company || 'Unknown Company';
+          UI.jobTitle.value = jobDetails.jobTitle || 'Unknown Position';
+          UI.jobCompany.value = jobDetails.company || 'Unknown Company';
+          UI.jdText.value = jobDetails.jdText || '';
+          updateJdMeta();
           showState(UI.stateJob);
           await fetchResumes();
           // Pre-check if this URL was already analyzed
@@ -77,6 +138,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
     });
   }
+
+  UI.jdText?.addEventListener('input', updateJdMeta);
+  UI.btnCleanJd?.addEventListener('click', () => {
+    const source = UI.jdText?.value || '';
+    const cleaned = autoCleanJdText(source, UI.jobTitle?.value || '');
+    UI.jdText.value = cleaned;
+    updateJdMeta();
+  });
 
   async function checkPreviousAnalysis(url) {
     try {
@@ -131,6 +200,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   UI.btnAnalyze.addEventListener('click', async () => {
     const resumeId = UI.resumeSelect.value;
     if (!resumeId || !jobDetails) return;
+    const jdText = (UI.jdText.value || '').trim();
+    if (!jdText) {
+      showState(UI.stateJob);
+      UI.errorMsg.textContent = 'Could not extract job description text. Open the full job details panel and retry.';
+      UI.errorMsg.classList.remove('hidden');
+      return;
+    }
 
     showState(UI.stateAnalyzing);
     UI.errorMsg.classList.add('hidden');
@@ -144,16 +220,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         },
         body: JSON.stringify({
           resumeId,
-          jdText: jobDetails.jdText,
+          jdText,
           jdUrl: jobDetails.jdUrl,
-          jobTitle: jobDetails.jobTitle,
-          company: jobDetails.company,
+          jobTitle: UI.jobTitle.value,
+          company: UI.jobCompany.value,
           portal: jobDetails.portal
         })
       });
 
       if (!response.ok) {
-        throw new Error(await response.text());
+        let detail = `HTTP ${response.status}`;
+        try {
+          const data = await response.json();
+          detail = data?.detail || JSON.stringify(data);
+        } catch {
+          detail = await response.text();
+        }
+        throw new Error(detail || `HTTP ${response.status}`);
       }
 
       const result = await response.json();
@@ -172,8 +255,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       showState(UI.stateResults);
     } catch (e) {
+      console.error('Analyze request failed', e);
       showState(UI.stateJob);
-      UI.errorMsg.textContent = 'Analysis failed. Make sure backend is running.';
+      UI.errorMsg.textContent = `Analysis failed: ${e.message || 'Unknown error'}`;
       UI.errorMsg.classList.remove('hidden');
     }
   });
