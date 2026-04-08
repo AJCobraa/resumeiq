@@ -8,6 +8,7 @@ import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import Spinner from '../components/ui/Spinner'
 import Modal from '../components/ui/Modal'
+import InterviewPrepPanel from '../components/dashboard/InterviewPrepPanel'
 
 const STATUS_OPTIONS = [
   { value: 'analyzed', label: 'Analyzed', color: 'blue' },
@@ -293,6 +294,11 @@ export default function Dashboard() {
             onStatusChange={(status) => handleStatusChange(jobDetail.jobId, status)}
             onRecommendation={(recId, action, text) => handleRecommendation(jobDetail.jobId, recId, action, text)}
             onReanalyze={() => handleReanalyze(jobDetail)}
+            onPrepUpdate={(updates) => {
+              const updatedJob = { ...jobDetail, ...updates }
+              setJobDetail(updatedJob)
+              setJobs(prev => prev.map(j => j.jobId === updatedJob.jobId ? updatedJob : j))
+            }}
             isReanalyzing={isReanalyzing}
           />
         ) : null}
@@ -335,7 +341,7 @@ export default function Dashboard() {
 /* ──────────────────────────────────────────────────────
    Job Detail Panel (inside modal)
    ────────────────────────────────────────────────────── */
-function JobDetailPanel({ job, onStatusChange, onRecommendation, onReanalyze, isReanalyzing }) {
+function JobDetailPanel({ job, onStatusChange, onRecommendation, onReanalyze, onPrepUpdate, isReanalyzing }) {
   const showDebug = import.meta.env.DEV && job?.debug
   const [showDetails, setShowDetails] = useState(false)
 
@@ -532,6 +538,9 @@ function JobDetailPanel({ job, onStatusChange, onRecommendation, onReanalyze, is
           </div>
         </div>
       )}
+
+      {/* Interview Prep Predictor */}
+      <InterviewPrepPanel job={job} onUpdate={onPrepUpdate} />
     </div>
   )
 }

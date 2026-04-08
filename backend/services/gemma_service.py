@@ -7,6 +7,7 @@ Functions:
   - generate_recommendations: resume improvement recommendations
   - rewrite_bullet: rewrite a specific bullet for ATS optimization
   - parse_resume_from_text: parse raw PDF text into ResumeIQ JSON schema
+  - generate_interview_prep: predict interview questions based on company tier and gaps
 
 All calls intercept usage_metadata for token logging.
 Logging fires as a background thread — never blocks responses.
@@ -330,3 +331,190 @@ async def _call_model_text(prompt: str, user_id: str = "", operation: str = "") 
                 time.sleep(2)
             else:
                 raise
+
+
+def classify_company_tier(company_name: str) -> dict:
+    """
+    Classify company into an interview tier based on name.
+    Returns a dict with tier label and interview style descriptor.
+    No API call — pure string matching against known companies.
+    Falls back to 'standard' for unknown companies.
+    """
+    if not company_name:
+        return _tier_config("standard")
+
+    name = company_name.lower().strip()
+
+    # FAANG + adjacent Big Tech
+    faang_and_big_tech = {
+        "google", "alphabet", "deepmind", "meta", "facebook", "instagram",
+        "whatsapp", "amazon", "aws", "apple", "netflix", "microsoft", "msft",
+        "linkedin", "openai", "anthropic", "nvidia", "tesla", "x.com", "twitter",
+        "uber", "lyft", "airbnb", "stripe", "palantir", "salesforce", "adobe",
+        "oracle", "ibm", "intel", "qualcomm", "snap", "pinterest", "spotify",
+        "shopify", "atlassian", "datadog", "snowflake", "databricks", "coinbase",
+        "robinhood", "doordash", "instacart", "bytedance", "tiktok",
+        # Indian Big Tech
+        "google india", "microsoft india", "amazon india", "flipkart", "meesho",
+        "phonepe", "paytm", "razorpay", "groww", "zerodha", "zomato", "swiggy",
+        "ola", "nykaa", "cred", "unacademy", "byju", "freshworks", "zoho",
+    }
+
+    # Well-funded unicorns / large public tech companies
+    unicorn_tier = {
+        "twilio", "twitch", "figma", "notion", "airtable", "vercel", "supabase",
+        "hashicorp", "confluent", "elastic", "gitlab", "github", "docker",
+        "cloudflare", "fastly", "segment", "mixpanel", "amplitude", "intercom",
+        "hubspot", "zendesk", "pagerduty", "splunk", "new relic", "dynatrace",
+        "mongodb", "redis", "cockroachdb", "planetscale", "neon", "railway",
+        # Indian unicorns
+        "infosys", "wipro", "tcs", "hcl", "accenture", "capgemini", "cognizant",
+        "mphasis", "persistent", "ltimindtree", "safe security", "druva",
+        "postman", "browserstack", "chargebee", "clevertap", "lenskart",
+    }
+
+    # Check FAANG tier first (exact word match within name)
+    for company in faang_and_big_tech:
+        if company in name or name in company:
+            return _tier_config("faang")
+
+    # Check unicorn/large tier
+    for company in unicorn_tier:
+        if company in name or name in company:
+            return _tier_config("unicorn")
+
+    # Default: standard tier
+    return _tier_config("standard")
+
+
+def _tier_config(tier: str) -> dict:
+    """Returns interview style config for a given tier."""
+    configs = {
+        "faang": {
+            "tier":           "faang",
+            "label":          "FAANG / Big Tech",
+            "depthLevel":     "expert",
+            "styleGuide":     (
+                "This is a FAANG-level interview. Questions must reflect the bar "
+                "Google, Meta, Amazon, or Microsoft actually set. Specifically:\n"
+                "- Questions probe DEPTH, not just familiarity. 'Have you used X?' "
+                "is never the question. 'Design X at 10M users' or 'what breaks first "
+                "in X under load?' is the question.\n"
+                "- Include a realistic follow-up sub-question inside the question "
+                "itself that a good interviewer would pivot to after the first answer.\n"
+                "- For Amazon: frame at least one question around an LP (Leadership "
+                "Principle) like 'Tell me about a time you disagreed with your team "
+                "on a technical decision and pushed back with data.'\n"
+                "- For system design gaps: the question must include a scale or "
+                "constraint e.g. '...that handles 500k requests/second with p99 "
+                "latency under 50ms.'\n"
+                "- Strategic answers must acknowledge the gap honestly but pivot "
+                "to demonstrable depth in adjacent systems."
+            ),
+            "difficultyBias": "hard",
+        },
+        "unicorn": {
+            "tier":           "unicorn",
+            "label":          "Unicorn / Large Tech",
+            "depthLevel":     "senior",
+            "styleGuide":     (
+                "This is a well-funded tech company or large enterprise tech interview. "
+                "Questions should reflect a senior bar without being purely theoretical:\n"
+                "- Questions focus on real delivery experience, not just knowledge. "
+                "'Tell me about a production incident you owned end to end' style.\n"
+                "- Include one question that tests cross-functional awareness: "
+                "how the candidate communicated a technical decision to non-engineers.\n"
+                "- Avoid purely academic or algorithm-focused questions unless the "
+                "role is clearly algorithm-heavy.\n"
+                "- Strategic answers should show ownership and business impact, "
+                "not just technical correctness."
+            ),
+            "difficultyBias": "medium",
+        },
+        "standard": {
+            "tier":           "standard",
+            "label":          "Tech Company",
+            "depthLevel":     "mid",
+            "styleGuide":     (
+                "This is a standard tech company interview (startup to mid-size). "
+                "Questions should be practical and direct:\n"
+                "- Focus on whether the candidate can actually do the job, not "
+                "theoretical edge cases.\n"
+                "- Questions test problem-solving approach and hands-on experience "
+                "more than scale or system design depth.\n"
+                "- Include one question about how the candidate learns new technologies "
+                "quickly (relevant since they have a gap).\n"
+                "- Strategic answers should emphasize speed of learning and "
+                "transferable practical skills."
+            ),
+            "difficultyBias": "medium",
+        },
+    }
+    return configs.get(tier, configs["standard"])
+
+
+async def generate_interview_prep(
+    missing_keywords: list[str],
+    resume_summary:   str,
+    job_title:        str,
+    company:          str,
+    company_tier:     dict = None,
+    user_id:          str = "",
+) -> list[dict]:
+    """
+    Predict likely interview questions based on resume gaps and company tier.
+    Returns list of { gap, question, strategicAnswer, difficulty, companyTier, companyLabel }
+    """
+    if company_tier is None:
+        company_tier = classify_company_tier(company)
+
+    # Convert missing keywords to a list of gaps
+    gaps = missing_keywords[:3]  # Focus on top 3 gaps
+    if not gaps:
+        gaps = ["General technical proficiency and role alignment"]
+
+    gaps_formatted = "\n".join([f"- {gap}" for gap in gaps])
+
+    prompt = f"""You are a senior technical interviewer and career coach specializing in {company_tier['label']} interviews.
+
+INTERVIEW CONTEXT:
+  Company: {company}
+  Company tier: {company_tier['label']}
+  Role: {job_title}
+  Interview depth level: {company_tier['depthLevel']}
+
+INTERVIEW STYLE INSTRUCTIONS:
+{company_tier['styleGuide']}
+
+CANDIDATE BACKGROUND (from their resume):
+{resume_summary}
+
+RESUME GAPS TO PROBE:
+{gaps_formatted}
+
+For each gap listed above, generate one interview question and one coached strategic answer.
+
+CRITICAL RULES FOR ALL QUESTIONS:
+- Questions must sound EXACTLY like what a real interviewer at {company} would ask — not generic, not textbook, specific to this company's known engineering culture and scale
+- Questions must expose the specific gap without being obviously confrontational ("I see you don't have X" is never how interviewers phrase it)
+- Strategic answers MUST use the candidate's actual resume experience — never suggest experience they did not demonstrate
+
+Return ONLY valid JSON — an array of exactly {len(gaps)} objects.
+No markdown, no explanation, raw JSON only.
+
+[
+  {{
+    "gap": "the exact gap skill or requirement",
+    "question": "The interviewer's question, written exactly as they would say it in the actual interview. For {company_tier['label']} interviews this should be {company_tier['depthLevel']}-level. Include a follow-up sub-question if appropriate for this tier.",
+    "strategicAnswer": "A 3-4 sentence coached answer. Must:
+                        1. Open with honesty about the gap without being defensive
+                        2. Pivot immediately to the closest relevant experience from the candidate's actual resume
+                        3. Show genuine enthusiasm to close the gap
+                        4. Sound natural for a {company_tier['label']} interview bar",
+    "difficulty": "{company_tier['difficultyBias']} — adjust per gap severity",
+    "companyTier": "{company_tier['tier']}",
+    "companyLabel": "{company_tier['label']}"
+  }}
+]"""
+
+    return await _call_model_json(prompt, user_id=user_id, operation="generate_interview_prep")

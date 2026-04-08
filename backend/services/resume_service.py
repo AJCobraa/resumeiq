@@ -1,6 +1,7 @@
 """
 Resume Firestore service — all database operations for resumes.
 Handles CRUD, section management, and data serialization for Firestore.
+Used by AI services for context generation.
 """
 import uuid
 from datetime import datetime, timezone
@@ -329,3 +330,25 @@ async def delete_resume(uid: str, resume_id: str) -> bool:
 
     ref.delete()
     return True
+
+
+def summarize_resume(data: dict) -> str:
+    """
+    Summarize resume data into a compact text format for AI context.
+    Focuses on role, summary, and experience highlights.
+    """
+    meta = data.get("meta", {})
+    summary = [
+        f"Name: {meta.get('name')}",
+        f"Title: {meta.get('title')}",
+        f"Summary: {meta.get('summary')}",
+        "\nExperience:",
+    ]
+
+    for sec in data.get("sections", []):
+        if sec.get("type") == "experience":
+            summary.append(f"- {sec.get('role')} at {sec.get('company')}")
+            for b in sec.get("bullets", [])[:2]:  # Top 2 bullets only
+                summary.append(f"  * {b.get('text')}")
+
+    return "\n".join(summary)
