@@ -16,6 +16,7 @@ class AnalyzeRequest(BaseModel):
     jobTitle: str = ""
     company: str = ""
     portal: str = "other"
+    jobId: str | None = None
 
 
 @router.post("/analyze")
@@ -31,6 +32,7 @@ async def analyze(body: AnalyzeRequest, uid: str = Depends(verify_token)):
             job_title=body.jobTitle,
             company=body.company,
             portal=body.portal,
+            job_id=body.jobId,
         )
         return result
     except ValueError as e:

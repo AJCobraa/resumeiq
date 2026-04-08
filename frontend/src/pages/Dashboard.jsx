@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [selectedJob, setSelectedJob] = useState(null)
   const [jobDetail, setJobDetail] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [isReanalyzing, setIsReanalyzing] = useState(false)
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -88,6 +89,30 @@ export default function Dashboard() {
       )
     } catch {
       toast.error('Failed to update recommendation')
+    }
+  }
+
+  const handleReanalyze = async (job) => {
+    try {
+      setIsReanalyzing(true)
+      const result = await api.analyze({
+        resumeId: job.resumeId,
+        jdText: job.jdText,
+        jdUrl: job.jdUrl,
+        jobTitle: job.jobTitle,
+        company: job.company,
+        portal: job.portal,
+        jobId: job.jobId
+      })
+      toast.success('Resume re-analyzed successfully!')
+      // Refresh the modal detail
+      setJobDetail(result)
+      // Also update the job in the main table list for sync
+      setJobs(prev => prev.map(j => j.jobId === result.jobId ? result : j))
+    } catch (e) {
+      toast.error('Analysis failed: ' + e.message)
+    } finally {
+      setIsReanalyzing(false)
     }
   }
 
@@ -267,6 +292,8 @@ export default function Dashboard() {
             job={jobDetail}
             onStatusChange={(status) => handleStatusChange(jobDetail.jobId, status)}
             onRecommendation={(recId, action, text) => handleRecommendation(jobDetail.jobId, recId, action, text)}
+            onReanalyze={() => handleReanalyze(jobDetail)}
+            isReanalyzing={isReanalyzing}
           />
         ) : null}
       </Modal>
@@ -308,7 +335,9 @@ export default function Dashboard() {
 /* ──────────────────────────────────────────────────────
    Job Detail Panel (inside modal)
    ────────────────────────────────────────────────────── */
-function JobDetailPanel({ job, onStatusChange, onRecommendation }) {
+function JobDetailPanel({ job, onStatusChange, onRecommendation, onReanalyze, isReanalyzing }) {
+  const showDebug = import.meta.env.DEV && job?.debug
+
   return (
     <div className="space-y-6 max-h-[70vh] overflow-y-auto">
       {/* Header info */}
@@ -321,15 +350,33 @@ function JobDetailPanel({ job, onStatusChange, onRecommendation }) {
             </a>
           )}
         </div>
-        <select
-          value={job.status}
-          onChange={(e) => onStatusChange(e.target.value)}
-          className="px-3 py-1.5 text-xs bg-bg-elevated border border-border-default rounded text-text-primary cursor-pointer"
-        >
-          {STATUS_OPTIONS.map(s => (
-            <option key={s.value} value={s.value}>{s.label}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-3">
+          <Button 
+            onClick={onReanalyze} 
+            disabled={isReanalyzing}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2 border-accent-blue text-accent-blue hover:bg-accent-blue/10"
+          >
+            {isReanalyzing ? <Spinner size="sm" /> : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Re-Analyze
+              </>
+            )}
+          </Button>
+          <select
+            value={job.status}
+            onChange={(e) => onStatusChange(e.target.value)}
+            className="px-3 py-1.5 text-xs bg-bg-elevated border border-border-default rounded text-text-primary cursor-pointer"
+          >
+            {STATUS_OPTIONS.map(s => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Score Cards */}
@@ -343,10 +390,36 @@ function JobDetailPanel({ job, onStatusChange, onRecommendation }) {
         <Card>
           <p className="text-xs text-text-muted mb-1">Semantic Match</p>
           <p className={`text-3xl font-bold font-mono ${getScoreColor(job.semanticScore)}`}>
-            {job.semanticScore}%
+            {job.semanticScore || 0}%
           </p>
         </Card>
       </div>
+
+      {/* Dev-only cache diagnostics */}
+      {showDebug && (
+        <Card>
+          <p className="text-xs font-semibold text-text-muted uppercase mb-2">Debug Cache Diagnostics</p>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+            <span className="text-text-muted">Cache Source</span>
+            <span className="font-mono">{job.debug.cacheLookupSource || 'none'}</span>
+
+            <span className="text-text-muted">Resolved Job ID</span>
+            <span className="font-mono break-all">{job.debug.resolvedJobId || job.jobId}</span>
+
+            <span className="text-text-muted">Matched Existing</span>
+            <span className="font-mono">{String(!!job.debug.matchedExistingJob)}</span>
+
+            <span className="text-text-muted">Has JD Cache</span>
+            <span className="font-mono">{String(!!job.debug.hasJdEmbeddingsCache)}</span>
+
+            <span className="text-text-muted">JD Embedding Computed</span>
+            <span className="font-mono">{String(!!job.debug.jdEmbeddingComputed)}</span>
+
+            <span className="text-text-muted">Resume Embeddings On-Demand</span>
+            <span className="font-mono">{String(!!job.debug.resumeEmbeddingsComputedOnDemand)}</span>
+          </div>
+        </Card>
+      )}
 
       {/* Breakdown */}
       {job.breakdown && (

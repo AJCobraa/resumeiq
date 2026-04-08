@@ -26,80 +26,84 @@
 
 ---
 
-## Getting Started Locally
+## Getting Started
 
 ### Prerequisites
-- Node.js (v20+)
-- Python (v3.11+)
-- Firebase Project with Firestore and Google Authentication enabled
-- Google AI Studio API Key (`GOOGLE_AI_STUDIO_API_KEY`)
+- **Node.js**: v20+ 
+- **Python**: v3.11+ (with `venv` support)
+- **Docker**: Optional (for containerized deployment)
+- **Firebase**: Project with Firestore & Google Auth enabled
+- **Google AI Studio**: API Key for Gemma & Embeddings
 
-### Method 1: Local Development (Hot-Reload)
+---
 
-**1. Clone & Set up Backend**
+### Quick Start (Local Development)
+
+The easiest way to get everything running is using the root-level orchestration scripts.
+
+1. **Clone the repository** (if you haven't already).
+2. **Install all dependencies**:
+   ```bash
+   # Installs root, frontend, and backend script dependencies
+   npm install && npm run install:all
+   ```
+3. **Setup Environment Variables**:
+   - Create `backend/.env` (see `backend/.env.example`)
+   - Create `frontend/.env.local` (see `frontend/.env.example`)
+4. **Run the full stack**:
+   ```bash
+   npm run dev
+   ```
+   - Frontend starts at: `http://localhost:5173`
+   - Backend starts at: `http://localhost:8000`
+
+---
+
+### Method 2: Docker Compose (Stateless Mode)
+
+If you prefer Docker, you can spin up the entire stack with a single command. 
+
+```bash
+# Ensure .env files are created as per Step 3 above
+npm run docker:up
+```
+
+---
+
+### Individual Service Setup
+
+If you need to run services separately for debugging:
+
+#### Backend
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+.\venv\Scripts\activate  # Windows
+source venv/bin/activate  # macOS/Linux
 pip install -r requirements.txt
-
-# Install Node dependencies needed for Puppeteer PDF generator
-cd scripts && npm install && cd ..
+uvicorn main:app --reload
 ```
 
-**2. Setup Backend Environment Variables**
-Create `backend/.env`:
-```ini
-GOOGLE_AI_STUDIO_API_KEY=your_key_here
-FIREBASE_SERVICE_ACCOUNT={"type": "service_account"...} # Your Firebase Service Account JSON string
-FRONTEND_URL=http://localhost:5173
-```
-
-**3. Run Backend**
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-**4. Set up Frontend**
+#### Frontend
 ```bash
 cd frontend
 npm install
-```
-
-**5. Setup Frontend Environment Variables**
-Create `frontend/.env.local`:
-```ini
-VITE_BACKEND_URL=http://localhost:8000
-VITE_FIREBASE_API_KEY=your_public_firebase_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project
-```
-
-**6. Run Frontend**
-```bash
 npm run dev
 ```
-
-### Method 2: Docker Compose (Full Stack)
-
-```bash
-# Needs .env files mapped as mentioned above
-docker-compose up --build
-```
-> Note: The frontend mounts to `http://localhost:5173` while back-end spins up heavily-cached Python logic at `:8000`.
 
 ---
 
 ## Using the Chrome Extension
 
-1. Go to `chrome://extensions/`
-2. Enable **Developer mode** in the top right.
-3. Click **Load unpacked** and select the `/extension` directory in the repository.
-4. Log in using the Web App at `localhost:5173`. The authentication token automatically syncs to your extension logic!
-5. Surf to a supported Job Portal and hit your Extension Icon.
+1. **Load the extension**:
+   - Open `chrome://extensions/`
+   - Enable **Developer mode**.
+   - Click **Load unpacked** and select the `/extension` folder.
+2. **Sync Auth**: Log in to the Web App at `localhost:5173`. The extension will automatically pick up your safe session token.
+3. **Analyze**: Navigate to a job listing (LinkedIn, Indeed, etc.) and click the extension icon to start the analysis.
 
 ---
 
 ## Architecture & Code Spec
 
-Read the detailed overview of our NoSQL modeling, component choices, and infrastructure reasons inside [`docs/ARCHITECTURE_AND_RATIONALE.md`](./docs/ARCHITECTURE_AND_RATIONALE.md).
+For a deep dive into the reasoning behind our NoSQL modeling, AI pipeline, and Puppeteer PDF generation, see [ARCHITECTURE_AND_RATIONALE.md](./docs/ARCHITECTURE_AND_RATIONALE.md).
