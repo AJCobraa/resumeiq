@@ -289,6 +289,7 @@ async def analyze_resume_vs_jd(
 
     created_at = (existing_job or {}).get("createdAt") or _now()
     status = (existing_job or {}).get("status", "analyzed")
+    initial_ats_score = (existing_job or {}).get("initialAtsScore", ats_score)
 
     job_doc = {
         "jobId": final_job_id,
@@ -303,6 +304,7 @@ async def analyze_resume_vs_jd(
         "jdEmbeddingsCache": jd_embeddings_cache,
         "isCacheHit": is_jd_cache_hit,
         "atsScore": ats_score,
+        "initialAtsScore": initial_ats_score,
         "semanticScore": semantic_score,
         "semanticDetails": semanticDetails,
         "breakdown": breakdown,

@@ -37,6 +37,7 @@ async function request(path, method = 'GET', body = null) {
 export const api = {
   // ── Auth ──────────────────────────────────────────
   getMe: () => request('/api/me'),
+  getMyStats: () => request('/api/me/stats'),
 
   // ── Resumes ───────────────────────────────────────
   getResumes:     ()           => request('/api/resumes'),
