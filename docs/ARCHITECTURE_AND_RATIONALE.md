@@ -440,3 +440,20 @@ ResumeIQ is a 3-part SaaS application:
 - **Frontend UI (`InterviewPrepPanel.jsx`):** A dedicated panel in the job details modal that displays questions with difficulty badges and expandable coached answers.
 
 **Why rule-based tiering?** FAANG and Unicorn bars are distinct and relatively stable. Using a local lookup instead of an LLM call for classification reduces latency and cost while maintaining high accuracy for known top-tier targets.
+
+---
+
+## Section 26 — Personal Usage & ROI Stats
+
+**Problem:** Users wanted to see the value ResumeIQ brings (ROI) and monitor their own AI usage/telemetry without needing access to global admin dashboards.
+
+**Decision:** Implement a strictly user-scoped stats engine that calculates ATS score improvements and tracks AI model performance metrics.
+
+**Implementation:**
+- **ROI Tracking:** Added `initialAtsScore` to the job document. This captures the very first score generated for a job-resume pair. Subsequent re-analyses update `atsScore` but preserve `initialAtsScore`, allowing the system to calculate `avgAtsImprovement`.
+- **User-Scoped Aggregation:** The `GET /api/me/stats` endpoint performs real-time aggregation of a user's jobs and model logs.
+- **Telemetry Breakdown:** Captures tokens, calls, and latency per model and operation type (e.g., `analyze_resume`, `rewrite_bullet`).
+- **Index Optimization:** Added a composite index on `modelLogs` (`userId` ASC, `timestamp` DESC) to allow efficient retrieval of a user's recent AI activity.
+- **Frontend Dashboard:** `PersonalStats.jsx` provides a premium visualization of these metrics using the existing design system tokens (metric cards, progress bars for cache efficiency, and detailed data tables).
+
+**Why Real-time Aggregation?** At the current individual user scale (dozens of jobs, hundreds of logs), real-time aggregation is extremely fast in Firestore and avoids the complexity of pre-computing and syncing aggregate documents.
