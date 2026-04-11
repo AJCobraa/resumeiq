@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ResumeProvider } from './context/ResumeContext'
 import { ToastProvider } from './components/ui/Toast'
@@ -20,6 +20,8 @@ export default function App() {
             <Routes>
               {/* Public */}
               <Route path="/" element={<Landing />} />
+              <Route path="/features" element={<Navigate to="/" replace />} />
+              <Route path="/pricing" element={<Navigate to="/" replace />} />
 
               {/* Authenticated — wrapped in sidebar layout */}
               <Route element={<AppLayout />}>
