@@ -109,6 +109,7 @@ class ResumeMeta(BaseModel):
 
 class CreateResumeRequest(BaseModel):
     title: str
+    templateId: Optional[str] = None
 
 
 class UpdateMetaRequest(BaseModel):

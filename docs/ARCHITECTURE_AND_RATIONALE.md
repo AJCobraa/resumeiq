@@ -117,6 +117,8 @@ ResumeIQ is a 3-part SaaS application:
 
 ## 5. Frontend Architecture
 
+*For detailed component maps and library info, see:* [FRONTEND_README.md](file:///c:/Users/1403/Applications/Projects/resumeiq/docs/FRONTEND_README.md)
+
 ### State Management
 - **AuthContext**: Firebase auth state + user profile
 - **ResumeContext**: Current resume being edited
@@ -144,6 +146,7 @@ ResumeIQ is a 3-part SaaS application:
 | File | Purpose |
 |------|---------|
 | `AGENTS.md` | Persistent agent rules |
+| `docs/FRONTEND_README.md` | Detailed frontend spec & library info |
 | `firebase.json` | Firebase CLI config |
 | `firestore.rules` | Security rules |
 | `firestore.indexes.json` | Composite indexes |
@@ -457,3 +460,41 @@ ResumeIQ is a 3-part SaaS application:
 - **Frontend Dashboard:** `PersonalStats.jsx` provides a premium visualization of these metrics using the existing design system tokens (metric cards, progress bars for cache efficiency, and detailed data tables).
 
 **Why Real-time Aggregation?** At the current individual user scale (dozens of jobs, hundreds of logs), real-time aggregation is extremely fast in Firestore and avoids the complexity of pre-computing and syncing aggregate documents.
+
+---
+
+## Section 27 — Dynamic Resume Template Selection
+
+**Background:** Previously, all resumes were locked to the `cobra` template (SaaS default). As the product matures, users requested visual variety and specialized layouts (e.g., modern vs. corporate).
+
+**Decision:** Implement a late-binding template architecture where the `templateId` is selected at creation/import time and persisted in the document.
+
+**Implementation:**
+- **Backend:** `resume_service.py` functions updated to accept `template_id`. `CreateResumeRequest` model updated with an optional `templateId` field.
+- **Frontend Dashboard:** `MyResumes.jsx` now uses a 2-step wizard.
+  - Step 1: Input Title (for New) or Select File (for Import).
+  - Step 2: visual selection of template ('Cobra' or 'Executive Blue').
+- **Editor Integration:** `ResumeEditor.jsx` dynamically imports and mounts the template component based on the `templateId` stored in the resume document.
+- **Import Flow:** The `import-pdf` endpoint now explicitly accepts a `templateId` form field so the logic is applied immediately upon first population.
+
+**Rationale for Client-Side Component Mapping:** Using a simple conditional map in `ResumeEditor.jsx` keeps the logic transparent and avoids complex higher-order component patterns while still being easily extensible as more templates are added.
+
+---
+
+## Section 28 — Late-Binding Template Registry & Auto-Discovery
+
+**Problem:** Adding a new resume template required manual updates in three separate locations: (1) direct imports in `ResumeEditor.jsx`, (2) hardcoded modal cards in `MyResumes.jsx`, and (3) conditional rendering logic. This was brittle and discouraged template variety.
+
+**Decision:** Implement a **Filename Auto-Discovery** pattern using Vite's `import.meta.glob`.
+
+**Implementation:**
+- **Metadata Export:** Every template component in `src/components/templates/` must now export a `templateMeta` object `{ id, name, description }`.
+- **Dynamic Registry (`templateRegistry.js`):**
+    - Uses `import.meta.glob` to eagerly load all `templateMeta` exports in the folder.
+    - Uses `import.meta.glob` to lazily load the default component exports.
+    - Automatically maps the template's preview image to `/resume-images/{FileName}.png`.
+- **Consumption:**
+    - `MyResumes.jsx` maps over `TEMPLATE_OPTIONS` to build the selection UI.
+    - `ResumeEditor.jsx` uses `TEMPLATE_REGISTRY[resume.templateId].component` inside a `<Suspense>` boundary.
+
+**Why Vite Glob Import?** It removes the need for a manually maintained mapping file while keeping the codebase clean. The transition to lazy loading (via `React.lazy`) also improves initial bundle size by only loading the template code when it is actually needed for rendering.

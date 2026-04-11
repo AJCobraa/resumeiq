@@ -11,7 +11,7 @@ import os
 import uuid
 import asyncio
 import tempfile
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
 from firebase_admin_init import verify_token
 from models.resume_model import (
@@ -54,7 +54,7 @@ async def get_resume(resume_id: str, uid: str = Depends(verify_token)):
 @router.post("/resumes", status_code=201)
 async def create_resume(body: CreateResumeRequest, uid: str = Depends(verify_token)):
     """Create a new blank resume."""
-    return await resume_service.create_resume(uid, body.title)
+    return await resume_service.create_resume(uid, body.title, body.templateId or "cobra")
 
 
 @router.patch("/resumes/{resume_id}/meta")
@@ -155,6 +155,7 @@ async def export_pdf(resume_id: str, body: ExportPDFRequest, uid: str = Depends(
 async def import_pdf(
     bg: BackgroundTasks,
     file: UploadFile = File(...),
+    templateId: str = Form("cobra"),
     uid: str = Depends(verify_token),
 ):
     """
@@ -214,7 +215,7 @@ async def import_pdf(
             raise HTTPException(status_code=422, detail="AI failed to parse resume structure from PDF text")
 
         # Save to Firestore
-        resume = await resume_service.create_resume_from_parsed(uid, parsed, title=title)
+        resume = await resume_service.create_resume_from_parsed(uid, parsed, title=title, template_id=templateId)
 
         # Trigger embedding cache in background
         bg.add_task(_refresh_embeddings, uid, resume["resumeId"], resume)

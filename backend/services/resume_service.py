@@ -13,14 +13,14 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def _make_blank_resume(uid: str, title: str) -> dict:
+def _make_blank_resume(uid: str, title: str, template_id: str = "cobra") -> dict:
     """Generate a blank resume document with default sections."""
     resume_id = str(uuid.uuid4())
     return resume_id, {
         "resumeId": resume_id,
         "userId": uid,
         "resumeTitle": title,
-        "templateId": "cobra",
+        "templateId": template_id,
         "meta": ResumeMeta().model_dump(),
         "sections": [
             {
@@ -92,14 +92,14 @@ def _resume_ref(uid: str, resume_id: str):
     return db.collection("users").document(uid).collection("resumes").document(resume_id)
 
 
-async def create_resume(uid: str, title: str) -> dict:
+async def create_resume(uid: str, title: str, template_id: str = "cobra") -> dict:
     """Create a new blank resume for the user."""
-    resume_id, data = _make_blank_resume(uid, title)
+    resume_id, data = _make_blank_resume(uid, title, template_id)
     _resume_ref(uid, resume_id).set(data)
     return data
 
 
-async def create_resume_from_parsed(uid: str, parsed: dict, title: str = "Imported Resume") -> dict:
+async def create_resume_from_parsed(uid: str, parsed: dict, title: str = "Imported Resume", template_id: str = "cobra") -> dict:
     """
     Create a resume populated from Gemma-parsed PDF data.
     `parsed` must contain `meta` and `sections` keys matching the schema.
@@ -191,7 +191,7 @@ async def create_resume_from_parsed(uid: str, parsed: dict, title: str = "Import
         "resumeId": resume_id,
         "userId": uid,
         "resumeTitle": title,
-        "templateId": "cobra",
+        "templateId": template_id,
         "meta": meta,
         "sections": sections,
         "createdAt": _now(),
