@@ -15,7 +15,7 @@ class RecentCallStat(BaseModel):
     model: str
     inputTokens: int
     outputTokens: int
-    latencyMs: int
+    latencyMs: float
     timestamp: Optional[datetime]
 
 class UserStatsResponse(BaseModel):

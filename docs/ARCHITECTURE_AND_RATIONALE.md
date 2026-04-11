@@ -132,9 +132,10 @@ ResumeIQ is a 3-part SaaS application:
 - `/settings` — Account settings
 
 ### Design System
-- Background: `#0A0A0F`, Cards: `#13131A`, Accent: `#4F8EF7`
-- Font UI: DM Sans, Font Mono: JetBrains Mono
-- All interactive elements: 200ms ease transitions
+- **Public landing (`Landing.jsx`):** Light marketing shell using CSS variables in `src/index.css` (`--background`, `--primary`, `--brand`, `shadow-soft` / `shadow-glow`) plus `tailwind.config.js` extensions (`bg-card`, `text-muted-foreground`, etc.). Sticky nav uses backdrop blur; layout is full width (no `#root` max-width).
+- **Authenticated app (dashboard, editor, modals):** Still uses legacy Tailwind tokens from the same `index.css` `@theme` block (`bg-bg-primary`, `text-accent-blue`, `border-border-default`, …) so existing screens keep their dark panels and accents without a sweeping component rewrite.
+- Font UI: DM Sans, Font Mono: JetBrains Mono (loaded in `index.html`).
+- Tailwind v4 loads the JS theme via `@config '../tailwind.config.js'` in `index.css`; `tailwindcss-animate` supplies shadcn-style animation utilities used by the extended theme.
 
 ---
 
@@ -174,9 +175,11 @@ ResumeIQ is a 3-part SaaS application:
 ### Frontend (`/frontend`)
 | File | Purpose |
 |------|---------|
+| `tailwind.config.js` | Tailwind theme extensions (semantic colors, shadows, keyframes) + `tailwindcss-animate` |
 | `src/App.jsx` | Root component with routing |
 | `src/main.jsx` | DOM entry point |
-| `src/index.css` | Tailwind + design system |
+| `src/App.css` | Intentionally empty placeholder; layout is Tailwind-only (avoids legacy `#root` centering) |
+| `src/index.css` | Tailwind v4 entry (`@import` + `@config`), landing HSL tokens, legacy `@theme` for in-app screens |
 | `src/lib/firebase.js` | Firebase SDK init (auth only) |
 | `src/lib/api.js` | Central API client (12 resume endpoints) |
 | `src/lib/utils.js` | Utility functions (debounce, formatDate, etc.) |
@@ -188,7 +191,7 @@ ResumeIQ is a 3-part SaaS application:
 | `src/components/editor/MetaEditor.jsx` | Personal info form fields |
 | `src/components/editor/SectionEditor.jsx` | All section type editors (exp/edu/skills/projects) |
 | `src/components/templates/CobraTemplate.jsx` | ATS-safe resume template (Arial, inline styles) |
-| `src/pages/Landing.jsx` | Landing page with ATS ring |
+| `src/pages/Landing.jsx` | Public marketing landing (hero, bento feature cards, Framer Motion demos; Google sign-in preserved) |
 | `src/pages/Dashboard.jsx` | Job dashboard with detailed analysis and prep |
 | `src/components/dashboard/InterviewPrepPanel.jsx` | Interview question & coached answer predictor |
 | `src/pages/MyResumes.jsx` | Resume list with CRUD modals |
@@ -498,3 +501,22 @@ ResumeIQ is a 3-part SaaS application:
     - `ResumeEditor.jsx` uses `TEMPLATE_REGISTRY[resume.templateId].component` inside a `<Suspense>` boundary.
 
 **Why Vite Glob Import?** It removes the need for a manually maintained mapping file while keeping the codebase clean. The transition to lazy loading (via `React.lazy`) also improves initial bundle size by only loading the template code when it is actually needed for rendering.
+
+---
+
+## Section 29 — Premium UI Overhaul & Tailwind v4 Transition
+
+**Problem:** The initial landing page was a basic placeholder. To feel like a high-end SaaS, the product required a "wow" factor, premium aesthetics, and fluid interactivity.
+
+**Decision:** Overhaul the public marketing shell using a "Zinc + Indigo" design system, a Bento Grid feature layout, and Framer Motion for high-fidelity animations. Simultaneously transitioned to Tailwind v4’s CSS-first architecture.
+
+**Implementation:**
+- **Tailwind v4 (CSS-First):** Moved theme definitions (colors, shadows, keepframes) from `tailwind.config.js` into the `src/index.css` `@theme` block. This ensures all custom variables are first-class CSS citizens and allows for cleaner integration with Vite.
+- **Layout Normalization:** Wiped `App.css` to remove the default `1280px` centered `#root` constraint, allowing the landing page to use full-width sections and sticky headers correctly.
+- **Bento Grid Layout:** Implemented a modern 3-column bento grid for features:
+    - **Semantic Matching Card:** Loops between "Competitor" (keyword matching) and "ResumeIQ" (semantic match) states.
+    - **Auto-Approve Card:** A multi-phase animation showing a bullet being suggested, approved, and instantly updated.
+    - **Interview Predictor Card:** A complex interactive demo showing tier selection, a loading sequence, and a reveal of predicted questions/coached answers.
+- **Animation Strategy:** Used `framer-motion` with generic "spring" and "gentleSpring" presets for all transitions to ensure consistent, physics-based movement rather than linear easing.
+
+**Why this works:** The high-fidelity animations on the landing page serve as an immediate demonstration of value (showing *how* the AI works) rather than just telling the user. The move to a light, Zinc-based aesthetic feels cleaner and more modern for career-focused software.
