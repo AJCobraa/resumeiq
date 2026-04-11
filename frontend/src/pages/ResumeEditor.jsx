@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useToast } from '../components/ui/Toast'
@@ -7,7 +7,7 @@ import Spinner from '../components/ui/Spinner'
 import Button from '../components/ui/Button'
 import MetaEditor from '../components/editor/MetaEditor'
 import SectionEditor from '../components/editor/SectionEditor'
-import CobraTemplate from '../components/templates/CobraTemplate'
+import { TEMPLATE_REGISTRY } from '../lib/templateRegistry'
 
 export default function ResumeEditor() {
   const { resumeId } = useParams()
@@ -203,7 +203,17 @@ export default function ResumeEditor() {
               transformOrigin: 'top center',
             }}
           >
-            <CobraTemplate resume={resume} />
+            <Suspense fallback={
+              <div className="flex items-center justify-center h-full">
+                <Spinner size="md" />
+                <span className="ml-3 text-sm text-text-muted">Loading template...</span>
+              </div>
+            }>
+              {(() => {
+                const SelectedTemplate = TEMPLATE_REGISTRY[resume.templateId]?.component || TEMPLATE_REGISTRY['cobra']?.component;
+                return SelectedTemplate ? <SelectedTemplate resume={resume} /> : null;
+              })()}
+            </Suspense>
           </div>
         </div>
       </div>

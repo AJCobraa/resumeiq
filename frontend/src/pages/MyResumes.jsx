@@ -8,6 +8,7 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Spinner from '../components/ui/Spinner'
 import Modal from '../components/ui/Modal'
+import { TEMPLATE_OPTIONS } from '../lib/templateRegistry'
 
 export default function MyResumes() {
   const navigate = useNavigate()
@@ -20,6 +21,9 @@ export default function MyResumes() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [pendingImportFile, setPendingImportFile] = useState(null)
+  const [selectionSource, setSelectionSource] = useState(null) // 'create' or 'import'
 
   const fetchResumes = useCallback(async () => {
     try {
@@ -37,13 +41,22 @@ export default function MyResumes() {
     fetchResumes()
   }, [fetchResumes])
 
-  const handleCreate = async () => {
+  const handleCreatePrompt = () => {
     if (!newTitle.trim()) return
+    setSelectionSource('create')
+    setShowCreate(false)
+    setShowTemplateModal(true)
+  }
+
+  const handleCreateFinal = async (templateId) => {
     try {
       setCreating(true)
-      const resume = await api.createResume({ title: newTitle.trim() })
+      const resume = await api.createResume({ 
+        title: newTitle.trim(),
+        templateId 
+      })
       toast.success('Resume created!')
-      setShowCreate(false)
+      setShowTemplateModal(false)
       setNewTitle('')
       navigate(`/resumes/${resume.resumeId}`)
     } catch (err) {
@@ -75,19 +88,27 @@ export default function MyResumes() {
       toast.error('Please select a PDF file')
       return
     }
+    setPendingImportFile(file)
+    setSelectionSource('import')
+    setShowTemplateModal(true)
+  }
+
+  const handleImportFinal = async (templateId) => {
+    if (!pendingImportFile) return
     try {
       setImporting(true)
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('file', pendingImportFile)
+      formData.append('templateId', templateId)
       const resume = await api.importPDF(formData)
       toast.success('Resume imported! Redirecting to editor...')
+      setShowTemplateModal(false)
+      setPendingImportFile(null)
       navigate(`/resumes/${resume.resumeId}`)
     } catch (err) {
-      toast.error('PDF import failed. Make sure the PDF has selectable text (not a scanned image).')
+      toast.error('PDF import failed. Make sure the PDF has selectable text.')
     } finally {
       setImporting(false)
-      // Reset input so the same file can be re-selected
-      e.target.value = ''
     }
   }
 
@@ -232,10 +253,50 @@ export default function MyResumes() {
           </div>
           <div className="flex justify-end gap-3">
             <Button variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button onClick={handleCreate} loading={creating} disabled={!newTitle.trim()}>
-              Create Resume
+            <Button onClick={handleCreatePrompt} loading={creating} disabled={!newTitle.trim()}>
+              Next: Choose Template
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Template Selection Modal */}
+      <Modal 
+        isOpen={showTemplateModal} 
+        onClose={() => setShowTemplateModal(false)} 
+        title="Choose a Template" 
+        size="md"
+      >
+        <div className="grid grid-cols-2 gap-6 py-2">
+          {TEMPLATE_OPTIONS.map(template => (
+            <div 
+              key={template.id}
+              onClick={() => selectionSource === 'create' ? handleCreateFinal(template.id) : handleImportFinal(template.id)}
+              className="group cursor-pointer space-y-3"
+            >
+              <div className="aspect-[3/4] rounded-lg border-2 border-border-default group-hover:border-accent-blue bg-white overflow-hidden transition-all duration-200 shadow-sm group-hover:shadow-md relative">
+                <img 
+                  src={template.image} 
+                  alt={template.name}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-accent-blue/0 group-hover:bg-accent-blue/5 transition-colors" />
+              </div>
+              <div className="text-center">
+                <h4 className="font-semibold text-text-primary">{template.name}</h4>
+                <p className="text-xs text-text-muted mt-1">{template.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-8 flex justify-center">
+          {(creating || importing) && (
+            <div className="flex items-center gap-3 text-sm text-accent-blue animate-pulse">
+              <Spinner size="sm" />
+              <span>{creating ? 'Creating your resume...' : 'Parsing PDF & populating template...'}</span>
+            </div>
+          )}
         </div>
       </Modal>
 

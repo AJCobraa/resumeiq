@@ -262,3 +262,9 @@ function BulletList({ bullets }) {
     </ul>
   )
 }
+
+export const templateMeta = {
+  id: 'cobra',
+  name: 'Standard ATS (Cobra)',
+  description: 'Modern & Clean ATS-Ready'
+};
