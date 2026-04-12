@@ -27,7 +27,11 @@ async def get_admin_stats(uid: str = Depends(verify_token)):
       - recentLogs: last 10 log entries
     """
     try:
-        docs = list(db.collection("modelLogs").order_by("timestamp", direction="DESCENDING").limit(500).stream())
+        # 1. Fetch last 50 logs for recent call list and breakdown
+        docs = list(db.collection("modelLogs")
+                      .order_by("timestamp", direction="DESCENDING")
+                      .limit(50)
+                      .stream())
 
         total_calls = len(docs)
         total_input_tokens = 0

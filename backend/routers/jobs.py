@@ -82,6 +82,7 @@ async def get_jobs(uid: str = Depends(verify_token)):
         .document(uid)
         .collection("jobs")
         .order_by("createdAt", direction="DESCENDING")
+        .limit(50)
         .stream()
     )
     results = []

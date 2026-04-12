@@ -6,6 +6,7 @@ import math
 import hashlib
 import re
 from datetime import datetime, timezone
+from google.cloud import firestore
 from firebase_admin_init import db
 from services import embedding_service, gemma_service
 
@@ -325,4 +326,10 @@ async def analyze_resume_vs_jd(
     }
 
     db.collection("users").document(user_id).collection("jobs").document(final_job_id).set(job_doc)
+    
+    # Update totalJobs counter if it's a new job
+    if not job_id and not existing_job:
+        summary_ref = db.collection("users").document(user_id).collection("stats").document("summary")
+        summary_ref.set({"totalJobs": firestore.Increment(1)}, merge=True)
+        
     return job_doc

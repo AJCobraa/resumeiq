@@ -20,8 +20,6 @@ class RecentCallStat(BaseModel):
 
 class UserStatsResponse(BaseModel):
     totalJobs: int
-    approvedFixes: int
-    avgAtsImprovement: float
     totalInputTokens: int
     totalOutputTokens: int
     totalAiCalls: int
@@ -29,4 +27,3 @@ class UserStatsResponse(BaseModel):
     avgLatencyMs: float
     modelsUsed: str
     operationBreakdown: List[OperationStat]
-    recentCalls: List[RecentCallStat]

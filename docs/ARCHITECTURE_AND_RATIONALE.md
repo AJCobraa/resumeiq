@@ -520,3 +520,59 @@ ResumeIQ is a 3-part SaaS application:
 - **Animation Strategy:** Used `framer-motion` with generic "spring" and "gentleSpring" presets for all transitions to ensure consistent, physics-based movement rather than linear easing.
 
 **Why this works:** The high-fidelity animations on the landing page serve as an immediate demonstration of value (showing *how* the AI works) rather than just telling the user. The move to a light, Zinc-based aesthetic feels cleaner and more modern for career-focused software.
+
+---
+
+## Section 30 — Premium Dashboard UI Overhaul
+
+**Problem:** The initial dashboard and interview prep interfaces were functional but lacked a "premium" feel. Layout bugs (specifically in `#root`) constrained the grid and centered content unnecessarily.
+
+**Decision:** Rewrite the Dashboard and Interview Prep components to use a refined "Zinc + Slate" aesthetic, fix the global layout centering, and standardize helper utilities.
+
+**Implementation:**
+- **Layout Fix:** `App.css` cleared to remove `#root` constraints, allowing for a standard top-left aligned application flow.
+- **Design Tokens:** `index.css` updated with specific `--shadow-soft` and `--shadow-glow` variables to provide depth and visual interest.
+- **Component Refresh:** 
+    - `Dashboard.jsx`: Redesigned with a cleaner application grid, elevated stat cards, and a more structured job table.
+    - `InterviewPrepPanel.jsx`: Updated with enhanced typography, better visual grouping for question cards, and clearer coached answer presentation.
+- **Utility Standardization:** `utils.js` reset to a standardized version with consistent color mappings (`emerald`, `amber`, `rose`) for ATS scores and portal backgrounds.
+
+**Why this works:** The new UI feels more like a modern SaaS application (comparable to Linear or Stripe) while maintaining full backward compatibility with the existing FastAPI backend and Firestore data model.
+
+---
+
+## Section 31 — Premium Job Detail Modal & Tabbed Coach
+
+**Problem:** The single-pane Job Detail modal was becoming overwhelmed as we added keyword matches, semantic matching, AI recommendations, and interview prep. Information density was too high, leading to limited cognitive focus.
+
+**Decision:** Architect a 3-tab navigation system within the modal and integrate circular SVG gauges for high-impact metric visualization.
+
+**Implementation:**
+- **Tabbed Layout (`Dashboard.jsx`):** Moved from a vertical scrolling list to a dedicated 3-view system:
+  - **Score Details**: Focal point for keyword/semantic matches and debug diagnostics.
+  - **AI Recommendations**: A dedicated interface for managing bullet-point improvements.
+  - **Interview Coach**: Full integration of the `InterviewPrepPanel` question predictor.
+- **SVG ScoreRings:** Replaced standard text percentages with animated circular gauges. Used custom SVG paths with `stroke-dasharray` for lightweight, pixel-precise progress visualization.
+- **Improved Semantic Highlighting:** Semantic match details now use a tri-color conditional system (Emerald/Orange/Red) based on similarity thresholds (65%/40%).
+- **Modal Constraints:** Fixed the Modal `size` to `lg`. This ensures a predictable viewport for the tabbed content and prevents horizontal overflow on ultra-wide displays.
+
+**Why Tabs?** It compartmentalizes the user's workflow into three distinct stages: (1) Understanding the match, (2) Improving the resume, and (3) Preparing for the interview. This structure reduces noise and improves completion rates for AI recommendations.
+
+---
+
+## Section 32 — Firestore Read Optimization (Pre-Aggregation)
+
+**Problem:** The Personal Stats and Admin dashboard performance was degrading over time. Every page load triggered a full scan of the `modelLogs` collection (to compute token usage and latency) and the `jobs` sub-collection (to compute ATS improvement and job counts). For a power user with 500+ logs, this represented hundreds of expensive reads per dashboard visit.
+
+**Decision:** Shift from a "Scan for Stats" model to an "Update Summary on Write" model using atomic increments. 
+
+**Implementation:**
+- **Pre-Aggregated Summary:** Created `users/{uid}/stats/summary` document.
+- **Model Logger Atomic Updates (`model_logger.py`):** The side-effect logger now performs a second write: it increments the global totals (`totalAiCalls`, `totalInputTokens`, etc.) and the nested `operations` map using `firestore.Increment`.
+- **Job Counter (`analysis_pipeline.py`):** Increments `totalJobs` in the stats summary only when a truly new job document is generated (not on re-analysis).
+- **Endpoint Simplification (`routers/stats.py`):** `GET /api/me/stats` now performs exactly **ONE** read (the summary doc) instead of $N$ log reads + $M$ job reads.
+- **Data Windowing (`routers/admin.py` & `routers/jobs.py`):** Implemented strict `.limit(50)` on raw log and job list retrievals.
+- **Frontend Simplification (`PersonalStats.jsx`):** Removed high-scan metrics (like "Average ATS Improvement") that were not suitable for atomic increment tracking without significant complexity.
+- **Backfill Script (`backend/scripts/backfill_stats_summary.py`):** Provided a one-time migration tool to populate summaries for existing legacy data.
+
+**Why this works:** Firestore billing is driven by read/write counts. By moving the "compute" burden to a single write at log-time (cheap), we eliminate thousands of repeated reads at view-time (expensive), leading to instant dashboard loading states and significantly lower cloud costs.

@@ -22,7 +22,7 @@ export default function PersonalStats() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [])
 
   useEffect(() => { fetchStats() }, [fetchStats])
 
@@ -50,9 +50,9 @@ export default function PersonalStats() {
       {/* Top Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         {[
-          { label: 'Avg ATS Boost', value: `+${stats.avgAtsImprovement}%`, icon: '🚀', color: 'text-green' },
-          { label: 'Approved Fixes', value: stats.approvedFixes, icon: '✅', color: 'text-accent-blue' },
           { label: 'Jobs Analyzed', value: stats.totalJobs, icon: '📋', color: 'text-purple-400' },
+          { label: 'Total AI Calls', value: stats.totalAiCalls, icon: '🤖', color: 'text-accent-blue' },
+          { label: 'Models Used', value: stats.modelsUsed.split('·').length, icon: '🧠', color: 'text-green' },
         ].map((stat, i) => (
           <motion.div 
             key={i}
@@ -76,19 +76,14 @@ export default function PersonalStats() {
       </div>
 
       {/* AI Telemetry Summary */}
-      <h2 className="text-lg font-bold text-[#F1F5F9] mb-4 mt-12">AI Model Usage</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-[#13131A] border border-[#1E1E2E] rounded-xl p-6">
-          <p className="text-[#64748B] text-xs font-semibold uppercase tracking-wider mb-2">Total AI Calls</p>
-          <span className="text-4xl font-bold text-[#4F8EF7]">{stats.totalAiCalls}</span>
-        </div>
-        
+      <h2 className="text-lg font-bold text-[#F1F5F9] mb-4 mt-12">AI Performance</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
         <div className="bg-[#13131A] border border-[#1E1E2E] rounded-xl p-6">
           <p className="text-[#64748B] text-xs font-semibold uppercase tracking-wider mb-2">Input Tokens</p>
           <span className="text-4xl font-bold text-[#A855F7]">
             {(stats.totalInputTokens / 1000).toFixed(1)}k
           </span>
-          <p className="text-[#64748B] text-xs mt-2">Total sent to models</p>
+          <p className="text-[#64748B] text-xs mt-2">Scale of data sent to models</p>
         </div>
 
         <div className="bg-[#13131A] border border-[#1E1E2E] rounded-xl p-6">
@@ -96,7 +91,7 @@ export default function PersonalStats() {
           <span className="text-4xl font-bold text-[#F59E0B]">
             {(stats.totalOutputTokens / 1000).toFixed(1)}k
           </span>
-          <p className="text-[#64748B] text-xs mt-2">Total generated</p>
+          <p className="text-[#64748B] text-xs mt-2">Scale of content generated</p>
         </div>
       </div>
 
@@ -119,18 +114,15 @@ export default function PersonalStats() {
                    className="h-full bg-gradient-to-r from-accent-blue to-purple-500 rounded-full"
                 />
               </div>
-              <p className="text-[10px] text-text-muted mt-2 leading-relaxed italic">
-                Percentage of job descriptions analyzed from cache vs fresh AI computation.
-              </p>
             </div>
 
             <div className="pt-4 border-t border-border-default space-y-3">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-text-muted">Average Latency</span>
+                <span className="text-text-muted">Avg Latency</span>
                 <span className="font-mono text-text-primary">{stats.avgLatencyMs}ms</span>
               </div>
               <div className="flex justify-between items-center text-xs">
-                <span className="text-text-muted">Models Used</span>
+                <span className="text-text-muted">Active Models</span>
                 <span className="text-accent-blue text-right ml-4 max-w-[150px] truncate">{stats.modelsUsed}</span>
               </div>
             </div>
@@ -148,8 +140,7 @@ export default function PersonalStats() {
                 <tr>
                   <th className="px-6 py-3 font-semibold">Operation</th>
                   <th className="px-6 py-3 font-semibold text-right">Calls</th>
-                  <th className="px-6 py-3 font-semibold text-right">Input Tokens</th>
-                  <th className="px-6 py-3 font-semibold text-right">Output Tokens</th>
+                  <th className="px-6 py-3 font-semibold text-right">In/Out Tok</th>
                   <th className="px-6 py-3 font-semibold text-right">Avg Latency</th>
                 </tr>
               </thead>
@@ -165,57 +156,13 @@ export default function PersonalStats() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right font-mono text-text-muted">{op.calls}</td>
-                    <td className="px-6 py-4 text-right font-mono text-accent-blue">{op.inputTokens.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-right font-mono text-purple-400">{op.outputTokens.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right">
+                       <span className="font-mono text-accent-blue">{Math.round(op.inputTokens/1000)}k</span>
+                       <span className="mx-1 opacity-20">/</span>
+                       <span className="font-mono text-purple-400">{Math.round(op.outputTokens/1000)}k</span>
+                    </td>
                     <td className="px-6 py-4 text-right">
                       <span className="font-mono text-text-muted">{op.avgLatency}ms</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      </div>
-
-      {/* Recent Model Calls Table */}
-      <div className="mb-4">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-text-muted mb-4 px-2">Recent AI Interactions</h3>
-        <Card className="overflow-hidden p-0 border-border-default/50">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-bg-elevated/30 text-text-muted text-[10px] uppercase font-bold tracking-widest border-b border-border-default">
-                <tr>
-                  <th className="px-6 py-3 font-semibold">Timestamp</th>
-                  <th className="px-6 py-3 font-semibold">Operation</th>
-                  <th className="px-6 py-3 font-semibold">Model</th>
-                  <th className="px-6 py-3 font-semibold text-center">In/Out Tokens</th>
-                  <th className="px-6 py-3 font-semibold text-right">Latency</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-default/50">
-                {stats.recentCalls.map((call, i) => (
-                  <tr key={i} className="hover:bg-bg-elevated/20 transition-colors group">
-                    <td className="px-6 py-4 text-xs text-text-muted whitespace-nowrap">
-                      {formatDate(call.timestamp)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge variant="outline" className="text-[10px] capitalize group-hover:border-accent-blue transition-colors">
-                        {call.operation.replace(/_/g, ' ')}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 text-xs font-mono text-text-muted whitespace-nowrap">
-                      {call.model}
-                    </td>
-                    <td className="px-6 py-4 text-center text-xs font-mono text-text-muted">
-                      <span className="text-text-primary">{call.inputTokens}</span>
-                      <span className="mx-1 opacity-30">/</span>
-                      <span className="text-accent-blue">{call.outputTokens}</span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="font-mono text-xs text-accent-blue bg-accent-blue/5 px-2 py-0.5 rounded border border-accent-blue/20">
-                        {call.latencyMs}ms
-                      </span>
                     </td>
                   </tr>
                 ))}
