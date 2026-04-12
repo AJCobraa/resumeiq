@@ -197,7 +197,6 @@ ResumeIQ is a 3-part SaaS application:
 | `src/pages/MyResumes.jsx` | Resume list with CRUD modals |
 | `src/pages/ResumeEditor.jsx` | Two-panel editor with live preview |
 | `src/pages/Settings.jsx` | Account settings |
-| `src/pages/Admin.jsx` | Model monitoring dashboard (Section 18.2) |
 
 ### Extension (`/extension`)
 | File | Purpose |
@@ -228,20 +227,8 @@ ResumeIQ is a 3-part SaaS application:
 
 **Why MD5 (not SHA256)?** Sufficient collision resistance for JD text; faster and shorter keys in Firestore.
 
-### 18.2 Model Usage Monitoring
-
-**Problem:** No visibility into AI token consumption, model latency, or cache effectiveness.
-
-**Decision:** Introduce a `modelLogs` root-level Firestore collection that captures every AI model call (Gemma + Embeddings) with metadata.
-
-**Implementation:**
-- `services/model_logger.py` — new fire-and-forget logging function
-- Runs in a daemon thread — never blocks the API response
-- Logs: `model`, `operation`, `inputTokens`, `outputTokens`, `latencyMs`, `isCacheHit`, `userId`, `timestamp`
-- `GET /api/admin/stats` aggregates last 500 logs on-demand
-- `src/pages/Admin.jsx` renders the monitoring dashboard
-
-**Why not a time-series DB?** For the current scale, Firestore on-demand aggregation is sufficient. A scheduled Cloud Function job to pre-aggregate can replace this when the collection grows large.
+### 18.2 Model Usage Monitoring (Legacy)
+**Note:** This section was moved to Personal Stats in Section 26.
 
 ---
 
@@ -324,6 +311,8 @@ ResumeIQ is a 3-part SaaS application:
 - If an identity matches, it recycles the `jobId` and `createdAt` dates.
 - We run `.set(job_doc)` against the matching ID natively within Firestore to inherently **OVERWRITE/UPSERT** analysis metrics, bypassing DB bloat entirely.
 - Added explicit `[CACHE]` logs in the FastAPI worker to enforce absolute visibility over routing hit rates.
+
+---
 
 ## Section 23 — In-App Re-Analyze UX Loop
 **Problem:** Users would approve multiple granular AI fixes inside the Job Detail Drawer, but the overall ATS score and Semantic Score wouldn't adapt live without backing completely out of the app, finding the extension again, and re-invoking the external content-script payload.
@@ -453,19 +442,6 @@ ResumeIQ is a 3-part SaaS application:
 
 **Problem:** Users wanted to see the value ResumeIQ brings (ROI) and monitor their own AI usage/telemetry without needing access to global admin dashboards.
 
-**Decision:** Implement a strictly user-scoped stats engine that calculates ATS score improvements and tracks AI model performance metrics.
-
-**Implementation:**
-- **ROI Tracking:** Added `initialAtsScore` to the job document. This captures the very first score generated for a job-resume pair. Subsequent re-analyses update `atsScore` but preserve `initialAtsScore`, allowing the system to calculate `avgAtsImprovement`.
-- **User-Scoped Aggregation:** The `GET /api/me/stats` endpoint performs real-time aggregation of a user's jobs and model logs.
-- **Telemetry Breakdown:** Captures tokens, calls, and latency per model and operation type (e.g., `analyze_resume`, `rewrite_bullet`).
-- **Index Optimization:** Added a composite index on `modelLogs` (`userId` ASC, `timestamp` DESC) to allow efficient retrieval of a user's recent AI activity.
-- **Frontend Dashboard:** `PersonalStats.jsx` provides a premium visualization of these metrics using the existing design system tokens (metric cards, progress bars for cache efficiency, and detailed data tables).
-
-**Why Real-time Aggregation?** At the current individual user scale (dozens of jobs, hundreds of logs), real-time aggregation is extremely fast in Firestore and avoids the complexity of pre-computing and syncing aggregate documents.
-
----
-
 ## Section 27 — Dynamic Resume Template Selection
 
 **Background:** Previously, all resumes were locked to the `cobra` template (SaaS default). As the product matures, users requested visual variety and specialized layouts (e.g., modern vs. corporate).
@@ -562,7 +538,7 @@ ResumeIQ is a 3-part SaaS application:
 
 ## Section 32 — Firestore Read Optimization (Pre-Aggregation)
 
-**Problem:** The Personal Stats and Admin dashboard performance was degrading over time. Every page load triggered a full scan of the `modelLogs` collection (to compute token usage and latency) and the `jobs` sub-collection (to compute ATS improvement and job counts). For a power user with 500+ logs, this represented hundreds of expensive reads per dashboard visit.
+**Problem:** The Personal Stats performance was degrading over time. Every page load triggered a full scan of the `modelLogs` collection (to compute token usage and latency) and the `jobs` sub-collection (to compute ATS improvement and job counts). For a power user with 500+ logs, this represented hundreds of expensive reads per dashboard visit.
 
 **Decision:** Shift from a "Scan for Stats" model to an "Update Summary on Write" model using atomic increments. 
 
@@ -571,7 +547,7 @@ ResumeIQ is a 3-part SaaS application:
 - **Model Logger Atomic Updates (`model_logger.py`):** The side-effect logger now performs a second write: it increments the global totals (`totalAiCalls`, `totalInputTokens`, etc.) and the nested `operations` map using `firestore.Increment`.
 - **Job Counter (`analysis_pipeline.py`):** Increments `totalJobs` in the stats summary only when a truly new job document is generated (not on re-analysis).
 - **Endpoint Simplification (`routers/stats.py`):** `GET /api/me/stats` now performs exactly **ONE** read (the summary doc) instead of $N$ log reads + $M$ job reads.
-- **Data Windowing (`routers/admin.py` & `routers/jobs.py`):** Implemented strict `.limit(50)` on raw log and job list retrievals.
+- `routers/jobs.py` implements strict `.limit(50)` on job list retrievals.
 - **Frontend Simplification (`PersonalStats.jsx`):** Removed high-scan metrics (like "Average ATS Improvement") that were not suitable for atomic increment tracking without significant complexity.
 - **Backfill Script (`backend/scripts/backfill_stats_summary.py`):** Provided a one-time migration tool to populate summaries for existing legacy data.
 
