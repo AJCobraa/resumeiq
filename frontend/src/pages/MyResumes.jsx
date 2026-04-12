@@ -35,7 +35,7 @@ export default function MyResumes() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [])
 
   useEffect(() => {
     fetchResumes()

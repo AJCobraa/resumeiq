@@ -91,7 +91,4 @@ export const api = {
   approveRecommendation:(id, body) => request(`/api/jobs/${id}/recommendation`, 'PATCH', body),
   generateInterviewPrep:(id)       => request(`/api/jobs/${id}/interview-prep`, 'POST'),
   deleteJob:            (id)   => request(`/api/jobs/${id}`, 'DELETE'),
-
-  // ── Admin ─────────────────────────────────────────
-  getAdminStats: () => request('/api/admin/stats'),
 }

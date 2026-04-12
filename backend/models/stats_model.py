@@ -10,14 +10,6 @@ class OperationStat(BaseModel):
     outputTokens: int
     avgLatency: float
 
-class RecentCallStat(BaseModel):
-    operation: str
-    model: str
-    inputTokens: int
-    outputTokens: int
-    latencyMs: float
-    timestamp: Optional[datetime]
-
 class UserStatsResponse(BaseModel):
     totalJobs: int
     totalInputTokens: int

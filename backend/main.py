@@ -12,7 +12,7 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import auth, resumes, jobs, analysis, admin, stats
+from routers import auth, resumes, jobs, analysis, stats
 
 app = FastAPI(
     title="ResumeIQ API",
@@ -44,5 +44,4 @@ app.include_router(auth.router)
 app.include_router(resumes.router)
 app.include_router(jobs.router)
 app.include_router(analysis.router)
-app.include_router(admin.router)
 app.include_router(stats.router)
