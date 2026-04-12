@@ -47,7 +47,7 @@ export default function Admin() {
       }
     }
     load()
-  }, [toast])
+  }, [])
 
   if (loading) {
     return (
@@ -119,42 +119,41 @@ export default function Admin() {
         </div>
       </Card>
 
-      {/* Per-Operation Breakdown */}
-      <Card className="mb-8">
-        <h2 className="text-base font-semibold mb-4">Breakdown by Operation</h2>
-        {Object.keys(breakdown).length === 0 ? (
-          <p className="text-sm text-text-muted">No model calls logged yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border-default text-left">
-                  <th className="pb-3 text-text-muted font-medium pr-4">Operation</th>
-                  <th className="pb-3 text-text-muted font-medium text-right pr-4">Calls</th>
-                  <th className="pb-3 text-text-muted font-medium text-right pr-4">Input Tokens</th>
-                  <th className="pb-3 text-text-muted font-medium text-right pr-4">Output Tokens</th>
-                  <th className="pb-3 text-text-muted font-medium text-right">Avg Latency</th>
+      {/* Operation Breakdown */}
+      <Card className="mb-12">
+        <h2 className="text-sm font-semibold uppercase tracking-widest text-[#64748B] mb-6 flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#4F8EF7]" />
+          Model Breakdown <span className="text-[10px] opacity-50 font-normal">(Last 50 calls)</span>
+        </h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border-default text-left">
+                <th className="pb-3 text-text-muted font-medium pr-4">Operation</th>
+                <th className="pb-3 text-text-muted font-medium text-right pr-4">Calls</th>
+                <th className="pb-3 text-text-muted font-medium text-right pr-4">Input Tokens</th>
+                <th className="pb-3 text-text-muted font-medium text-right pr-4">Output Tokens</th>
+                <th className="pb-3 text-text-muted font-medium text-right">Avg Latency</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(breakdown).map(([op, data]) => (
+                <tr key={op} className="border-b border-border-default/50 last:border-0">
+                  <td className="py-3 pr-4">
+                    <span className="font-medium text-text-primary">
+                      {OPERATION_LABELS[op] || op}
+                    </span>
+                    <span className="ml-2 text-xs text-text-muted font-mono"> {data.model} </span>
+                  </td>
+                  <td className="py-3 pr-4 text-right"> {data.calls.toLocaleString()} </td>
+                  <td className="py-3 pr-4 text-right text-accent-blue"> {data.inputTokens.toLocaleString()} </td>
+                  <td className="py-3 pr-4 text-right text-purple-400"> {data.outputTokens.toLocaleString()} </td>
+                  <td className="py-3 text-right text-text-muted"> {data.avgLatencyMs} ms </td>
                 </tr>
-              </thead>
-              <tbody>
-                {Object.entries(breakdown).map(([op, data]) => (
-                  <tr key={op} className="border-b border-border-default/50 last:border-0">
-                    <td className="py-3 pr-4">
-                      <span className="font-medium text-text-primary">
-                        {OPERATION_LABELS[op] || op}
-                      </span>
-                      <span className="ml-2 text-xs text-text-muted font-mono"> {data.model} </span>
-                    </td>
-                    <td className="py-3 pr-4 text-right"> {data.calls.toLocaleString()} </td>
-                    <td className="py-3 pr-4 text-right text-accent-blue"> {data.inputTokens.toLocaleString()} </td>
-                    <td className="py-3 pr-4 text-right text-purple-400"> {data.outputTokens.toLocaleString()} </td>
-                    <td className="py-3 text-right text-text-muted"> {data.avgLatencyMs} ms </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
 
       {/* Recent Logs */}

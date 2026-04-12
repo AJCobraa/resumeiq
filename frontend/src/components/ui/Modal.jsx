@@ -1,59 +1,77 @@
 import { useEffect } from 'react'
-import { cn } from '../../lib/utils'
+import { motion, AnimatePresence } from 'framer-motion'
 
-export default function Modal({ isOpen, onClose, title, children, size = 'md' }) {
-  const sizes = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
+const gentleSpring = { type: 'spring', stiffness: 200, damping: 24 }
+
+export default function Modal({ isOpen, onClose, title, size = 'md', children }) {
+  // Expanded sizes to give the dashboard more horizontal space
+  const widths = { 
+    sm: 'max-w-md', 
+    md: 'max-w-lg', 
+    lg: 'max-w-3xl',
+    xl: 'max-w-4xl' 
   }
 
+  // Prevent body scroll when modal is open
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
+    if (isOpen) document.body.style.overflow = 'hidden'
+    else document.body.style.overflow = ''
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
 
+  // Close on Escape key
   useEffect(() => {
     const handleEsc = (e) => { if (e.key === 'Escape') onClose() }
     if (isOpen) window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
   }, [isOpen, onClose])
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
-        onClick={onClose}
-      />
-      {/* Modal */}
-      <div className={cn(
-        'relative w-full mx-4 bg-bg-card border border-border-default',
-        'rounded-[8px] shadow-2xl animate-fade-in',
-        sizes[size],
-      )}>
-        {title && (
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
-            <h2 className="text-lg font-semibold">{title}</h2>
-            <button
-              onClick={onClose}
-              className="text-text-muted hover:text-text-primary transition-colors p-1 cursor-pointer"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
-        <div className="p-5">{children}</div>
-      </div>
-    </div>
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+          
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          
+          {/* Modal Panel Container */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={gentleSpring}
+            className={`relative w-full ${widths[size] || widths.md} bg-white rounded-2xl border border-slate-200/60 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)] flex flex-col max-h-[90vh] overflow-hidden`}
+          >
+            
+            {/* Header (Sticky at top) */}
+            {title && (
+              <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100/80 shrink-0 bg-white z-10">
+                <h2 className="text-lg font-semibold tracking-tight text-slate-900">{title}</h2>
+                <button
+                  onClick={onClose}
+                  className="text-slate-400 hover:text-slate-900 transition-colors p-1.5 rounded-xl hover:bg-slate-50 cursor-pointer"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+            
+            {/* Scrollable Content Area */}
+            <div className="p-6 overflow-y-auto">
+              {children}
+            </div>
+
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   )
 }
