@@ -21,7 +21,13 @@ ResumeIQ is a 3-part SaaS application:
 └──────────────────┘
 ```
 
-### Data Flow (A-Z)
+#### Job Persistence & Resume Association
+Jobs are linked to the resume used for their analysis. If a resume is deleted, the job analysis history is preserved but enters a "Resume deleted" state. 
+- **Snapshotting**: The `resumeTitle` is snapshotted into the Job document at analysis time to ensure the UI can display which resume was used even if the original is gone.
+- **Re-analysis**: When a job's source resume is missing, the user is prompted to select an active resume before re-analyzing.
+- **Approvals**: Bullet point approvals are disabled for jobs with deleted resumes to prevent database inconsistency.
+
+## Data Flow (A-Z)
 1. User signs in via Google (Firebase Auth) on the web app
 2. Frontend receives an ID token from Firebase
 3. Every API call includes this token in the `Authorization` header

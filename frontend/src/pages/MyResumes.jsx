@@ -303,9 +303,11 @@ export default function MyResumes() {
       {/* Delete Confirmation Modal */}
       <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Resume?" size="sm">
         <div className="space-y-4">
-          <p className="text-sm text-text-muted">
-            Are you sure you want to delete <strong className="text-text-primary">{deleteTarget?.resumeTitle}</strong>?
-            This will also delete all associated job analyses. This action cannot be undone.
+          <p className="text-sm text-slate-500 leading-relaxed">
+            Are you sure you want to delete <strong className="text-slate-900">{deleteTarget?.resumeTitle}</strong>?
+          </p>
+          <p className="text-xs text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-100 italic">
+            Note: Your existing job analyses will be preserved, but they will show a "Resume deleted" status. You can still view them and re-analyze them with other resumes later.
           </p>
           <div className="flex justify-end gap-3">
             <Button variant="ghost" onClick={() => setDeleteTarget(null)}>Cancel</Button>

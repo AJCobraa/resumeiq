@@ -296,6 +296,7 @@ async def analyze_resume_vs_jd(
         "jobId": final_job_id,
         "userId": user_id,
         "resumeId": resume_id,
+        "resumeTitle": resume.get("resumeTitle", "Untitled Resume"),
         "jobTitle": job_title,
         "company": company,
         "portal": portal,
