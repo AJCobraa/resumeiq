@@ -561,17 +561,18 @@ Jobs are linked to the resume used for their analysis. If a resume is deleted, t
 
 ---
 
-## Section 33 — PDF Export Reliability & Error Transparency
+---
 
-**Problem:** PDF export failures on Windows were difficult to debug because the frontend surfaced a generic "PDF export failed" toast, hiding backend details. Additionally, Windows absolute paths in `file://` URLs were causing intermittent loading failures in headless Chromium.
+## Section 34 — Puppeteer v20+ Compatibility & Route Collisions
 
-**Decision:** Harden the Puppeteer URL formatting and expose backend error details to the frontend.
+**Problem:** PDF export was failing silently with empty `detail: ""` errors. This was caused by Puppeteer v20+ writing Chrome-missing errors to `stdout` (swallowed by the previous `stderr`-only capture) and a FastAPI route collision where `{resume_id}` intercepted the `import-pdf` path.
+
+**Decision:** Implement a robust error-capture layer and fix the route registration sequence.
 
 **Implementation:**
-- **Robust URL Formatting (`pdf_render.js`):** Implemented a normalization layer that ensures all paths (Windows or Linux) are converted to valid `file:///` URLs with forward slashes. This prevents Chromium from misinterpreting the Windows drive letter as a host.
-- **Backend Detail Extraction (`api.js`):** Updated the central API client to parse the `detail` field from 500/400 error responses. The UI now displays the actual cause (e.g., "Puppeteer timeout") instead of a generic catch-all.
-- **Subprocess Tuning (`pdf_service.py`):**
-    - Increased `asyncio` timeout to 60s to account for slow cold-starts and large resume rendering.
-    - Improved internal logging to include the exact command-line string being executed for easier sysadmin triage.
+- **Error Capture Layer (`pdf_service.py`):** Rewrote the subprocess handler to decode both `stdout` and `stderr` with UTF-8 replacement. The error message now uses `stderr_text or stdout_text`, ensuring that Puppeteer initialization failures are fully reported in the API response.
+- **Route Order Correction (`resumes.py`):** Moved the `@router.post("/resumes/import-pdf")` handler above the dynamic `@router.post("/resumes/{resume_id}/export-pdf")` handler. This ensures FastAPI matches the static path before the wildcard.
+- **Auto-Installation (`package.json`):** Added a `postinstall` script to `backend/scripts/package.json` to automatically download the correct Chrome binary on `npm install`, eliminating "Chrome not found" errors in new environments.
+- **Graceful Exception Handling (`resumes.py`):** Expanded the `export_pdf` handler to include a catch-all `Exception` block, ensuring any internal failure (e.g., file system or network) returns a readable message instead of an empty payload.
 
-**Why this works:** Chromium is strict about `file://` protocols. By explicitly adding the third slash (`file:///`) and flipping backslashes, we ensure 100% path compatibility across Windows, Linux (Docker), and macOS. Surfacing the error detail allows users to fix environment issues (like a missing Node path) without developer intervention.
+**Why this works:** Route ordering is a foundational FastAPI behavior that was causing path shadowing. Combining this with full output capture ensures that any failure in the headless Chrome layer is immediately visible to both developers (via logs) and users (via clear UI error messages).

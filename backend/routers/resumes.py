@@ -232,16 +232,6 @@ async def export_pdf(resume_id: str, body: ExportPDFRequest, uid: str = Depends(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except (RuntimeError, TimeoutError) as e:
-        import traceback
-        error_type = type(e).__name__
-        msg = str(e) or "No error message provided"
-        print(f"[{error_type}] PDF Export error: {msg}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"[{error_type}] {msg}")
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
-        import traceback
-        error_type = type(e).__name__
-        msg = str(e) or "Internal server error"
-        print(f"[{error_type}] PDF Export UNEXPECTED: {msg}")
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"PDF export failed: [{error_type}] {msg}")
+        raise HTTPException(status_code=500, detail=f"PDF export failed: {str(e)}")
