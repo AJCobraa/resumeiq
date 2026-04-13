@@ -32,6 +32,16 @@ export default function Dashboard() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [isReanalyzing, setIsReanalyzing] = useState(false)
   const [showExtensionGuide, setShowExtensionGuide] = useState(false)
+  const [resumes, setResumes] = useState([])
+
+  const fetchResumes = useCallback(async () => {
+    try {
+      const data = await api.getResumes()
+      setResumes(data)
+    } catch {
+      console.error('Failed to load resumes for picker')
+    }
+  }, [])
 
   const fetchJobs = useCallback(async () => {
     try {
@@ -45,7 +55,10 @@ export default function Dashboard() {
     }
   }, [])
 
-  useEffect(() => { fetchJobs() }, [])
+  useEffect(() => { 
+    fetchJobs()
+    fetchResumes()
+  }, [])
 
   const openJobDetail = async (jobId) => {
     try {
@@ -90,7 +103,14 @@ export default function Dashboard() {
     }
   }
 
-  const handleReanalyze = async (job) => {
+  const handleReanalyze = async (jobOrEvent) => {
+    // Guard: if a DOM Event was passed instead of a job object, use current jobDetail
+    const job = (jobOrEvent && typeof jobOrEvent === 'object' && jobOrEvent.resumeId)
+      ? jobOrEvent
+      : jobDetail
+
+    if (!job) return
+
     try {
       setIsReanalyzing(true)
       const result = await api.analyze({
@@ -100,7 +120,7 @@ export default function Dashboard() {
         jobTitle: job.jobTitle,
         company: job.company,
         portal: job.portal,
-        jobId: job.jobId
+        jobId: job.jobId,
       })
       toast.success('Resume re-analyzed!')
       setJobDetail(result)
@@ -219,6 +239,18 @@ export default function Dashboard() {
                                   {portal.label}
                                 </span>
                               </p>
+                              <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                                <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                {job.resumeTitle && job.resumeTitle !== '__deleted__'
+                                  ? job.resumeTitle
+                                  : job.resumeTitle === '__deleted__'
+                                    ? <span className="italic text-orange-300">Resume deleted</span>
+                                    : <span className="italic text-slate-300">—</span>
+                                }
+                              </p>
                             </div>
                           </div>
                         </td>
@@ -263,9 +295,10 @@ export default function Dashboard() {
           ) : jobDetail ? (
             <JobDetailPanel 
               job={jobDetail}
+              resumes={resumes}
               onStatusChange={(s) => handleStatusChange(jobDetail.jobId, s)}
               onRecommendation={(id, a, t) => handleRecommendation(jobDetail.jobId, id, a, t)}
-              onReanalyze={() => handleReanalyze(jobDetail)}
+              onReanalyze={(jobObj) => handleReanalyze(jobObj || jobDetail)}
               onPrepUpdate={setJobDetail}
               isReanalyzing={isReanalyzing}
             />
@@ -340,12 +373,14 @@ function ScoreRing({ score, label, color }) {
   )
 }
 
-function JobDetailPanel({ job, onStatusChange, onRecommendation, onReanalyze, onPrepUpdate, isReanalyzing }) {
+function JobDetailPanel({ job, resumes, onStatusChange, onRecommendation, onReanalyze, onPrepUpdate, isReanalyzing }) {
   const showDebug = import.meta.env.DEV && job?.debug
   const [activeTab, setActiveTab] = useState('score')
 
   const portal = getPortalInfo(job.portal)
   const pendingRecs = job.recommendations?.filter(r => r.status === 'pending').length || 0
+
+  const resumeExists = resumes.some(r => r.resumeId === job.resumeId)
 
   return (
     <div className="flex flex-col">
@@ -355,6 +390,18 @@ function JobDetailPanel({ job, onStatusChange, onRecommendation, onReanalyze, on
         <div>
           <p className="text-sm text-muted-foreground">
             {job.company}{job.company && portal.label ? ' • ' : ''}{portal.label}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+            <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            {job.resumeTitle && job.resumeTitle !== '__deleted__'
+              ? <span className="font-medium text-foreground">{job.resumeTitle}</span>
+              : job.resumeTitle === '__deleted__'
+                ? <span className="italic text-orange-400">Resume deleted</span>
+                : <span className="italic text-muted-foreground">Original Resume</span>
+            }
           </p>
           {job.jdUrl && (
             <a
@@ -368,25 +415,29 @@ function JobDetailPanel({ job, onStatusChange, onRecommendation, onReanalyze, on
           )}
         </div>
         <div className="flex items-center gap-2.5 flex-shrink-0">
-          <Button
-            onClick={onReanalyze}
-            disabled={isReanalyzing}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-1.5 rounded-full border-border/60 text-foreground text-xs px-3"
-          >
-            {isReanalyzing ? (
-              <Spinner size="sm" />
-            ) : (
-              <>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Re-Analyze
-              </>
-            )}
-          </Button>
+          {job.resumeTitle === '__deleted__' ? (
+            <ResumePickerReanalyze job={job} onReanalyze={onReanalyze} isReanalyzing={isReanalyzing} />
+          ) : (
+            <Button
+              onClick={() => onReanalyze(job)}
+              disabled={isReanalyzing}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-1.5 rounded-full border-border/60 text-foreground text-xs px-3"
+            >
+              {isReanalyzing ? (
+                <Spinner size="sm" />
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Re-Analyze
+                </>
+              )}
+            </Button>
+          )}
           <select
             value={job.status}
             onChange={(e) => onStatusChange(e.target.value)}
@@ -585,9 +636,22 @@ function JobDetailPanel({ job, onStatusChange, onRecommendation, onReanalyze, on
               </div>
             ) : (
               <>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                  {job.recommendations.length} Recommendations
-                </p>
+              {job.resumeTitle === '__deleted__' && (
+                <div className="flex items-start gap-3 p-3.5 rounded-xl bg-orange-50 border border-orange-200 text-xs text-orange-700 mb-3">
+                  <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>
+                    The resume used for this analysis has been deleted.
+                    Recommendations are shown for reference only — approve/dismiss is disabled.
+                    Use <strong>Re-Analyze</strong> above with a new resume to apply changes.
+                  </span>
+                </div>
+              )}
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                {job.recommendations.length} Recommendations
+              </p>
                 {job.recommendations.map((rec, idx) => (
                   <motion.div
                     key={rec.recommendationId}
@@ -597,6 +661,7 @@ function JobDetailPanel({ job, onStatusChange, onRecommendation, onReanalyze, on
                   >
                     <RecommendationCard
                       rec={rec}
+                      resumeDeleted={job.resumeTitle === '__deleted__'}
                       onAction={(action, text) => onRecommendation(rec.recommendationId, action, text)}
                     />
                   </motion.div>
@@ -616,7 +681,7 @@ function JobDetailPanel({ job, onStatusChange, onRecommendation, onReanalyze, on
   )
 }
 
-function RecommendationCard({ rec, onAction }) {
+function RecommendationCard({ rec, onAction, resumeDeleted = false }) {
   const isResolved = rec.status === 'approved' || rec.status === 'dismissed'
 
   const accentColor =
@@ -688,7 +753,7 @@ function RecommendationCard({ rec, onAction }) {
         </p>
 
         {/* Approve / Dismiss buttons */}
-        {rec.status === 'pending' && (
+        {rec.status === 'pending' && !resumeDeleted && (
           <div className="flex items-center gap-3 pt-3 border-t border-border/30">
             <Button
               size="sm"
@@ -707,7 +772,76 @@ function RecommendationCard({ rec, onAction }) {
             </Button>
           </div>
         )}
+        {rec.status === 'pending' && resumeDeleted && (
+          <div className="pt-3 border-t border-border/30">
+            <p className="text-[10px] text-muted-foreground italic">
+              Re-analyze with a new resume to apply these changes.
+            </p>
+          </div>
+        )}
       </div>
+    </div>
+  )
+}
+
+function ResumePickerReanalyze({ job, onReanalyze, isReanalyzing }) {
+  const [resumes, setResumes] = useState([])
+  const [selectedResumeId, setSelectedResumeId] = useState('')
+  const [loadingResumes, setLoadingResumes] = useState(true)
+
+  useEffect(() => {
+    api.getResumes()
+      .then(data => {
+        setResumes(data)
+        if (data.length > 0) setSelectedResumeId(data[0].resumeId)
+      })
+      .catch(() => {})
+      .finally(() => setLoadingResumes(false))
+  }, [])
+
+  const handleClick = () => {
+    if (!selectedResumeId) return
+    onReanalyze({ ...job, resumeId: selectedResumeId })
+  }
+
+  if (loadingResumes) return <Spinner size="sm" />
+
+  if (resumes.length === 0) {
+    return <span className="text-xs text-muted-foreground italic">No resumes available</span>
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <select
+        value={selectedResumeId}
+        onChange={e => setSelectedResumeId(e.target.value)}
+        className="px-2 py-1.5 text-xs bg-secondary border border-border/40 rounded-xl text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring max-w-[160px] truncate"
+      >
+        {resumes.map(r => (
+          <option key={r.resumeId} value={r.resumeId}>
+            {r.resumeTitle || 'Untitled Resume'}
+          </option>
+        ))}
+      </select>
+      <Button
+        onClick={handleClick}
+        disabled={isReanalyzing || !selectedResumeId}
+        variant="outline"
+        size="sm"
+        className="flex items-center gap-1.5 rounded-full border-orange-300 text-orange-500 text-xs px-3 hover:bg-orange-50"
+      >
+        {isReanalyzing ? (
+          <Spinner size="sm" />
+        ) : (
+          <>
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Re-Analyze
+          </>
+        )}
+      </Button>
     </div>
   )
 }

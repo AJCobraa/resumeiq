@@ -65,6 +65,7 @@ async def check_job(
                 "atsScore": d.get("atsScore", 0),
                 "jobTitle": d.get("jobTitle", ""),
                 "company": d.get("company", ""),
+                "resumeTitle": d.get("resumeTitle", ""),
                 "isCacheHit": d.get("isCacheHit", False),
                 "createdAt": d.get("createdAt"),
             }
@@ -91,6 +92,7 @@ async def get_jobs(uid: str = Depends(verify_token)):
         results.append({
             "jobId": d.get("jobId"),
             "resumeId": d.get("resumeId"),
+            "resumeTitle": d.get("resumeTitle", ""),
             "jobTitle": d.get("jobTitle", ""),
             "company": d.get("company", ""),
             "portal": d.get("portal", "other"),

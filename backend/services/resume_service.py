@@ -316,17 +316,22 @@ async def update_resume_title(uid: str, resume_id: str, title: str) -> dict:
 
 
 async def delete_resume(uid: str, resume_id: str) -> bool:
-    """Delete a resume and all associated jobs."""
+    """
+    Delete a resume.
+    Instead of cascade-deleting jobs, mark all affected jobs with
+    resumeTitle='__deleted__' so the UI can show a deleted state
+    while preserving all analysis history.
+    """
     ref = _resume_ref(uid, resume_id)
     doc = ref.get()
     if not doc.exists:
         return False
 
-    # Delete associated jobs
+    # Mark all jobs that used this resume as having a deleted resume
     jobs_ref = db.collection("users").document(uid).collection("jobs")
     jobs = jobs_ref.where("resumeId", "==", resume_id).stream()
     for job in jobs:
-        job.reference.delete()
+        job.reference.update({"resumeTitle": "__deleted__"})
 
     ref.delete()
     return True
