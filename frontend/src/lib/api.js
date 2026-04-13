@@ -19,6 +19,29 @@ async function getHeaders(isMultipart = false) {
   return headers
 }
 
+async function getToken() {
+  return auth.currentUser?.getIdToken()
+}
+
+async function requestWithToken(token, path, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  }
+  if (body) opts.body = JSON.stringify(body)
+  logger.log(`${method} ${path}`)
+  const res = await fetch(`${BASE}${path}`, opts)
+  if (!res.ok) {
+    const err = await res.text()
+    logger.error(`API Error: ${method} ${path} → ${res.status}`, err)
+    throw new Error(err || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
 async function request(path, method = 'GET', body = null) {
   const opts = { method, headers: await getHeaders() }
   if (body) opts.body = JSON.stringify(body)
@@ -49,6 +72,16 @@ export const api = {
   updateTemplate: (id, body)   => request(`/api/resumes/${id}/template`, 'PATCH', body),
   updateResumeTitle:(id, body) => request(`/api/resumes/${id}/title`, 'PATCH', body),
   deleteResume:   (id)         => request(`/api/resumes/${id}`, 'DELETE'),
+
+  // Batch save — fetches ONE token then fires all 3 requests truly in parallel
+  saveResume: async (id, { meta, sections, title }) => {
+    const token = await getToken()
+    return Promise.all([
+      requestWithToken(token, `/api/resumes/${id}/meta`, 'PATCH', meta),
+      requestWithToken(token, `/api/resumes/${id}/sections`, 'PATCH', { sections }),
+      requestWithToken(token, `/api/resumes/${id}/title`, 'PATCH', { title }),
+    ])
+  },
 
   importPDF: async (formData) => {
     const res = await fetch(`${BASE}/api/resumes/import-pdf`, {

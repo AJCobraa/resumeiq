@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useBlocker } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useToast } from '../components/ui/Toast'
-import { debounce } from '../lib/utils'
 import Spinner from '../components/ui/Spinner'
 import Button from '../components/ui/Button'
 import MetaEditor from '../components/editor/MetaEditor'
@@ -21,6 +20,7 @@ export default function ResumeEditor() {
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [activeTab, setActiveTab] = useState('meta')
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const resumeRef = useRef(null)
 
   // Keep ref in sync for debounced save
@@ -41,58 +41,69 @@ export default function ResumeEditor() {
 
   useEffect(() => { fetchResume() }, [fetchResume])
 
-  // ── Auto-save debounced (500ms) ─────────────────────
-  const debouncedSaveSections = useRef(
-    debounce(async (id, sections) => {
-      try {
-        setSaving(true)
-        await api.updateSections(id, { sections })
-      } catch {
-        // silent fail — user can retry
-      } finally {
-        setSaving(false)
-      }
-    }, 500)
-  ).current
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
+  )
 
-  const debouncedSaveMeta = useRef(
-    debounce(async (id, updates) => {
-      try {
-        setSaving(true)
-        await api.updateMeta(id, updates)
-      } catch {
-        // silent fail
-      } finally {
-        setSaving(false)
+  // ── Manual Save ─────────────────────────────────────
+  const handleSave = useCallback(async () => {
+    if (!resume || saving) return
+    try {
+      setSaving(true)
+      await api.saveResume(resumeId, {
+        meta: resume.meta,
+        sections: resume.sections,
+        title: resume.resumeTitle,
+      })
+      setHasUnsavedChanges(false)
+      toast.success('Resume saved!')
+    } catch (err) {
+      toast.error('Failed to save resume. Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }, [resume, resumeId, saving, toast])
+
+  // ── Keyboard Shortcut ───────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        handleSave()
       }
-    }, 500)
-  ).current
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleSave])
+
+  // ── Browser Tab Close Warning ───────────────────────
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [hasUnsavedChanges])
 
   // ── Handlers ────────────────────────────────────────
   const handleMetaChange = useCallback((field, value) => {
-    setResume(prev => {
-      const updated = { ...prev, meta: { ...prev.meta, [field]: value } }
-      debouncedSaveMeta(resumeId, { [field]: value })
-      return updated
-    })
-  }, [resumeId, debouncedSaveMeta])
+    setResume(prev => ({ ...prev, meta: { ...prev.meta, [field]: value } }))
+    setHasUnsavedChanges(true)
+  }, [])
 
   const handleSectionsChange = useCallback((newSections) => {
-    setResume(prev => {
-      const updated = { ...prev, sections: newSections }
-      debouncedSaveSections(resumeId, newSections)
-      return updated
-    })
-  }, [resumeId, debouncedSaveSections])
+    setResume(prev => ({ ...prev, sections: newSections }))
+    setHasUnsavedChanges(true)
+  }, [])
 
-  const handleTitleChange = useCallback(async (newTitle) => {
+  const handleTitleChange = useCallback((newTitle) => {
     setResume(prev => ({ ...prev, resumeTitle: newTitle }))
-    try {
-      await api.updateResumeTitle(resumeId, { title: newTitle })
-    } catch {
-      // silent
-    }
-  }, [resumeId])
+    setHasUnsavedChanges(true)
+  }, [])
 
   const handleExportPDF = useCallback(async () => {
     try {
@@ -145,9 +156,21 @@ export default function ResumeEditor() {
             />
           </div>
           <div className="flex items-center gap-2">
+            {hasUnsavedChanges && !saving && (
+              <span className="text-xs text-yellow-500">Unsaved changes</span>
+            )}
             {saving && (
               <span className="text-xs text-text-muted animate-pulse">Saving...</span>
             )}
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={handleSave}
+              loading={saving}
+              disabled={!hasUnsavedChanges || saving}
+            >
+              Save
+            </Button>
             <Button size="sm" variant="outline" onClick={handleExportPDF} loading={exporting}>
               Export PDF
             </Button>
@@ -220,6 +243,25 @@ export default function ResumeEditor() {
           </div>
         </div>
       </div>
+
+      {blocker.state === 'blocked' && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-bg-primary border border-border-default rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-text-primary font-semibold text-lg mb-2">Unsaved Changes</h3>
+            <p className="text-text-muted text-sm mb-6">
+              You have unsaved changes. Are you sure you want to leave? Your changes will be lost.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" size="sm" onClick={() => blocker.reset()}>
+                Stay
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => blocker.proceed()}>
+                Leave anyway
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
