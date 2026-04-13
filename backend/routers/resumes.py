@@ -48,6 +48,7 @@ async def get_resume(resume_id: str, uid: str = Depends(verify_token)):
     resume = await resume_service.get_resume(uid, resume_id)
     if not resume:
         raise HTTPException(status_code=404, detail="Resume not found")
+    resume.pop("embeddingsCache", None)  # Strip large embedding data from frontend response
     return resume
 
 

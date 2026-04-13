@@ -13,6 +13,19 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def _invalidate_embeddings_cache(ref) -> None:
+    """
+    Null out embeddingsCache so the next analysis recomputes fresh embeddings.
+    Uses Firestore .update() — only touches embeddingsCache, all other fields
+    including resumeTitle, meta, sections remain completely intact.
+
+    Called only on saves that change embeddable content.
+    NOT called on title-only saves — resumeTitle is not embedded.
+    NOT called on template saves — templateId is visual only.
+    """
+    ref.update({"embeddingsCache": None})
+
+
 def _make_blank_resume(uid: str, title: str, template_id: str = "cobra") -> dict:
     """Generate a blank resume document with default sections."""
     resume_id = str(uuid.uuid4())
@@ -248,6 +261,7 @@ async def update_meta(uid: str, resume_id: str, updates: dict) -> dict:
             patch[f"meta.{key}"] = val
 
     ref.update(patch)
+    _invalidate_embeddings_cache(ref)
     return (await get_resume(uid, resume_id))
 
 
@@ -259,6 +273,7 @@ async def update_sections(uid: str, resume_id: str, sections: list[dict]) -> dic
         return None
 
     ref.update({"sections": sections, "updatedAt": _now()})
+    _invalidate_embeddings_cache(ref)
     return (await get_resume(uid, resume_id))
 
 
@@ -276,16 +291,16 @@ async def update_bullet(uid: str, resume_id: str, section_id: str, bullet_id: st
         if section.get("sectionId") == section_id:
             # Handle sections with direct bullets (experience, achievements)
             for bullet in section.get("bullets", []):
-                if bullet.get("bulletId") == bullet_id:
                     bullet["text"] = text
                     ref.update({"sections": sections, "updatedAt": _now()})
+                    _invalidate_embeddings_cache(ref)
                     return (await get_resume(uid, resume_id))
             # Handle sections with items containing bullets (projects)
             for item in section.get("items", []):
                 for bullet in item.get("bullets", []):
-                    if bullet.get("bulletId") == bullet_id:
                         bullet["text"] = text
                         ref.update({"sections": sections, "updatedAt": _now()})
+                        _invalidate_embeddings_cache(ref)
                         return (await get_resume(uid, resume_id))
 
     return None
