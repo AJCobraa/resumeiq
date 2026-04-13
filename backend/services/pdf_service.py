@@ -19,6 +19,7 @@ import tempfile
 import uuid
 from pathlib import Path
 from itertools import groupby
+import sys
 
 from services import resume_service
 
@@ -88,33 +89,76 @@ async def export_resume_pdf(user_id: str, resume_id: str, template_id: str = "co
     except RuntimeError as e:
         raise RuntimeError(str(e))
 
-    print(f"[pdf_service] node={node_bin}")
-    print(f"[pdf_service] script={PUPPETEER_SCRIPT}")
-    print(f"[pdf_service] html={html_path}")
-    print(f"[pdf_service] pdf={pdf_path}")
+    print(f"[pdf_service] cmd: {node_bin} {PUPPETEER_SCRIPT} {html_path} {pdf_path}")
 
+    # ── Windows Subprocess Fix ───────────────────────────────────
+    # Ensure Proactor loop is used, otherwise create_subprocess_exec raises NotImplementedError
+    if sys.platform == "win32":
+        try:
+            from asyncio import WindowsProactorEventLoopPolicy
+            if not isinstance(asyncio.get_event_loop_policy(), WindowsProactorEventLoopPolicy):
+                asyncio.set_event_loop_policy(WindowsProactorEventLoopPolicy())
+        except Exception:
+            pass
+    # ─────────────────────────────────────────────────────────────
+
+    # ── PDF Generation Logic ─────────────────────────────────────
+    # We try create_subprocess_exec first, but fall back to subprocess.run on Windows if needed.
+    stdout, stderr = None, None
+    returncode = None
+    
     try:
-        # 4 — Invoke Puppeteer with absolute paths
-        proc = await asyncio.create_subprocess_exec(
-            node_bin,
-            PUPPETEER_SCRIPT,
-            html_path,
-            pdf_path,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=SCRIPTS_DIR,  # CWD = scripts dir so require('puppeteer') resolves correctly
-        )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=45)
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                node_bin,
+                PUPPETEER_SCRIPT,
+                html_path,
+                pdf_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=SCRIPTS_DIR,
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+                returncode = proc.returncode
+            except asyncio.TimeoutError:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+                raise TimeoutError("Puppeteer PDF render timed out after 120 seconds")
+                
+        except NotImplementedError:
+            print("[pdf_service] Catching NotImplementedError on Windows. Falling back to subprocess.run...")
+            import subprocess
+            
+            def run_sync():
+                return subprocess.run(
+                    [node_bin, PUPPETEER_SCRIPT, html_path, pdf_path],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    cwd=SCRIPTS_DIR,
+                    timeout=120
+                )
+                
+            result = await asyncio.to_thread(run_sync)
+            stdout, stderr = result.stdout, result.stderr
+            returncode = result.returncode
 
-        # 5 — Print stderr always (useful for debugging)
-        if stdout:
-            print(f"[pdf_service stdout] {stdout.decode()}")
-        if stderr:
-            print(f"[pdf_service stderr] {stderr.decode()}")
+        stdout_text = stdout.decode("utf-8", errors="replace") if stdout else ""
+        stderr_text = stderr.decode("utf-8", errors="replace") if stderr else ""
 
-        if proc.returncode != 0:
-            error_msg = stderr.decode() if stderr else "Unknown Puppeteer error"
-            raise RuntimeError(f"Puppeteer PDF render failed (exit {proc.returncode}): {error_msg}")
+        if stdout_text:
+            print(f"[pdf_service stdout] {stdout_text}")
+        if stderr_text:
+            print(f"[pdf_service stderr] {stderr_text}")
+
+        if returncode != 0:
+            # Puppeteer v20+ writes Chrome-missing errors to stdout, not stderr
+            error_msg = stderr_text or stdout_text or "Unknown Puppeteer error"
+            raise RuntimeError(
+                f"Puppeteer PDF render failed (exit {returncode}): {error_msg}"
+            )
 
         # 6 — Read PDF bytes
         if not os.path.exists(pdf_path):

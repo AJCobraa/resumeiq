@@ -558,3 +558,21 @@ Jobs are linked to the resume used for their analysis. If a resume is deleted, t
 - **Backfill Script (`backend/scripts/backfill_stats_summary.py`):** Provided a one-time migration tool to populate summaries for existing legacy data.
 
 **Why this works:** Firestore billing is driven by read/write counts. By moving the "compute" burden to a single write at log-time (cheap), we eliminate thousands of repeated reads at view-time (expensive), leading to instant dashboard loading states and significantly lower cloud costs.
+
+---
+
+---
+
+## Section 34 — Puppeteer v20+ Compatibility & Route Collisions
+
+**Problem:** PDF export was failing silently with empty `detail: ""` errors. This was caused by Puppeteer v20+ writing Chrome-missing errors to `stdout` (swallowed by the previous `stderr`-only capture) and a FastAPI route collision where `{resume_id}` intercepted the `import-pdf` path.
+
+**Decision:** Implement a robust error-capture layer and fix the route registration sequence.
+
+**Implementation:**
+- **Error Capture Layer (`pdf_service.py`):** Rewrote the subprocess handler to decode both `stdout` and `stderr` with UTF-8 replacement. The error message now uses `stderr_text or stdout_text`, ensuring that Puppeteer initialization failures are fully reported in the API response.
+- **Route Order Correction (`resumes.py`):** Moved the `@router.post("/resumes/import-pdf")` handler above the dynamic `@router.post("/resumes/{resume_id}/export-pdf")` handler. This ensures FastAPI matches the static path before the wildcard.
+- **Auto-Installation (`package.json`):** Added a `postinstall` script to `backend/scripts/package.json` to automatically download the correct Chrome binary on `npm install`, eliminating "Chrome not found" errors in new environments.
+- **Graceful Exception Handling (`resumes.py`):** Expanded the `export_pdf` handler to include a catch-all `Exception` block, ensuring any internal failure (e.g., file system or network) returns a readable message instead of an empty payload.
+
+**Why this works:** Route ordering is a foundational FastAPI behavior that was causing path shadowing. Combining this with full output capture ensures that any failure in the headless Chrome layer is immediately visible to both developers (via logs) and users (via clear UI error messages).

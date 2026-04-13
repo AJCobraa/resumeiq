@@ -72,7 +72,18 @@ export const api = {
       },
       body: JSON.stringify({ templateId }),
     })
-    if (!res.ok) throw new Error('PDF export failed')
+    if (!res.ok) {
+      const raw = await res.text().catch(() => '')
+      let detail = ''
+      try {
+        const parsed = JSON.parse(raw)
+        detail = parsed?.detail || ''
+      } catch {
+        detail = raw
+      }
+      logger.error(`API Error: POST /api/resumes/${id}/export-pdf → ${res.status}`, detail)
+      throw new Error(detail || `PDF export failed (HTTP ${res.status})`)
+    }
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

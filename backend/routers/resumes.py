@@ -134,23 +134,6 @@ async def delete_resume(resume_id: str, uid: str = Depends(verify_token)):
     return {"deleted": True}
 
 
-@router.post("/resumes/{resume_id}/export-pdf")
-async def export_pdf(resume_id: str, body: ExportPDFRequest, uid: str = Depends(verify_token)):
-    """Export resume as PDF via Puppeteer."""
-    try:
-        from services import pdf_service
-        pdf_bytes = await pdf_service.export_resume_pdf(uid, resume_id, body.templateId)
-        return Response(
-            content=pdf_bytes,
-            media_type="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename="resume_{resume_id[:8]}.pdf"'},
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.post("/resumes/import-pdf", status_code=201)
 async def import_pdf(
     bg: BackgroundTasks,
@@ -233,3 +216,22 @@ async def import_pdf(
                 os.remove(tmp_path)
         except Exception:
             pass
+
+
+@router.post("/resumes/{resume_id}/export-pdf")
+async def export_pdf(resume_id: str, body: ExportPDFRequest, uid: str = Depends(verify_token)):
+    """Export resume as PDF via Puppeteer."""
+    try:
+        from services import pdf_service
+        pdf_bytes = await pdf_service.export_resume_pdf(uid, resume_id, body.templateId)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="resume_{resume_id[:8]}.pdf"'},
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except (RuntimeError, TimeoutError) as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"PDF export failed: {str(e)}")
