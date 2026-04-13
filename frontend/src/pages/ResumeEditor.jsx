@@ -99,8 +99,8 @@ export default function ResumeEditor() {
       setExporting(true)
       await api.exportPDF(resumeId, resume?.templateId || 'cobra')
       toast.success('PDF downloaded!')
-    } catch {
-      toast.error('PDF export failed')
+    } catch (err) {
+      toast.error(err?.message || 'PDF export failed')
     } finally {
       setExporting(false)
     }

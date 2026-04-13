@@ -10,6 +10,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import asyncio
+import sys
+
+# Force ProactorEventLoop on Windows to support asyncio.create_subprocess_exec (PIPEs)
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth, resumes, jobs, analysis, stats

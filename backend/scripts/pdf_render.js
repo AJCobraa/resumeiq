@@ -45,9 +45,13 @@ async function renderPDF(htmlPath, pdfPath) {
     await page.setViewport({ width: 794, height: 1123 });
 
     // Load the resume HTML
-    const fileUrl = `file://${absHtmlPath}`;
+    // Ensure forward slashes and three-slash prefix for reliable local file loading
+    let normalizedPath = absHtmlPath.replace(/\\/g, '/');
+    if (!normalizedPath.startsWith('/')) normalizedPath = '/' + normalizedPath;
+    const fileUrl = `file://${normalizedPath}`;
+
     console.error(`[pdf_render] loading: ${fileUrl}`);
-    await page.goto(fileUrl, { waitUntil: 'networkidle0', timeout: 20000 });
+    await page.goto(fileUrl, { waitUntil: 'networkidle0', timeout: 40000 });
 
     // Generate A4 PDF with text-selectable content
     await page.pdf({
