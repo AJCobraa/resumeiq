@@ -5,6 +5,7 @@ import uuid
 import math
 import hashlib
 import re
+import asyncio
 from datetime import datetime, timezone
 from google.cloud import firestore
 from firebase_admin_init import db
@@ -185,12 +186,17 @@ async def analyze_resume_vs_jd(
     is_jd_cache_hit = cached_jd is not None
 
     semantic_score = 0
-    resume_cache = resume.get("embeddingsCache", {})
+    resume_cache = resume.get("embeddingsCache") or {}
     chunks = resume_cache.get("chunks") or []
     resume_embeddings_computed_on_demand = False
     if not chunks:
         chunks = await embedding_service.compute_embeddings(resume, user_id=user_id)
         resume_embeddings_computed_on_demand = True
+        # Write embeddings back to Firestore so the next analysis is a cache hit.
+        # Fire-and-forget — do not await, do not block analysis response.
+        asyncio.ensure_future(
+            embedding_service.update_embeddings_cache(user_id, resume_id, resume)
+        )
 
     jd_embedding_computed = False
     cached_reqs = []
