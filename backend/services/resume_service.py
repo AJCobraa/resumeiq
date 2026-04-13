@@ -215,15 +215,13 @@ async def list_resumes(uid: str) -> list[dict]:
     for doc in docs:
         d = doc.to_dict()
         results.append({
-            "resumeId": d.get("resumeId"),
+            "resumeId":    d.get("resumeId"),
             "resumeTitle": d.get("resumeTitle", "Untitled"),
-            "templateId": d.get("templateId", "cobra"),
-            "meta": {
-                "name": d.get("meta", {}).get("name", ""),
-                "title": d.get("meta", {}).get("title", ""),
-            },
-            "updatedAt": d.get("updatedAt"),
-            "createdAt": d.get("createdAt"),
+            "templateId":  d.get("templateId", "cobra"),
+            "meta":        d.get("meta", {}),        # return full meta — needed for thumbnail render
+            "sections":    d.get("sections", []),    # return full sections — needed for thumbnail render
+            "updatedAt":   d.get("updatedAt"),
+            "createdAt":   d.get("createdAt"),
         })
     return results
 

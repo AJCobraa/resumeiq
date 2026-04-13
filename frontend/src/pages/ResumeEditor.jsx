@@ -13,6 +13,9 @@ export default function ResumeEditor() {
   const { resumeId } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
+  const toastRef = useRef(toast)
+  useEffect(() => { toastRef.current = toast }, [toast])
+  
   const [resume, setResume] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -29,12 +32,12 @@ export default function ResumeEditor() {
       const data = await api.getResume(resumeId)
       setResume(data)
     } catch {
-      toast.error('Failed to load resume')
+      toastRef.current.error('Failed to load resume')
       navigate('/resumes')
     } finally {
       setLoading(false)
     }
-  }, [resumeId, navigate, toast])
+  }, [resumeId, navigate])
 
   useEffect(() => { fetchResume() }, [fetchResume])
 
