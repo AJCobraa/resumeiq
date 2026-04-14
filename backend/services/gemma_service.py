@@ -246,12 +246,26 @@ Return ONLY valid JSON matching this exact schema:
           ]
         }}
       ]
+    }},
+    {{
+      "type": "certifications",
+      "items": [
+        {{
+          "name": "Certification Title",
+          "issuer": "Issuing Organization",
+          "year": "2024",
+          "link": "https://credential-url.com or empty string",
+          "description": "One-line description or empty string"
+        }}
+      ]
     }}
   ]
 }}
 
 Rules:
 - Include ALL sections from the resume (only include section types that exist in the resume)
+- For certifications: extract every certificate, license, or professional credential listed in the resume
+- If no certifications exist in the resume, omit the certifications section entirely
 - Multiple experience entries should each be their own experience object in the sections array
 - Keep bullets truthful and intact — do not paraphrase
 - If a field is not present in the resume, use an empty string

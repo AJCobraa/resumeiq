@@ -132,9 +132,7 @@ function AiToolsTab() {
 const A4_HEIGHT_PX = 1122  // 297mm at 96dpi
 
 function PageBreakGuides() {
-  // Render dashed lines at every A4 page boundary
-  // These are purely visual — they do not affect PDF output
-  const guides = [1, 2, 3, 4, 5]  // support up to 6 pages
+  const guides = [1, 2, 3, 4, 5]
   return (
     <>
       {guides.map(n => (
@@ -142,15 +140,31 @@ function PageBreakGuides() {
           key={n}
           style={{
             position: 'absolute',
-            top: A4_HEIGHT_PX * n,
+            top: A4_HEIGHT_PX * n - 1,
             left: 0,
             right: 0,
-            height: 1,
-            background: 'repeating-linear-gradient(to right, #94a3b8 0, #94a3b8 6px, transparent 6px, transparent 12px)',
+            height: 3,
+            background: '#cbd5e1',
             zIndex: 10,
             pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
-        />
+        >
+          <span style={{
+            fontSize: 9,
+            color: '#94a3b8',
+            background: '#f1f5f9',
+            padding: '1px 8px',
+            borderRadius: 3,
+            fontFamily: 'system-ui, sans-serif',
+            letterSpacing: '0.05em',
+            userSelect: 'none',
+          }}>
+            — page {n + 1} —
+          </span>
+        </div>
       ))}
     </>
   )
@@ -445,7 +459,6 @@ export default function ResumeEditor() {
               background: '#ffffff',
               boxShadow: '0 4px 40px rgba(0,0,0,0.18)',
               borderRadius: 4,
-              overflow: 'hidden',
               position: 'relative',
             }}>
               <Suspense fallback={

@@ -424,7 +424,10 @@ def _render_certifications_group(sections: list) -> str:
     """Render all certification items under ONE 'Certifications' header."""
     all_items = []
     for s in sections:
-        all_items.extend([i for i in s.get("items", []) if i.get("name")])
+        all_items.extend([
+            i for i in s.get("items", [])
+            if i.get("name") or i.get("title")
+        ])
     if not all_items:
         return ""
     html = '<div class="section-title">Certifications</div>'
@@ -444,7 +447,7 @@ def _render_certifications_group(sections: list) -> str:
     <div class="entry">
       <div class="entry-header">
         <div>
-          <span class="entry-title">{item.get('name', '')}</span>
+          <span class="entry-title">{item.get('name') or item.get('title', '')}</span>
           {issuer}
         </div>
         <span class="entry-date">{year}</span>

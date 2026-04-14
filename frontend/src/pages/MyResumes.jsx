@@ -10,6 +10,232 @@ import Spinner from '../components/ui/Spinner'
 import Modal from '../components/ui/Modal'
 import { TEMPLATE_OPTIONS, TEMPLATE_REGISTRY } from '../lib/templateRegistry'
 
+function ScannerVisual({ file }) {
+  const [pdfUrl, setPdfUrl] = useState(null)
+
+  useEffect(() => {
+    if (!file) return
+    const url = URL.createObjectURL(file)
+    setPdfUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+
+  return (
+    <div style={{
+      position: 'relative',
+      width: 260, height: 300,
+      flexShrink: 0,
+    }}>
+      {/* ── Document frame ── */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        borderRadius: 12,
+        border: '1px solid #e2e8f0',
+        background: '#f8fafc',
+        overflow: 'hidden',
+      }}>
+
+        {/* ── Live PDF preview or faux lines fallback ── */}
+        {pdfUrl ? (
+          /*
+            Outer div clips to the frame. Inner embed is rendered
+            taller than the frame so page 1 fills it, and overflow
+            hidden on both layers kills the scrollbar entirely.
+          */
+          <div style={{
+            position: 'absolute', inset: 0,
+            overflow: 'hidden',
+            borderRadius: 5,
+          }}>
+            <embed
+              src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH&page=1`}
+              type="application/pdf"
+              style={{
+                position: 'absolute',
+                top: 0, left: 0,
+                width: '100%',
+                height: '400%',      /* render tall so page 1 fills frame */
+                border: 'none',
+                pointerEvents: 'none',
+                userSelect: 'none',
+                overflow: 'hidden',
+                opacity: 0.92,
+              }}
+            />
+          </div>
+        ) : (
+          /* Fallback faux lines while URL generates */
+          [14, 28, 42, 56, 70, 84, 98].map((top, i) => (
+            <div key={i} style={{
+              position: 'absolute', left: 10, top,
+              height: 4, borderRadius: 999,
+              background: 'rgba(148,163,184,0.2)',
+              width: i % 3 === 0 ? '60%' : i % 2 === 0 ? '75%' : '50%',
+            }} />
+          ))
+        )}
+
+        {/* ── Glowing scan line — always rendered on top ── */}
+        <motion.div
+          style={{
+            position: 'absolute', left: 0, width: '100%', height: 2,
+            background: 'linear-gradient(90deg, transparent 0%, #7c3aed 30%, #7c3aed 70%, transparent 100%)',
+            boxShadow: '0 0 14px 4px rgba(124,58,237,0.45)',
+            zIndex: 10,
+          }}
+          animate={{ top: ['8%', '92%', '8%'] }}
+          transition={{ duration: 3, ease: 'easeInOut', repeat: Infinity }}
+        />
+
+        {/* ── Semi-transparent purple tint overlay ──
+             gives the scan line something to glow against ── */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'rgba(124,58,237,0.04)',
+          zIndex: 9, pointerEvents: 'none',
+        }} />
+      </div>
+
+      {/* ── Corner accents ── */}
+      {[
+        { top: -1, left: -1, borderTop: '2px solid #7c3aed', borderLeft: '2px solid #7c3aed', borderRadius: '4px 0 0 0' },
+        { top: -1, right: -1, borderTop: '2px solid #7c3aed', borderRight: '2px solid #7c3aed', borderRadius: '0 4px 0 0' },
+        { bottom: -1, left: -1, borderBottom: '2px solid #7c3aed', borderLeft: '2px solid #7c3aed', borderRadius: '0 0 0 4px' },
+        { bottom: -1, right: -1, borderBottom: '2px solid #7c3aed', borderRight: '2px solid #7c3aed', borderRadius: '0 0 4px 0' },
+      ].map((s, i) => (
+        <div key={i} style={{ position: 'absolute', width: 10, height: 10, ...s }} />
+      ))}
+
+      {/* ── File name chip below frame ── */}
+      {file && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0,
+          marginTop: 6, textAlign: 'center',
+        }}>
+          <span style={{
+            display: 'inline-block',
+            fontSize: 9, fontWeight: 600,
+            color: '#7c3aed',
+            background: 'rgba(124,58,237,0.08)',
+            border: '1px solid rgba(124,58,237,0.15)',
+            borderRadius: 999, padding: '2px 7px',
+            maxWidth: 96, overflow: 'hidden',
+            textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {file.name}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ImportLoadingScreen({ step, file }) {
+  const STEPS = [
+    {
+      icon: '📄',
+      title: '📄Reading your PDF',
+      detail: 'We extract every character of text from your PDF — unlike screenshot-based tools, this keeps your content 100% accurate and ATS-readable.',
+    },
+    {
+      icon: '🧠',
+      title: '🧠AI is understanding your resume',
+      detail: 'Our AI model reads your full resume and maps it to structured fields — name, experience, skills, projects, certifications and more.',
+    },
+    {
+      icon: '🗂️',
+      title: '🗂️Organising your sections',
+      detail: 'Each section is sorted into the right place: work history by date, skills by category, projects with their tech stacks and bullets.',
+    },
+    {
+      icon: '🎨',
+      title: '🎨Applying your template',
+      detail: 'Your parsed content is being fitted into the template you chose. Every font, spacing, and layout rule is applied for a clean ATS-safe output.',
+    },
+    {
+      icon: '✅',
+      title: '✅Almost done!',
+      detail: 'Saving everything to your account and preparing the editor. You\'ll be redirected automatically in a moment.',
+    },
+  ]
+  const currentStep = STEPS[step] || STEPS[0]
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      padding: '32px 24px', minHeight: 340, textAlign: 'center',
+    }}>
+      <div style={{ marginBottom: 20 }}>
+        <ScannerVisual file={file} />
+      </div>
+
+      <h3 style={{
+        fontSize: 18, fontWeight: 700, color: '#111827',
+        marginTop: 16, marginBottom: 10,
+      }}>
+        {currentStep.title}
+      </h3>
+
+      <p style={{
+        fontSize: 13, color: '#6b7280', lineHeight: 1.6,
+        maxWidth: 360, marginBottom: 28,
+      }}>
+        {currentStep.detail}
+      </p>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 28 }}>
+        {STEPS.map((_, i) => (
+          <div key={i} style={{
+            width: i === step ? 20 : 8,
+            height: 8, borderRadius: 999,
+            background: i === step ? '#7c3aed' : '#e5e7eb',
+            transition: 'all 0.4s ease',
+          }} />
+        ))}
+      </div>
+
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '10px 20px', background: '#faf5ff',
+        borderRadius: 999, border: '1px solid #ede9fe',
+      }}>
+        <div style={{
+          width: 16, height: 16,
+          border: '2.5px solid #ede9fe',
+          borderTop: '2.5px solid #7c3aed',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#7c3aed' }}>
+          Parsing resume with AI — this takes ~30–60 seconds
+        </span>
+      </div>
+
+      <div style={{
+        marginTop: 24, padding: '12px 16px',
+        background: '#f0fdf4', border: '1px solid #bbf7d0',
+        borderRadius: 12, maxWidth: 380,
+      }}>
+        <p style={{ fontSize: 11, color: '#166534', lineHeight: 1.5 }}>
+          💡 <strong>Why AI parsing?</strong> Most resume tools copy text
+          blindly. We use AI to understand context — so "Led a team of 5"
+          goes into Experience, not Skills, every time.
+        </p>
+      </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.12); }
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+    </div>
+  )
+}
+
 const ResumeThumbnail = memo(({ resume }) => {
   const templateId = resume?.templateId || 'cobra'
   const TemplateComponent = TEMPLATE_REGISTRY[templateId]?.component
@@ -46,6 +272,8 @@ export default function MyResumes() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [importStep, setImportStep] = useState(0)
+  const importStepTimer = useRef(null)
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [pendingImportFile, setPendingImportFile] = useState(null)
   const [selectionSource, setSelectionSource] = useState(null) // 'create' or 'import'
@@ -124,9 +352,18 @@ export default function MyResumes() {
   }
 
   const handleImportFinal = async (templateId) => {
-    if (!pendingImportFile) return
+    if (!pendingImportFile || importing) return
+    setImportStep(0)
     try {
       setImporting(true)
+      // Animate through informational steps every 10s
+      const steps = [0, 1, 2, 3, 4]
+      let i = 0
+      importStepTimer.current = setInterval(() => {
+        i = Math.min(i + 1, steps.length - 1)
+        setImportStep(i)
+      }, 25000)
+
       const formData = new FormData()
       formData.append('file', pendingImportFile)
       formData.append('templateId', templateId)
@@ -140,7 +377,9 @@ export default function MyResumes() {
     } catch (err) {
       toast.error('PDF import failed. Make sure the PDF has selectable text.')
     } finally {
+      clearInterval(importStepTimer.current)
       setImporting(false)
+      setImportStep(0)
     }
   }
 
@@ -292,41 +531,56 @@ export default function MyResumes() {
         title="Choose a Template" 
         size="md"
       >
-        <div className="grid grid-cols-2 gap-6 py-4">
-          {TEMPLATE_OPTIONS.map(template => (
-            <div 
-              key={template.id}
-              onClick={() => selectionSource === 'create' ? handleCreateFinal(template.id) : handleImportFinal(template.id)}
-              className="group cursor-pointer space-y-3"
-            >
-              <div className="aspect-[3/4] rounded-xl border-2 border-slate-200 group-hover:border-blue-500 bg-white overflow-hidden transition-all duration-200 shadow-sm group-hover:shadow-md relative">
-                <img 
-                  src={template.image} 
-                  alt={template.name}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/5 transition-colors flex items-center justify-center">
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-blue-600 text-white px-4 py-2 rounded-full text-xs font-bold shadow-lg transform translate-y-4 group-hover:translate-y-0 duration-300">
-                    Select {template.name}
+        {importing ? (
+          <ImportLoadingScreen step={importStep} file={pendingImportFile} />
+        ) : (
+          /* ── Normal template selection grid ── */
+          <>
+            <div className="grid grid-cols-2 gap-6 py-4">
+              {TEMPLATE_OPTIONS.map(template => (
+                <div
+                  key={template.id}
+                  onClick={() =>
+                    selectionSource === 'create'
+                      ? handleCreateFinal(template.id)
+                      : handleImportFinal(template.id)
+                  }
+                  className="group cursor-pointer space-y-3"
+                >
+                  <div className="aspect-[3/4] rounded-xl border-2 border-slate-200 group-hover:border-blue-500 bg-white overflow-hidden transition-all duration-200 shadow-sm group-hover:shadow-md relative">
+                    <img
+                      src={template.image}
+                      alt={template.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-blue-600/0 group-hover:bg-blue-600/5 transition-colors flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-blue-600 text-white px-4 py-2 rounded-full text-xs font-bold shadow-lg transform translate-y-4 group-hover:translate-y-0 duration-300">
+                        Select {template.name}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <h4 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
+                      {template.name}
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {template.description}
+                    </p>
                   </div>
                 </div>
-              </div>
-              <div className="text-center">
-                <h4 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">{template.name}</h4>
-                <p className="text-xs text-slate-500 mt-1">{template.description}</p>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        <div className="mt-4 flex justify-center">
-          {(creating || importing) && (
-            <div className="flex items-center gap-3 text-sm text-blue-600 bg-blue-50 px-6 py-3 rounded-full border border-blue-100 shadow-sm animate-pulse">
-              <Spinner size="sm" />
-              <span className="font-medium">{creating ? 'Creating your resume...' : 'Parsing PDF & populating template...'}</span>
-            </div>
-          )}
-        </div>
+            {creating && (
+              <div className="mt-4 flex justify-center">
+                <div className="flex items-center gap-3 text-sm text-blue-600 bg-blue-50 px-6 py-3 rounded-full border border-blue-100 shadow-sm animate-pulse">
+                  <Spinner size="sm" />
+                  <span className="font-medium">Creating your resume...</span>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </Modal>
 
       {/* Delete Confirmation Modal */}
