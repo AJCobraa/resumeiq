@@ -252,7 +252,7 @@ def _build_template_html(resume: dict, template_id: str) -> str:
       color: #1a1a1a;
       font-size: 10pt;
       line-height: 1.4;
-      padding: 40px 48px;
+      margin: 0; padding: 0;
     }}
     .header {{ text-align: center; margin-bottom: 20px; }}
     .header h1 {{ font-size: 22pt; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 4px; }}
@@ -277,9 +277,19 @@ def _build_template_html(resume: dict, template_id: str) -> str:
     .skill-items {{ color: #555; }}
     .tech-stack {{ color: #2563eb; font-size: 9pt; margin-left: 8px; }}
     .grade {{ font-size: 9pt; color: #555; margin-top: 1px; }}
+    .page-wrap {{ width: 100%; }}
+    .cert-link {{
+      font-size: 8.5pt;
+      color: #2563eb;
+      margin-top: 2px;
+    }}
+    .cert-link a {{
+      color: #2563eb;
+      text-decoration: none;
+    }}
     @page {{
       size: A4;
-      margin: 0;
+      margin: 28px 48px;
     }}
     .entry {{
       page-break-inside: avoid;
@@ -295,7 +305,7 @@ def _build_template_html(resume: dict, template_id: str) -> str:
     }}
   </style>
 </head>
-<body>
+<body><div class="page-wrap">
   <div class="header">
     {name_html}
     {title_html}
@@ -303,7 +313,7 @@ def _build_template_html(resume: dict, template_id: str) -> str:
   </div>
   {summary_html}
   {grouped_html}
-</body>
+</div></body>
 </html>"""
 
 
@@ -389,6 +399,10 @@ def _render_projects_group(sections: list) -> str:
         dates = " – ".join(filter(None, [item.get("startDate"), item.get("endDate")]))
         tech = f"<span class='tech-stack'>[{item['techStack']}]</span>" if item.get("techStack") else ""
         location = f"<p class='entry-location'>{item['institution']}</p>" if item.get("institution") else ""
+        description_html = (
+            f"<p class='entry-location'>{item['description']}</p>"
+            if item.get("description") else ""
+        )
         bullets = _render_bullets(item.get("bullets", []))
         html += f"""
     <div class="entry">
@@ -400,6 +414,7 @@ def _render_projects_group(sections: list) -> str:
         <span class="entry-date">{dates}</span>
       </div>
       {location}
+      {description_html}
       {bullets}
     </div>"""
     return html
@@ -416,7 +431,15 @@ def _render_certifications_group(sections: list) -> str:
     for item in all_items:
         issuer = f" &mdash; <span class='entry-company'>{item['issuer']}</span>" if item.get("issuer") else ""
         year = item.get("year", "")
-        description = f"<p class='entry-location'>{item['description']}</p>" if item.get("description") else ""
+        link_html = (
+            f"<p class='cert-link'>"
+            f"<a href='{item['link']}'>{item['link']}</a></p>"
+            if item.get("link") else ""
+        )
+        description_html = (
+            f"<p class='entry-location'>{item['description']}</p>"
+            if item.get("description") else ""
+        )
         html += f"""
     <div class="entry">
       <div class="entry-header">
@@ -426,7 +449,8 @@ def _render_certifications_group(sections: list) -> str:
         </div>
         <span class="entry-date">{year}</span>
       </div>
-      {description}
+      {description_html}
+      {link_html}
     </div>"""
     return html
 

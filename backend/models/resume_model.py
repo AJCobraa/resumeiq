@@ -78,6 +78,8 @@ class CertificationItem(BaseModel):
     name: str = ""
     issuer: str = ""
     year: str = ""
+    link: str = ""
+    description: str = ""
 
 
 class CertificationsSection(BaseModel):

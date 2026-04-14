@@ -16,7 +16,7 @@ export function CertificationsAccordion({ sections, allSections, onChange }) {
     }))
 
   const addEntry = () => {
-    const newItem = { certId: genId(), name: '', issuer: '', year: '', description: '' }
+    const newItem = { certId: genId(), name: '', issuer: '', year: '', link: '', description: '' }
     const existingSection = sections[0]
     if (existingSection) {
       onChange(allSections.map(s =>
@@ -56,11 +56,30 @@ export function CertificationsAccordion({ sections, allSections, onChange }) {
           showMoveDown={false}
         >
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 10px' }}>
-            <FormField label="Certification Name" value={item.name} onChange={v => updateItem(item._sectionId, item.certId, 'name', v)} placeholder="AWS Solutions Architect" />
-            <FormField label="Issuer" value={item.issuer} onChange={v => updateItem(item._sectionId, item.certId, 'issuer', v)} placeholder="Amazon Web Services" />
-            <div style={{ gridColumn: 'span 1' }}>
-              <FormField label="Year / Date" value={item.year} onChange={v => updateItem(item._sectionId, item.certId, 'year', v)} placeholder="2024" />
-            </div>
+            <FormField
+              label="Certification Name"
+              value={item.name}
+              onChange={v => updateItem(item._sectionId, item.certId, 'name', v)}
+              placeholder="AWS Solutions Architect"
+            />
+            <FormField
+              label="Issuer"
+              value={item.issuer}
+              onChange={v => updateItem(item._sectionId, item.certId, 'issuer', v)}
+              placeholder="Amazon Web Services"
+            />
+            <FormField
+              label="Year / Date"
+              value={item.year}
+              onChange={v => updateItem(item._sectionId, item.certId, 'year', v)}
+              placeholder="2024"
+            />
+            <FormField
+              label="Certificate Link"
+              value={item.link}
+              onChange={v => updateItem(item._sectionId, item.certId, 'link', v)}
+              placeholder="https://www.credly.com/badges/..."
+            />
           </div>
           <FormField label="Description (optional)" value={item.description} onChange={v => updateItem(item._sectionId, item.certId, 'description', v)} placeholder="Brief note about this certification…" multiline rows={2} />
         </EntryCard>

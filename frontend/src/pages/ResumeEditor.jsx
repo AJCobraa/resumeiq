@@ -382,7 +382,7 @@ export default function ResumeEditor() {
               </AccordionSection>
 
               <AccordionSection icon={<FolderIcon />} iconColor="#f97316" title="Projects"
-                count={projectSections.length}>
+                count={projectSections.flatMap(s => s.items || []).length}>
                 <ProjectsAccordion sections={projectSections} allSections={resume.sections} onChange={handleSectionsChange} />
               </AccordionSection>
 
