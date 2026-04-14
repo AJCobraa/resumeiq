@@ -210,6 +210,10 @@ def _build_template_html(resume: dict, template_id: str) -> str:
             grouped_html += _render_skills_group(items)
         elif stype == "projects":
             grouped_html += _render_projects_group(items)
+        elif stype == "certifications":
+            grouped_html += _render_certifications_group(items)
+        elif stype == "achievements":
+            grouped_html += _render_achievements_group(items)
 
     contact_items = [
         meta.get("email"),
@@ -217,6 +221,8 @@ def _build_template_html(resume: dict, template_id: str) -> str:
         meta.get("location"),
         _strip_scheme(meta.get("linkedin", "")),
         _strip_scheme(meta.get("github", "")),
+        _strip_scheme(meta.get("blog", "")),
+        _strip_scheme(meta.get("leetcode", "")),
     ]
     contact_items = [c for c in contact_items if c]
     contact_html = "  •  ".join(contact_items) if contact_items else ""
@@ -246,7 +252,7 @@ def _build_template_html(resume: dict, template_id: str) -> str:
       color: #1a1a1a;
       font-size: 10pt;
       line-height: 1.4;
-      padding: 40px 48px;
+      margin: 0; padding: 0;
     }}
     .header {{ text-align: center; margin-bottom: 20px; }}
     .header h1 {{ font-size: 22pt; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 4px; }}
@@ -271,9 +277,35 @@ def _build_template_html(resume: dict, template_id: str) -> str:
     .skill-items {{ color: #555; }}
     .tech-stack {{ color: #2563eb; font-size: 9pt; margin-left: 8px; }}
     .grade {{ font-size: 9pt; color: #555; margin-top: 1px; }}
+    .page-wrap {{ width: 100%; }}
+    .cert-link {{
+      font-size: 8.5pt;
+      color: #2563eb;
+      margin-top: 2px;
+    }}
+    .cert-link a {{
+      color: #2563eb;
+      text-decoration: none;
+    }}
+    @page {{
+      size: A4;
+      margin: 28px 48px;
+    }}
+    .entry {{
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }}
+    .section-title {{
+      page-break-after: avoid;
+      break-after: avoid;
+    }}
+    .skill-line {{
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }}
   </style>
 </head>
-<body>
+<body><div class="page-wrap">
   <div class="header">
     {name_html}
     {title_html}
@@ -281,7 +313,7 @@ def _build_template_html(resume: dict, template_id: str) -> str:
   </div>
   {summary_html}
   {grouped_html}
-</body>
+</div></body>
 </html>"""
 
 
@@ -367,6 +399,10 @@ def _render_projects_group(sections: list) -> str:
         dates = " – ".join(filter(None, [item.get("startDate"), item.get("endDate")]))
         tech = f"<span class='tech-stack'>[{item['techStack']}]</span>" if item.get("techStack") else ""
         location = f"<p class='entry-location'>{item['institution']}</p>" if item.get("institution") else ""
+        description_html = (
+            f"<p class='entry-location'>{item['description']}</p>"
+            if item.get("description") else ""
+        )
         bullets = _render_bullets(item.get("bullets", []))
         html += f"""
     <div class="entry">
@@ -378,8 +414,59 @@ def _render_projects_group(sections: list) -> str:
         <span class="entry-date">{dates}</span>
       </div>
       {location}
+      {description_html}
       {bullets}
     </div>"""
+    return html
+
+
+def _render_certifications_group(sections: list) -> str:
+    """Render all certification items under ONE 'Certifications' header."""
+    all_items = []
+    for s in sections:
+        all_items.extend([
+            i for i in s.get("items", [])
+            if i.get("name") or i.get("title")
+        ])
+    if not all_items:
+        return ""
+    html = '<div class="section-title">Certifications</div>'
+    for item in all_items:
+        issuer = f" &mdash; <span class='entry-company'>{item['issuer']}</span>" if item.get("issuer") else ""
+        year = item.get("year", "")
+        link_html = (
+            f"<p class='cert-link'>"
+            f"<a href='{item['link']}'>{item['link']}</a></p>"
+            if item.get("link") else ""
+        )
+        description_html = (
+            f"<p class='entry-location'>{item['description']}</p>"
+            if item.get("description") else ""
+        )
+        html += f"""
+    <div class="entry">
+      <div class="entry-header">
+        <div>
+          <span class="entry-title">{item.get('name') or item.get('title', '')}</span>
+          {issuer}
+        </div>
+        <span class="entry-date">{year}</span>
+      </div>
+      {description_html}
+      {link_html}
+    </div>"""
+    return html
+
+
+def _render_achievements_group(sections: list) -> str:
+    """Render all achievement bullets under ONE 'Achievements' header."""
+    all_bullets = []
+    for s in sections:
+        all_bullets.extend([b for b in s.get("bullets", []) if b.get("text")])
+    if not all_bullets:
+        return ""
+    html = '<div class="section-title">Achievements</div>'
+    html += _render_bullets(all_bullets)
     return html
 
 

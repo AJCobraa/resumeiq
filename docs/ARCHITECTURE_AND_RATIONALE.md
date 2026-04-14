@@ -576,3 +576,112 @@ Jobs are linked to the resume used for their analysis. If a resume is deleted, t
 - **Graceful Exception Handling (`resumes.py`):** Expanded the `export_pdf` handler to include a catch-all `Exception` block, ensuring any internal failure (e.g., file system or network) returns a readable message instead of an empty payload.
 
 **Why this works:** Route ordering is a foundational FastAPI behavior that was causing path shadowing. Combining this with full output capture ensures that any failure in the headless Chrome layer is immediately visible to both developers (via logs) and users (via clear UI error messages).
+
+---
+
+## Section 35 — Certifications, Achievements & Full Template Parity
+
+### 35.1 New Section Types: Certifications & Achievements
+
+**Problem:** The only editable section types were `experience`, `education`, `skills`, and `projects`. Users could not record certifications or standalone achievement bullet points — common for competitive job seekers.
+
+**Decision:** Introduce `certifications` and `achievements` as first-class section types throughout the stack.
+
+**Data Shape:**
+- `certifications`: `{ sectionId, type: 'certifications', items: [{ certId(uuid), name, issuer, year, description }] }`
+- `achievements`: `{ sectionId, type: 'achievements', bullets: [{ bulletId(uuid), text }] }`
+
+**Why these shapes?** Certifications are structured records (name + issuer + year) while achievements are free-form bullet points — matching the `experience` bullets pattern for consistency.
+
+### 35.2 SectionEditor — New Editors
+
+**Files changed:** `frontend/src/components/editor/SectionEditor.jsx`
+
+- Added `CertificationsEditor` — 2-column grid (Name, Issuer, Year, Description) with add/remove per item.
+- Added `AchievementsEditor` — bullet-list textarea rows, identical UX pattern to `ExperienceEditor` bullets.
+- Both editors registered in `renderSection` switch and `addSection` factory.
+- Corresponding "🏅 Certifications" and "🏆 Achievements" buttons added to the **Add Section** toolbar.
+
+### 35.3 Template Rendering — CobraTemplate & ExecutiveBlueTemplate
+
+**Files changed:** `CobraTemplate.jsx`, `ExecutiveBlueTemplate.jsx`
+
+Both templates now handle `certifications` and `achievements` inside their `groups.map()` switch using dedicated group-level components that follow the same `groupBy` pattern as existing types.
+
+- `CertificationsGroup`: flatMaps `s.items`, renders name + issuer + year in a flex row.
+- `AchievementsGroup`: flatMaps `s.bullets`, renders as `<BulletList>`.
+
+**Why group-level?** Prevents duplicate section headers — all certifications across multiple `certifications`-typed sections are rendered under a single "Certifications" heading.
+
+### 35.4 ExecutiveBlueTemplate — Photo Block Removal
+
+Removed the avatar/initials placeholder (`meta.photoUrl ? <img> : <div with initials>`) from the header. Resume photos are not ATS-safe and create layout inconsistency across PDF exports. The `ContactRow` already renders all relevant identity information (email, phone, location, LinkedIn, GitHub).
+
+### 35.5 ExecutiveBlueTemplate — GitHub Contact Link
+
+Added `meta.github` rendering to `ContactRow` in `ExecutiveBlueTemplate`, matching the parity already present in `CobraTemplate`.
+
+### 35.6 Backend — Skills Category Apply Strategy (jobs.py)
+
+**Problem:** Approving a skills-rewrite recommendation failed silently. Skills are stored as `{ categoryId, items: [string] }` — not as `{ bulletId, text }` bullet objects. Strategy 1 (ID-based targeting) in `_apply_recommendation_to_resume` only searched `section.bullets` and `item.bullets`, missing the skills shape entirely.
+
+**Fix:** Added **Strategy 1b** — before checking nested project items, if the matched section has `type == 'skills'`, iterate `section.categories` and match `cat.categoryId == bullet_id`. On match, replace `cat.items` with the comma-split `new_text` array.
+
+**Why comma-split?** The AI rewrites a skills category as a comma-separated list (e.g., `"React, TypeScript, GraphQL"`). Splitting on `,` preserves the existing storage format without requiring a schema change.
+
+### 35.7 PDF Service — Certifications & Achievements Rendering
+
+**Files changed:** `backend/services/pdf_service.py`
+
+Added `_render_certifications_group` and `_render_achievements_group` to the HTML builder. These are invoked inside the section-type switch in `_build_resume_html`, ensuring PDF exports are in full parity with the React template rendering.
+
+---
+
+## Section 36 — ResumeEditor Full UI Rebuild (Accordion Split-Pane)
+
+### 36.1 Motivation
+
+The previous `ResumeEditor.jsx` used a flat tab-based layout (`Personal Info | Sections | Template`) that rendered raw `MetaEditor` and `SectionEditor` components in a single scrolling column. This worked but was hard to navigate for long resumes. The new design introduces a premium accordion-based split-pane UI matching a design spec with entry-level collapsible cards per job/school/project.
+
+### 36.2 Layout Override — Breaking Out of AppLayout
+
+`AppLayout` wraps all pages with a sidebar (240 px `marginLeft`). The editor must be visually full-screen. The chosen approach adds `position: fixed; inset: 0; z-index: 50` to the root div of `ResumeEditor`. This places the editor above the sidebar without modifying `AppLayout`, `App.jsx`, or any routing config.
+
+**Why not a separate route outside AppLayout?** Routing changes would also require adjusting the `useBlocker` ref context and the `navigate('/resumes')` paths. The fixed-overlay approach is zero-footprint on routing.
+
+### 36.3 File Split
+
+The rebuild is split into focused files to keep components under 200 lines:
+
+| File | Contents |
+|---|---|
+| `src/lib/sectionUtils.js` | `moveSection()`, `genId()` — shared pure functions |
+| `src/components/editor/AccordionSection.jsx` | `AccordionSection`, `EntryCard`, `FormField`, `AddEntryButton` |
+| `src/components/editor/ExperienceAccordion.jsx` | Experience entry cards + bullet editing |
+| `src/components/editor/EducationAccordion.jsx` | Education items (flattened from sections[].items) |
+| `src/components/editor/ProjectsAccordion.jsx` | Projects entry cards + bullet editing |
+| `src/components/editor/SkillsAccordion.jsx` | Flat category rows (no EntryCard nesting) |
+| `src/components/editor/CertificationsAccordion.jsx` | Certifications items (flattened) |
+| `src/components/editor/AchievementsAccordion.jsx` | Flat bullet list |
+| `src/pages/ResumeEditor.jsx` | Main page — wires all above |
+
+**Files deliberately kept unchanged:** `MetaEditor.jsx`, `SectionEditor.jsx`, `CobraTemplate.jsx`, `ExecutiveBlueTemplate.jsx`, `api.js`, `App.jsx`, all backend files.
+
+### 36.4 Header Design
+
+Three zones:
+- **Left**: chevron back button + DocIcon + "ResumeIQ" wordmark + dimmed resume title.
+- **Center**: pill tab switcher (`Content | Customize | AI Tools`) with filled-purple active state.
+- **Right**: "Save Changes" button that activates (purple) only when `hasUnsavedChanges`, plus an orange dot indicator.
+
+### 36.5 AccordionSection + EntryCard Pattern
+
+`AccordionSection` is the outer group card (one per section type). `EntryCard` is an inner collapsible per entry (one per job, school, project, certification). The two-level nesting mirrors how resume data is structured: sections array (top level) → items/bullets (inner level).
+
+### 36.6 Move Up/Down Logic
+
+`moveSection()` in `sectionUtils.js` swaps `order` values between the target section and its nearest neighbor of the same type, then re-sorts the full array. This avoids index manipulation on a heterogeneous array and keeps order semantically encoded in each section object.
+
+### 36.7 Data Model Compatibility
+
+No data model changes. All accordion components read/write the same `resume.meta` (flat object) and `resume.sections` (typed array) fields used by the API and templates. The `handleMetaChange` and `handleSectionsChange` callbacks are identical to the previous implementation.

@@ -314,6 +314,103 @@ function ProjectsEditor({ section, onUpdate, onRemoveSection }) {
 }
 
 /* ──────────────────────────────────────────────────────
+   Certifications Section Editor
+   ────────────────────────────────────────────────────── */
+function CertificationsEditor({ section, onUpdate, onRemoveSection }) {
+  const updateItem = (idx, field, value) => {
+    const items = [...section.items]
+    items[idx] = { ...items[idx], [field]: value }
+    onUpdate({ ...section, items })
+  }
+
+  const addItem = () => {
+    onUpdate({
+      ...section,
+      items: [...(section.items || []), { certId: uuid(), name: '', issuer: '', year: '', description: '' }],
+    })
+  }
+
+  const removeItem = (idx) => {
+    onUpdate({ ...section, items: section.items.filter((_, i) => i !== idx) })
+  }
+
+  return (
+    <div className="p-4 bg-bg-elevated border border-border-default rounded-[8px] space-y-3">
+      <div className="flex items-start justify-between">
+        <span className="text-xs font-medium text-accent-blue uppercase">Certifications</span>
+        <RemoveButton onClick={onRemoveSection} />
+      </div>
+      {(section.items || []).map((item, i) => (
+        <div key={item.certId} className="space-y-2 pb-3 border-b border-border-default last:border-0 last:pb-0">
+          <div className="flex justify-end"><RemoveButton onClick={() => removeItem(i)} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <FieldInput label="Certification Name" value={item.name} onChange={v => updateItem(i, 'name', v)} placeholder="AWS Solutions Architect" />
+            <FieldInput label="Issuing Organization" value={item.issuer} onChange={v => updateItem(i, 'issuer', v)} placeholder="Amazon Web Services" />
+            <FieldInput label="Year" value={item.year} onChange={v => updateItem(i, 'year', v)} placeholder="2024" />
+            <FieldInput label="Description" value={item.description} onChange={v => updateItem(i, 'description', v)} placeholder="Optional short description" />
+          </div>
+        </div>
+      ))}
+      <button onClick={addItem} className="text-xs text-accent-blue hover:text-accent-blue/80 font-medium cursor-pointer">+ Add Certification</button>
+    </div>
+  )
+}
+
+/* ──────────────────────────────────────────────────────
+   Achievements Section Editor
+   ────────────────────────────────────────────────────── */
+function AchievementsEditor({ section, onUpdate, onRemoveSection }) {
+  const addBullet = () => {
+    onUpdate({
+      ...section,
+      bullets: [...(section.bullets || []), { bulletId: uuid(), text: '' }],
+    })
+  }
+
+  const updateBullet = (idx, text) => {
+    const bullets = [...section.bullets]
+    bullets[idx] = { ...bullets[idx], text }
+    onUpdate({ ...section, bullets })
+  }
+
+  const removeBullet = (idx) => {
+    onUpdate({ ...section, bullets: section.bullets.filter((_, i) => i !== idx) })
+  }
+
+  return (
+    <div className="p-4 bg-bg-elevated border border-border-default rounded-[8px] space-y-3">
+      <div className="flex items-start justify-between">
+        <span className="text-xs font-medium text-accent-orange uppercase">Achievements</span>
+        <RemoveButton onClick={onRemoveSection} />
+      </div>
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs font-medium text-text-muted">Highlights</label>
+          <button onClick={addBullet} className="text-xs text-accent-orange hover:text-accent-orange/80 cursor-pointer">+ Add</button>
+        </div>
+        {(section.bullets || []).map((b, i) => (
+          <div key={b.bulletId} className="flex items-start gap-2 mb-2">
+            <span className="text-text-muted text-xs mt-2.5">•</span>
+            <textarea
+              value={b.text}
+              onChange={(e) => updateBullet(i, e.target.value)}
+              placeholder="Won 1st place at HackMIT 2024..."
+              rows={2}
+              className="flex-1 px-3 py-2 bg-bg-primary border border-border-default rounded-[6px] text-sm text-text-primary placeholder-text-muted focus:border-accent-blue focus:outline-none resize-none"
+            />
+            <button onClick={() => removeBullet(i)} className="mt-2 text-text-muted hover:text-red cursor-pointer">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ──────────────────────────────────────────────────────
    Main Section Editor
    ────────────────────────────────────────────────────── */
 export default function SectionEditor({ sections, onChange }) {
@@ -343,6 +440,12 @@ export default function SectionEditor({ sections, onChange }) {
       case 'projects':
         newSection = { ...base, type: 'projects', items: [{ projectId: uuid(), name: '', institution: '', startDate: '', endDate: '', techStack: '', description: '', bullets: [{ bulletId: uuid(), text: '' }] }] }
         break
+      case 'certifications':
+        newSection = { ...base, type: 'certifications', items: [{ certId: uuid(), name: '', issuer: '', year: '', description: '' }] }
+        break
+      case 'achievements':
+        newSection = { ...base, type: 'achievements', bullets: [{ bulletId: uuid(), text: '' }] }
+        break
       default:
         return
     }
@@ -359,6 +462,10 @@ export default function SectionEditor({ sections, onChange }) {
         return <SkillsEditor key={section.sectionId} section={section} onUpdate={(s) => updateSection(idx, s)} onRemoveSection={() => removeSection(idx)} />
       case 'projects':
         return <ProjectsEditor key={section.sectionId} section={section} onUpdate={(s) => updateSection(idx, s)} onRemoveSection={() => removeSection(idx)} />
+      case 'certifications':
+        return <CertificationsEditor key={section.sectionId} section={section} onUpdate={(s) => updateSection(idx, s)} onRemoveSection={() => removeSection(idx)} />
+      case 'achievements':
+        return <AchievementsEditor key={section.sectionId} section={section} onUpdate={(s) => updateSection(idx, s)} onRemoveSection={() => removeSection(idx)} />
       default:
         return null
     }
@@ -375,10 +482,12 @@ export default function SectionEditor({ sections, onChange }) {
         <p className="text-xs text-text-muted mb-2 font-medium">Add Section</p>
         <div className="flex flex-wrap gap-2">
           {[
-            { type: 'experience', label: '💼 Experience', color: 'accent-blue' },
+                      { type: 'experience', label: '💼 Experience', color: 'accent-blue' },
             { type: 'education', label: '🎓 Education', color: 'accent-green' },
             { type: 'skills', label: '⚡ Skills', color: 'accent-purple' },
             { type: 'projects', label: '🚀 Projects', color: 'accent-orange' },
+            { type: 'certifications', label: '🏅 Certifications', color: 'accent-blue' },
+            { type: 'achievements', label: '🏆 Achievements', color: 'accent-orange' },
           ].map(({ type, label }) => (
             <button
               key={type}
