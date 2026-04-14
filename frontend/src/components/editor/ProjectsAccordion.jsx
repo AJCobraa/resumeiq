@@ -28,77 +28,211 @@ function BulletRow({ bullet, onChange, onRemove }) {
 export function ProjectsAccordion({ sections, allSections, onChange }) {
   const [openId, setOpenId] = useState(null)
 
-  const update = (sectionId, field, value) =>
-    onChange(allSections.map(s => s.sectionId === sectionId ? { ...s, [field]: value } : s))
+  // Flatten all project items from all project sections
+  const allItems = sections.flatMap(s =>
+    (s.items || []).map(item => ({ ...item, _sectionId: s.sectionId }))
+  )
 
-  const updateBullet = (sectionId, bi, text) =>
+  const updateItem = (sectionId, projectId, field, value) =>
     onChange(allSections.map(s => {
       if (s.sectionId !== sectionId) return s
-      const bullets = (s.bullets || []).map((b, i) => i === bi ? { ...b, text } : b)
-      return { ...s, bullets }
+      const items = (s.items || []).map(item =>
+        item.projectId === projectId ? { ...item, [field]: value } : item
+      )
+      return { ...s, items }
     }))
 
-  const addBullet = (sectionId) =>
+  const updateBullet = (sectionId, projectId, bi, text) =>
     onChange(allSections.map(s => {
       if (s.sectionId !== sectionId) return s
-      return { ...s, bullets: [...(s.bullets || []), { bulletId: genId(), text: '' }] }
+      const items = (s.items || []).map(item => {
+        if (item.projectId !== projectId) return item
+        const bullets = (item.bullets || []).map((b, i) =>
+          i === bi ? { ...b, text } : b
+        )
+        return { ...item, bullets }
+      })
+      return { ...s, items }
     }))
 
-  const removeBullet = (sectionId, bi) =>
+  const addBullet = (sectionId, projectId) =>
     onChange(allSections.map(s => {
       if (s.sectionId !== sectionId) return s
-      return { ...s, bullets: (s.bullets || []).filter((_, i) => i !== bi) }
+      const items = (s.items || []).map(item => {
+        if (item.projectId !== projectId) return item
+        return {
+          ...item,
+          bullets: [...(item.bullets || []),
+                    { bulletId: genId(), text: '' }]
+        }
+      })
+      return { ...s, items }
+    }))
+
+  const removeBullet = (sectionId, projectId, bi) =>
+    onChange(allSections.map(s => {
+      if (s.sectionId !== sectionId) return s
+      const items = (s.items || []).map(item => {
+        if (item.projectId !== projectId) return item
+        return {
+          ...item,
+          bullets: (item.bullets || []).filter((_, i) => i !== bi)
+        }
+      })
+      return { ...s, items }
     }))
 
   const addEntry = () => {
-    const newSec = {
-      sectionId: genId(), type: 'projects', order: allSections.length,
-      name: '', techStack: '', startDate: '', endDate: '', description: '',
+    const newItem = {
+      projectId: genId(), name: '', techStack: '',
+      startDate: '', endDate: '', institution: '',
+      description: '',
       bullets: [{ bulletId: genId(), text: '' }],
     }
-    onChange([...allSections, newSec])
-    setOpenId(newSec.sectionId)
+    const existingSection = sections[0]
+    if (existingSection) {
+      onChange(allSections.map(s =>
+        s.sectionId === existingSection.sectionId
+          ? { ...s, items: [...(s.items || []), newItem] }
+          : s
+      ))
+    } else {
+      const newSection = {
+        sectionId: genId(), type: 'projects',
+        order: Math.max(0, ...allSections.map(s => s.order || 0)) + 1,
+        items: [newItem],
+      }
+      onChange([...allSections, newSection])
+    }
+    setOpenId(newItem.projectId)
   }
 
-  const removeEntry = (sectionId) => onChange(allSections.filter(s => s.sectionId !== sectionId))
-  const moveEntry = (sectionId, dir) => onChange(moveSection(allSections, sectionId, dir))
+  const removeItem = (sectionId, projectId) => {
+    const updated = allSections.map(s => {
+      if (s.sectionId !== sectionId) return s
+      return {
+        ...s,
+        items: (s.items || []).filter(i => i.projectId !== projectId)
+      }
+    })
+    // Remove the section entirely if it has no items left
+    onChange(updated.filter(
+      s => s.type !== 'projects' || (s.items && s.items.length > 0)
+    ))
+  }
+
+  const moveItem = (sectionId, projectId, dir) => {
+    // Reorder within the section's items array
+    const updated = allSections.map(s => {
+      if (s.sectionId !== sectionId) return s
+      const items = [...(s.items || [])]
+      const idx = items.findIndex(i => i.projectId === projectId)
+      if (dir === 'up' && idx === 0) return s
+      if (dir === 'down' && idx === items.length - 1) return s
+      const swapIdx = dir === 'up' ? idx - 1 : idx + 1
+      ;[items[idx], items[swapIdx]] = [items[swapIdx], items[idx]]
+      return { ...s, items }
+    })
+    onChange(updated)
+  }
 
   return (
     <div>
-      {sections.map((sec, idx) => (
-        <EntryCard
-          key={sec.sectionId}
-          title={sec.name || 'New Project'}
-          subtitle={sec.techStack}
-          isOpen={openId === sec.sectionId}
-          onToggle={() => setOpenId(openId === sec.sectionId ? null : sec.sectionId)}
-          onRemove={() => removeEntry(sec.sectionId)}
-          onMoveUp={() => moveEntry(sec.sectionId, 'up')}
-          onMoveDown={() => moveEntry(sec.sectionId, 'down')}
-          showMoveUp={idx > 0}
-          showMoveDown={idx < sections.length - 1}
-        >
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 10px' }}>
-            <FormField label="Project Name" value={sec.name} onChange={v => update(sec.sectionId, 'name', v)} placeholder="ResumeIQ" />
-            <FormField label="Tech Stack" value={sec.techStack} onChange={v => update(sec.sectionId, 'techStack', v)} placeholder="React, FastAPI, Firestore" />
-            <FormField label="Start Date" value={sec.startDate} onChange={v => update(sec.sectionId, 'startDate', v)} placeholder="Mar 2024" />
-            <FormField label="End Date" value={sec.endDate} onChange={v => update(sec.sectionId, 'endDate', v)} placeholder="Present" />
-          </div>
-          <FormField label="Description" value={sec.description} onChange={v => update(sec.sectionId, 'description', v)} placeholder="One-line project summary…" />
-
-          <div style={{ marginTop: 4 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <label style={{ fontSize: 11, fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Bullets</label>
-              <button onClick={() => addBullet(sec.sectionId)} style={{ fontSize: 11, color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-                + Add Bullet
-              </button>
+      {allItems.map((item, idx) => {
+        // Count items in the same section for move up/down bounds
+        const sectionItems = sections
+          .find(s => s.sectionId === item._sectionId)?.items || []
+        const itemIdx = sectionItems.findIndex(
+          i => i.projectId === item.projectId
+        )
+        return (
+          <EntryCard
+            key={item.projectId}
+            title={item.name || 'New Project'}
+            subtitle={item.techStack}
+            isOpen={openId === item.projectId}
+            onToggle={() =>
+              setOpenId(openId === item.projectId ? null : item.projectId)
+            }
+            onRemove={() => removeItem(item._sectionId, item.projectId)}
+            onMoveUp={() => moveItem(item._sectionId, item.projectId, 'up')}
+            onMoveDown={() =>
+              moveItem(item._sectionId, item.projectId, 'down')
+            }
+            showMoveUp={itemIdx > 0}
+            showMoveDown={itemIdx < sectionItems.length - 1}
+          >
+            <div style={{
+              display: 'grid', gridTemplateColumns: '1fr 1fr',
+              gap: '0 10px'
+            }}>
+              <FormField label="Project Name" value={item.name}
+                onChange={v =>
+                  updateItem(item._sectionId, item.projectId, 'name', v)
+                }
+                placeholder="ResumeIQ" />
+              <FormField label="Tech Stack" value={item.techStack}
+                onChange={v =>
+                  updateItem(item._sectionId, item.projectId, 'techStack', v)
+                }
+                placeholder="React, FastAPI, Firestore" />
+              <FormField label="Start Date" value={item.startDate}
+                onChange={v =>
+                  updateItem(item._sectionId, item.projectId, 'startDate', v)
+                }
+                placeholder="Mar 2024" />
+              <FormField label="End Date" value={item.endDate}
+                onChange={v =>
+                  updateItem(item._sectionId, item.projectId, 'endDate', v)
+                }
+                placeholder="Present" />
             </div>
-            {(sec.bullets || []).map((b, bi) => (
-              <BulletRow key={b.bulletId} bullet={b} onChange={text => updateBullet(sec.sectionId, bi, text)} onRemove={() => removeBullet(sec.sectionId, bi)} />
-            ))}
-          </div>
-        </EntryCard>
-      ))}
+            <FormField label="Description" value={item.description}
+              onChange={v =>
+                updateItem(item._sectionId, item.projectId, 'description', v)
+              }
+              placeholder="One-line project summary…" />
+
+            {/* Bullets */}
+            <div style={{ marginTop: 4 }}>
+              <div style={{
+                display: 'flex', alignItems: 'center',
+                justifyContent: 'space-between', marginBottom: 6
+              }}>
+                <label style={{
+                  fontSize: 11, fontWeight: 500, color: '#6b7280',
+                  textTransform: 'uppercase', letterSpacing: '0.03em'
+                }}>
+                  Bullets
+                </label>
+                <button
+                  onClick={() =>
+                    addBullet(item._sectionId, item.projectId)
+                  }
+                  style={{
+                    fontSize: 11, color: '#7c3aed', background: 'none',
+                    border: 'none', cursor: 'pointer', fontWeight: 600
+                  }}
+                >
+                  + Add Bullet
+                </button>
+              </div>
+              {(item.bullets || []).map((b, bi) => (
+                <BulletRow
+                  key={b.bulletId}
+                  bullet={b}
+                  onChange={text =>
+                    updateBullet(item._sectionId, item.projectId, bi, text)
+                  }
+                  onRemove={() =>
+                    removeBullet(item._sectionId, item.projectId, bi)
+                  }
+                />
+              ))}
+            </div>
+          </EntryCard>
+        )
+      })}
       <AddEntryButton label="Add Project" onClick={addEntry} />
     </div>
   )

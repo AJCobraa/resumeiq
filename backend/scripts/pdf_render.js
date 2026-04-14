@@ -42,7 +42,7 @@ async function renderPDF(htmlPath, pdfPath) {
     const page = await browser.newPage();
 
     // Set viewport to A4 pixel dimensions for accurate rendering
-    await page.setViewport({ width: 794, height: 1123 });
+    await page.setViewport({ width: 794, height: 5000 });
 
     // Load the resume HTML
     // Ensure forward slashes and three-slash prefix for reliable local file loading

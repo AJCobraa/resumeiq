@@ -277,6 +277,22 @@ def _build_template_html(resume: dict, template_id: str) -> str:
     .skill-items {{ color: #555; }}
     .tech-stack {{ color: #2563eb; font-size: 9pt; margin-left: 8px; }}
     .grade {{ font-size: 9pt; color: #555; margin-top: 1px; }}
+    @page {{
+      size: A4;
+      margin: 0;
+    }}
+    .entry {{
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }}
+    .section-title {{
+      page-break-after: avoid;
+      break-after: avoid;
+    }}
+    .skill-line {{
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }}
   </style>
 </head>
 <body>

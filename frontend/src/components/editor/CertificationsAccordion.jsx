@@ -16,7 +16,7 @@ export function CertificationsAccordion({ sections, allSections, onChange }) {
     }))
 
   const addEntry = () => {
-    const newItem = { certId: genId(), title: '', issuer: '', date: '', description: '' }
+    const newItem = { certId: genId(), name: '', issuer: '', year: '', description: '' }
     const existingSection = sections[0]
     if (existingSection) {
       onChange(allSections.map(s =>
@@ -47,7 +47,7 @@ export function CertificationsAccordion({ sections, allSections, onChange }) {
       {allItems.map((item) => (
         <EntryCard
           key={item.certId}
-          title={item.title || 'New Certification'}
+          title={item.name || 'New Certification'}
           subtitle={item.issuer}
           isOpen={openId === item.certId}
           onToggle={() => setOpenId(openId === item.certId ? null : item.certId)}
@@ -56,10 +56,10 @@ export function CertificationsAccordion({ sections, allSections, onChange }) {
           showMoveDown={false}
         >
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 10px' }}>
-            <FormField label="Certification Name" value={item.title} onChange={v => updateItem(item._sectionId, item.certId, 'title', v)} placeholder="AWS Solutions Architect" />
+            <FormField label="Certification Name" value={item.name} onChange={v => updateItem(item._sectionId, item.certId, 'name', v)} placeholder="AWS Solutions Architect" />
             <FormField label="Issuer" value={item.issuer} onChange={v => updateItem(item._sectionId, item.certId, 'issuer', v)} placeholder="Amazon Web Services" />
             <div style={{ gridColumn: 'span 1' }}>
-              <FormField label="Year / Date" value={item.date} onChange={v => updateItem(item._sectionId, item.certId, 'date', v)} placeholder="2024" />
+              <FormField label="Year / Date" value={item.year} onChange={v => updateItem(item._sectionId, item.certId, 'year', v)} placeholder="2024" />
             </div>
           </div>
           <FormField label="Description (optional)" value={item.description} onChange={v => updateItem(item._sectionId, item.certId, 'description', v)} placeholder="Brief note about this certification…" multiline rows={2} />
