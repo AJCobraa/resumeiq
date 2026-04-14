@@ -219,12 +219,21 @@ def _apply_recommendation_to_resume(
         if section_id and bullet_id:
             for section in sections:
                 if section.get("sectionId") == section_id:
+                    # 1a: Regular bullets (experience, achievements)
                     for bullet in section.get("bullets", []):
                         if bullet.get("bulletId") == bullet_id:
                             bullet["text"] = new_text
                             updated = True
                             break
-                    # Check items with bullets (projects)
+                    # 1b: Skills category items — bulletId is the categoryId here
+                    if not updated and section.get("type") == "skills":
+                        for cat in section.get("categories", []):
+                            if cat.get("categoryId") == bullet_id:
+                                # Replace the entire items list with split text
+                                cat["items"] = [s.strip() for s in new_text.split(",") if s.strip()]
+                                updated = True
+                                break
+                    # 1c: Items with nested bullets (projects)
                     if not updated:
                         for item in section.get("items", []):
                             for bullet in item.get("bullets", []):

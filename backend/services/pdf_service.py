@@ -210,6 +210,10 @@ def _build_template_html(resume: dict, template_id: str) -> str:
             grouped_html += _render_skills_group(items)
         elif stype == "projects":
             grouped_html += _render_projects_group(items)
+        elif stype == "certifications":
+            grouped_html += _render_certifications_group(items)
+        elif stype == "achievements":
+            grouped_html += _render_achievements_group(items)
 
     contact_items = [
         meta.get("email"),
@@ -217,6 +221,8 @@ def _build_template_html(resume: dict, template_id: str) -> str:
         meta.get("location"),
         _strip_scheme(meta.get("linkedin", "")),
         _strip_scheme(meta.get("github", "")),
+        _strip_scheme(meta.get("blog", "")),
+        _strip_scheme(meta.get("leetcode", "")),
     ]
     contact_items = [c for c in contact_items if c]
     contact_html = "  •  ".join(contact_items) if contact_items else ""
@@ -380,6 +386,44 @@ def _render_projects_group(sections: list) -> str:
       {location}
       {bullets}
     </div>"""
+    return html
+
+
+def _render_certifications_group(sections: list) -> str:
+    """Render all certification items under ONE 'Certifications' header."""
+    all_items = []
+    for s in sections:
+        all_items.extend([i for i in s.get("items", []) if i.get("name")])
+    if not all_items:
+        return ""
+    html = '<div class="section-title">Certifications</div>'
+    for item in all_items:
+        issuer = f" &mdash; <span class='entry-company'>{item['issuer']}</span>" if item.get("issuer") else ""
+        year = item.get("year", "")
+        description = f"<p class='entry-location'>{item['description']}</p>" if item.get("description") else ""
+        html += f"""
+    <div class="entry">
+      <div class="entry-header">
+        <div>
+          <span class="entry-title">{item.get('name', '')}</span>
+          {issuer}
+        </div>
+        <span class="entry-date">{year}</span>
+      </div>
+      {description}
+    </div>"""
+    return html
+
+
+def _render_achievements_group(sections: list) -> str:
+    """Render all achievement bullets under ONE 'Achievements' header."""
+    all_bullets = []
+    for s in sections:
+        all_bullets.extend([b for b in s.get("bullets", []) if b.get("text")])
+    if not all_bullets:
+        return ""
+    html = '<div class="section-title">Achievements</div>'
+    html += _render_bullets(all_bullets)
     return html
 
 

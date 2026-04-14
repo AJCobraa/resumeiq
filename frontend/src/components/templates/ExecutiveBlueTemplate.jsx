@@ -60,19 +60,6 @@ export default function ExecutiveBlueTemplate({ resume }) {
           </div>
           <ContactRow meta={meta} />
         </div>
-        
-        {/* Profile Picture Placeholder - Optional based on your DB schema */}
-        {meta.photoUrl ? (
-           <img 
-             src={meta.photoUrl} 
-             alt={meta.name} 
-             style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover', border: '3px solid white', marginLeft: '20px' }} 
-           />
-        ) : (
-           <div style={{ width: '100px', height: '100px', borderRadius: '50%', backgroundColor: '#1E4E70', border: '3px solid white', marginLeft: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-             <span style={{ fontSize: '24pt', color: 'white' }}>{meta.name ? meta.name.charAt(0) : ''}</span>
-           </div>
-        )}
       </div>
 
       {/* ── Body Section ───────────────────────────────── */}
@@ -99,6 +86,10 @@ export default function ExecutiveBlueTemplate({ resume }) {
               return <SkillsGroup key={`skills-${gi}`} sections={group.items} />
             case 'projects':
               return <ProjectsGroup key={`proj-${gi}`} sections={group.items} />
+            case 'certifications':
+              return <CertificationsGroup key={`cert-${gi}`} sections={group.items} />
+            case 'achievements':
+              return <AchievementsGroup key={`achv-${gi}`} sections={group.items} />
             default:
               return null
           }
@@ -176,6 +167,47 @@ function ProjectsGroup({ sections }) {
           <ProjectEntry key={item.projectId} item={item} />
         ))}
       </div>
+    </div>
+  )
+}
+
+function CertificationsGroup({ sections }) {
+  const allItems = sections.flatMap(s => (s.items || []).filter(c => c.name))
+  if (allItems.length === 0) return null
+  return (
+    <div style={{ marginBottom: '20px' }}>
+      <SectionTitle text="Certifications" />
+      <div style={{ marginTop: '8px' }}>
+        {allItems.map((item, idx) => (
+          <div key={item.certId || idx} style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <span style={{ fontWeight: 700, fontSize: '10.5pt', color: COLOR.text }}>{item.name}</span>
+                {item.issuer && (
+                  <span style={{ fontStyle: 'italic', fontSize: '10pt', color: COLOR.secondary }}> — {item.issuer}</span>
+                )}
+              </div>
+              {item.year && (
+                <span style={{ fontSize: '10pt', color: COLOR.text }}>{item.year}</span>
+              )}
+            </div>
+            {item.description && (
+              <p style={{ fontSize: '10pt', color: COLOR.secondary, margin: '2px 0 0' }}>{item.description}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function AchievementsGroup({ sections }) {
+  const allBullets = sections.flatMap(s => (s.bullets || []).filter(b => b.text))
+  if (allBullets.length === 0) return null
+  return (
+    <div style={{ marginBottom: '20px' }}>
+      <SectionTitle text="Achievements" />
+      <BulletList bullets={allBullets} />
     </div>
   )
 }
@@ -275,6 +307,12 @@ function ContactRow({ meta }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span dangerouslySetInnerHTML={{ __html: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>' }} />
           <span>{meta.linkedin.replace(/^https?:\/\//, '')}</span>
+        </div>
+      )}
+      {meta.github && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span dangerouslySetInnerHTML={{ __html: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>' }} />
+          <span>{meta.github.replace(/^https?:\/\//, '')}</span>
         </div>
       )}
     </div>
