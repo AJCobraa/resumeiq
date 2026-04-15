@@ -11,6 +11,14 @@
   // Prevent double injection
   if (document.getElementById('resumeiq-sidebar')) return;
 
+  // CRITICAL: Guard against invalidated extension context.
+  // If the extension was reloaded after this script was injected,
+  // chrome.runtime.id will be undefined and all sendMessage/getURL calls fail.
+  if (!chrome.runtime?.id) {
+    console.warn('[ResumeIQ] sidebar.js loaded in invalidated context. Aborting.');
+    return;
+  }
+
   let state = {
     token: null,
     resumes: [],           // all user resumes fetched from API
@@ -102,7 +110,20 @@
 
   // ─── Auth check ──────────────────────────────────────────────
   function checkAuth() {
+    // Guard: extension context may have been invalidated between injection and
+    // execution (e.g. user reloaded the extension from chrome://extensions).
+    if (!chrome.runtime?.id) {
+      renderErrorState('Extension context invalidated. Reload the extension and refresh this page.');
+      return;
+    }
+
     chrome.runtime.sendMessage({ action: 'GET_TOKEN' }, function (response) {
+      // lastError is set if the background service worker isn't reachable
+      if (chrome.runtime.lastError) {
+        renderErrorState('Extension disconnected. Please reload the page.');
+        return;
+      }
+
       state.token = response && response.token ? response.token : null;
       const badge = document.getElementById('riq-status-badge');
 

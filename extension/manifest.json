@@ -51,7 +51,15 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["sidebar.js", "sidebar.css", "keyword-engine.js", "config.js", "icons/*"],
+      "resources": [
+        "sidebar.js",
+        "sidebar.css",
+        "keyword-engine.js",
+        "config.js",
+        "popup.html",
+        "popup.css",
+        "icons/*"
+      ],
       "matches": [
         "*://*.linkedin.com/*",
         "*://*.naukri.com/*",

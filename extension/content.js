@@ -273,34 +273,63 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 function injectSidebar(jobDetails) {
   if (document.getElementById('resumeiq-sidebar')) return; // already injected
 
+  // CRITICAL: Guard against invalidated extension context.
+  // chrome.runtime.getURL() returns "chrome-extension://invalid" when the
+  // extension was reloaded/updated mid-session, which causes ERR_FAILED on
+  // every subsequent script/link tag load. Bail out early in this case.
+  if (!chrome.runtime?.id) {
+    console.warn('[ResumeIQ] Extension context invalidated. Reload the extension.');
+    return;
+  }
+
   // Store job details for sidebar.js to pick up
   window.__riqJobDetails = jobDetails;
 
-  // Load config first (sidebar.js needs CONFIG.backendUrl)
+  // Set a safe default config immediately so sidebar.js never hangs waiting
+  // for config.js to load. Will be overwritten if config.js loads successfully.
+  window.__riqConfig = window.__riqConfig || {
+    backendUrl: 'http://localhost:8000',
+    frontendUrl: 'http://localhost:5173',
+  };
+
+  // Loads keyword-engine.js then sidebar.js in strict order.
+  // Called after config.js resolves (or fails — config is optional).
+  function loadKeywordEngineAndSidebar() {
+    // Load sidebar CSS (independent of JS chain)
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = chrome.runtime.getURL('sidebar.css');
+    link.onerror = () => console.warn('[ResumeIQ] sidebar.css failed to load — check web_accessible_resources');
+    document.head.appendChild(link);
+
+    // Load keyword engine, then sidebar.js only after engine is ready
+    const engineScript = document.createElement('script');
+    engineScript.src = chrome.runtime.getURL('keyword-engine.js');
+    engineScript.onerror = () => console.warn('[ResumeIQ] keyword-engine.js failed to load');
+    engineScript.onload = () => {
+      const sidebarScript = document.createElement('script');
+      sidebarScript.src = chrome.runtime.getURL('sidebar.js');
+      sidebarScript.onerror = () => console.warn('[ResumeIQ] sidebar.js failed to load');
+      document.head.appendChild(sidebarScript);
+    };
+    document.head.appendChild(engineScript);
+  }
+
+  // Attempt to load config.js. If it fails (file missing or context issue),
+  // fall through to loadKeywordEngineAndSidebar() with the default config set above.
   const configScript = document.createElement('script');
   configScript.src = chrome.runtime.getURL('config.js');
   configScript.onload = () => {
-    window.__riqConfig = window.CONFIG || { backendUrl: 'http://localhost:8000' };
+    // Prefer the real CONFIG global; fall back to the default we already set
+    window.__riqConfig = window.CONFIG || window.__riqConfig;
+    loadKeywordEngineAndSidebar();
+  };
+  configScript.onerror = () => {
+    // config.js is optional — default values are already in window.__riqConfig
+    console.warn('[ResumeIQ] config.js not found or failed to load. Using defaults.');
+    loadKeywordEngineAndSidebar();
   };
   document.head.appendChild(configScript);
-
-  // Load sidebar CSS
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = chrome.runtime.getURL('sidebar.css');
-  document.head.appendChild(link);
-
-  // Load keyword engine
-  const engineScript = document.createElement('script');
-  engineScript.src = chrome.runtime.getURL('keyword-engine.js');
-  document.head.appendChild(engineScript);
-
-  // Load sidebar JS after engine is ready
-  engineScript.onload = () => {
-    const sidebarScript = document.createElement('script');
-    sidebarScript.src = chrome.runtime.getURL('sidebar.js');
-    document.head.appendChild(sidebarScript);
-  };
 }
 
 // Auto-inject on page load for supported job portals

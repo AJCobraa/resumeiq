@@ -790,3 +790,26 @@ When the popup opens on a job page, it checks whether the sidebar is already inj
 - `chrome.storage.local` is used for token access — never `localStorage` for auth
 - CORS is not relaxed — the sidebar's deep analysis call uses the same `Authorization: Bearer` header flow as the popup
 - `web_accessible_resources` is scoped to exact job portal match patterns — not `<all_urls>`
+
+### 37.11 chrome.runtime Guard Pattern (ERR_FAILED Fix)
+
+**Problem:** After the extension is reloaded or updated from `chrome://extensions` while a job page is already open, `chrome.runtime.id` becomes `undefined`. Any subsequent call to `chrome.runtime.getURL()` returns the literal string `"chrome-extension://invalid"` instead of a real URL. Every `<script src>` and `<link href>` that uses this URL fails with `net::ERR_FAILED`, causing the sidebar to silently mount an empty black panel stuck on "Initializing...".
+
+**Why it's silent:** The browser loads the scripts but the URLs resolve to nothing — there is no JavaScript exception, only a network-level failure. Without `onerror` handlers, the load chain breaks invisibly.
+
+**Fix applied in three places:**
+
+1. **`content.js` — `injectSidebar()` top guard:**
+   - Checks `chrome.runtime?.id` before calling `getURL()`. If undefined, logs a warning and returns immediately. No broken URLs ever enter the DOM.
+
+2. **`content.js` — load chain `onerror` handlers:**
+   - Each `<script>` and `<link>` tag now has an `onerror` callback that logs a named warning so DevTools clearly identify which resource failed.
+   - `config.js` failure is explicitly non-fatal: the `onerror` path calls `loadKeywordEngineAndSidebar()` with the default config already set on `window.__riqConfig`.
+
+3. **`sidebar.js` — IIFE top guard + `checkAuth()` guard:**
+   - Top of IIFE: checks `chrome.runtime?.id` before any DOM work — exits cleanly if context is invalid.
+   - `checkAuth()`: checks `chrome.runtime?.id` again (context could be invalidated between injection and execution), then also checks `chrome.runtime.lastError` inside the `sendMessage` callback (covers the background service worker being unreachable). Both failure paths call `renderErrorState()` with a human-readable message.
+
+**Why two guard locations in `sidebar.js`?** The IIFE guard covers the case where the extension is reloaded before `sidebar.js` executes. The `checkAuth()` guard covers the rarer case where execution began normally but the context was torn down before the async `sendMessage` callback fired.
+
+**User-visible result:** Instead of a black panel, the user now sees either nothing (if the context was invalidated before the sidebar mounted) or an error message ("Extension disconnected. Please reload the page.") with actionable guidance.
