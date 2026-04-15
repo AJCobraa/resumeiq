@@ -48,5 +48,16 @@
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["sidebar.js", "sidebar.css", "keyword-engine.js", "config.js", "icons/*"],
+      "matches": [
+        "*://*.linkedin.com/*",
+        "*://*.naukri.com/*",
+        "*://*.indeed.com/*",
+        "*://internshala.com/*"
+      ]
+    }
+  ]
 }

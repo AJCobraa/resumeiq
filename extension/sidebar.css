@@ -1,0 +1,347 @@
+/* sidebar.css — injected into job pages */
+#resumeiq-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 360px;
+  height: 100vh;
+  z-index: 2147483647;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  background: #0f1117;
+  border-left: 1px solid #1e2130;
+  box-shadow: -4px 0 24px rgba(0,0,0,0.4);
+  transform: translateX(100%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #e2e8f0;
+}
+
+#resumeiq-sidebar.riq-visible {
+  transform: translateX(0);
+}
+
+#resumeiq-sidebar.riq-collapsed {
+  width: 48px;
+}
+
+/* Toggle button that sticks to the right edge */
+#resumeiq-toggle-btn {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2147483646;
+  width: 32px;
+  height: 64px;
+  background: #6366f1;
+  border: none;
+  border-radius: 8px 0 0 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  box-shadow: -2px 0 12px rgba(99,102,241,0.4);
+  transition: background 0.15s, right 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#resumeiq-toggle-btn:hover { background: #4f46e5; }
+
+#resumeiq-toggle-btn .riq-toggle-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 0.05em;
+  transform: rotate(180deg);
+}
+
+/* Header */
+.riq-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid #1e2130;
+  flex-shrink: 0;
+  background: #0f1117;
+}
+
+.riq-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  color: #e2e8f0;
+}
+
+.riq-logo-icon {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: white;
+}
+
+.riq-status-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(16,185,129,0.15);
+  color: #10b981;
+  border: 1px solid rgba(16,185,129,0.25);
+}
+
+.riq-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+.riq-close-btn:hover { color: #e2e8f0; background: #1e2130; }
+
+/* Scrollable body */
+.riq-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+.riq-body::-webkit-scrollbar { width: 4px; }
+.riq-body::-webkit-scrollbar-track { background: transparent; }
+.riq-body::-webkit-scrollbar-thumb { background: #2d3148; border-radius: 2px; }
+
+/* Job info card */
+.riq-job-card {
+  background: #1a1d2e;
+  border: 1px solid #1e2130;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.riq-job-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.riq-job-company { font-size: 12px; color: #8892b0; }
+
+/* Resume selector */
+.riq-section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.riq-best-match-banner {
+  background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1));
+  border: 1px solid rgba(99,102,241,0.3);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.riq-best-match-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.riq-best-match-text { flex: 1; }
+.riq-best-match-title { font-size: 12px; font-weight: 600; color: #c4b5fd; margin-bottom: 2px; }
+.riq-best-match-sub { font-size: 11px; color: #8892b0; }
+.riq-switch-btn {
+  width: 100%;
+  padding: 8px;
+  background: #6366f1;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 0.15s;
+}
+.riq-switch-btn:hover { background: #4f46e5; }
+
+/* Score ring */
+.riq-score-section {
+  background: #1a1d2e;
+  border: 1px solid #1e2130;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.riq-score-ring-wrap { flex-shrink: 0; position: relative; }
+.riq-score-ring-wrap svg { transform: rotate(-90deg); }
+.riq-score-ring-val {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  font-size: 18px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+}
+.riq-score-details { flex: 1; }
+.riq-score-label { font-size: 13px; font-weight: 700; color: #e2e8f0; margin-bottom: 4px; }
+.riq-score-sublabel { font-size: 11px; color: #8892b0; line-height: 1.4; }
+.riq-score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+  margin-top: 6px;
+}
+.riq-badge-excellent { background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.25); }
+.riq-badge-good { background: rgba(245,158,11,0.15); color: #f59e0b; border: 1px solid rgba(245,158,11,0.25); }
+.riq-badge-low { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
+
+/* Resume ranking list */
+.riq-resume-rank {
+  background: #1a1d2e;
+  border: 1px solid #1e2130;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.riq-resume-rank-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: background 0.1s;
+  border-radius: 6px;
+  padding: 8px 6px;
+  border-bottom: 1px solid #1e2130;
+}
+.riq-resume-rank-item:last-child { border-bottom: none; }
+.riq-resume-rank-item:hover { background: #232640; }
+.riq-resume-rank-item.riq-active { background: rgba(99,102,241,0.1); }
+.riq-rank-num { width: 20px; font-size: 11px; color: #6b7280; font-weight: 600; flex-shrink: 0; text-align: center; }
+.riq-rank-name { flex: 1; font-size: 12px; color: #c9d1d9; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.riq-rank-score { font-size: 13px; font-weight: 800; font-family: monospace; flex-shrink: 0; }
+.riq-rank-bar-wrap { width: 60px; height: 4px; background: #1e2130; border-radius: 2px; flex-shrink: 0; }
+.riq-rank-bar { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+
+/* Keyword sections */
+.riq-kw-section {
+  background: #1a1d2e;
+  border: 1px solid #1e2130;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+.riq-kw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.riq-kw-title { font-size: 12px; font-weight: 700; color: #e2e8f0; display: flex; align-items: center; gap: 6px; }
+.riq-kw-count { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.riq-kw-count-matched { background: rgba(16,185,129,0.15); color: #10b981; }
+.riq-kw-count-missing { background: rgba(239,68,68,0.15); color: #ef4444; }
+.riq-kw-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.riq-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 500;
+}
+.riq-pill-matched { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.2); }
+.riq-pill-missing { background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.2); }
+
+/* Deep analysis button */
+.riq-analyze-btn {
+  width: 100%;
+  padding: 13px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: 14px;
+  transition: opacity 0.15s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.riq-analyze-btn:hover { opacity: 0.9; }
+.riq-analyze-btn:active { transform: scale(0.99); }
+.riq-analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Loading skeleton */
+.riq-skeleton {
+  background: linear-gradient(90deg, #1a1d2e 25%, #232640 50%, #1a1d2e 75%);
+  background-size: 200% 100%;
+  animation: riq-shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+@keyframes riq-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Status states */
+.riq-loading-state { padding: 20px 0; text-align: center; color: #6b7280; font-size: 12px; }
+.riq-login-state { padding: 20px; text-align: center; }
+.riq-login-state p { color: #8892b0; font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
+.riq-login-btn {
+  padding: 10px 20px; background: #6366f1; border: none; border-radius: 8px;
+  color: white; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+
+/* Footer */
+.riq-footer {
+  padding: 10px 16px;
+  border-top: 1px solid #1e2130;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.riq-footer-link {
+  font-size: 11px; color: #6b7280; text-decoration: none; cursor: pointer;
+}
+.riq-footer-link:hover { color: #6366f1; }
+.riq-spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: riq-spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes riq-spin { to { transform: rotate(360deg); } }
+
+/* Toast fade-in animation */
+@keyframes riq-fadein {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}

@@ -265,3 +265,84 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   return true;
 });
+
+/**
+ * Inject sidebar into current page if not already injected.
+ * Called after successful job extraction.
+ */
+function injectSidebar(jobDetails) {
+  if (document.getElementById('resumeiq-sidebar')) return; // already injected
+
+  // Store job details for sidebar.js to pick up
+  window.__riqJobDetails = jobDetails;
+
+  // Load config first (sidebar.js needs CONFIG.backendUrl)
+  const configScript = document.createElement('script');
+  configScript.src = chrome.runtime.getURL('config.js');
+  configScript.onload = () => {
+    window.__riqConfig = window.CONFIG || { backendUrl: 'http://localhost:8000' };
+  };
+  document.head.appendChild(configScript);
+
+  // Load sidebar CSS
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = chrome.runtime.getURL('sidebar.css');
+  document.head.appendChild(link);
+
+  // Load keyword engine
+  const engineScript = document.createElement('script');
+  engineScript.src = chrome.runtime.getURL('keyword-engine.js');
+  document.head.appendChild(engineScript);
+
+  // Load sidebar JS after engine is ready
+  engineScript.onload = () => {
+    const sidebarScript = document.createElement('script');
+    sidebarScript.src = chrome.runtime.getURL('sidebar.js');
+    document.head.appendChild(sidebarScript);
+  };
+}
+
+// Auto-inject on page load for supported job portals
+(function autoInjectOnLoad() {
+  const host = window.location.hostname;
+  const isJobPage = (
+    host.includes('linkedin.com') ||
+    host.includes('naukri.com') ||
+    host.includes('indeed.com') ||
+    host.includes('internshala.com')
+  );
+  if (!isJobPage) return;
+
+  // Wait for page to settle then extract and inject
+  setTimeout(() => {
+    const details = extractJobDetails();
+    if (details && (details.jdText || details.jobTitle !== 'Unknown Position')) {
+      injectSidebar(details);
+    }
+  }, 1500);
+
+  // Re-inject on URL change (LinkedIn SPA navigation)
+  let lastUrl = location.href;
+  const observer = new MutationObserver(() => {
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      setTimeout(() => {
+        // Remove old sidebar elements
+        const oldSidebar = document.getElementById('resumeiq-sidebar');
+        if (oldSidebar) oldSidebar.remove();
+        const oldBtn = document.getElementById('resumeiq-toggle-btn');
+        if (oldBtn) oldBtn.remove();
+        document.body.style.marginRight = '';
+        window.__riqJobDetails = null;
+
+        // Re-extract and inject
+        const details = extractJobDetails();
+        if (details && (details.jdText || details.jobTitle !== 'Unknown Position')) {
+          injectSidebar(details);
+        }
+      }, 1500);
+    }
+  });
+  observer.observe(document, { subtree: true, childList: true });
+})();

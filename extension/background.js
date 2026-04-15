@@ -24,6 +24,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       return true; // async response
     }
+  } else if (request.action === 'OPEN_DASHBOARD') {
+    const dashboardUrl = (typeof CONFIG !== 'undefined' ? CONFIG.frontendUrl : 'http://localhost:5173') + '/dashboard';
+    chrome.tabs.create({ url: dashboardUrl });
   }
 });
 

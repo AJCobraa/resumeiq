@@ -101,6 +101,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       UI.statusBadge.textContent = 'Connected';
       UI.statusBadge.classList.add('connected');
       await initializeApp();
+
+      // Show sidebar status in popup header
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+          chrome.scripting.executeScript({
+            target: { tabId: tabs[0].id },
+            func: () => !!document.getElementById('resumeiq-sidebar'),
+          }).then(results => {
+            const sidebarActive = results?.[0]?.result;
+            if (sidebarActive) {
+              const badge = document.getElementById('user-status');
+              if (badge) {
+                badge.textContent = 'Sidebar Active';
+                badge.style.background = 'rgba(99,102,241,0.2)';
+                badge.style.color = '#818cf8';
+              }
+            }
+          }).catch(() => {});
+        }
+      });
     }
   });
 
