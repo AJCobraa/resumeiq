@@ -208,10 +208,13 @@ Jobs are linked to the resume used for their analysis. If a resume is deleted, t
 | File | Purpose |
 |------|---------|
 | `manifest.json` | MV3 configuration |
-| `content.js` | Extract logic for 4 specific job portals |
-| `background.js` | Service worker managing persistent token |
-| `popup.html/.js/.css` | 5-state popup logic |
+| `content.js` | Job extraction + sidebar injection for 4 portals |
+| `background.js` | Service worker — token persistence + `OPEN_DASHBOARD` handler |
+| `popup.html/.js/.css` | 5-state popup with "Sidebar Active" badge |
 | `auth-sync.js` | Connects React local storage to extension |
+| `keyword-engine.js` | Client-side keyword extraction + resume matching (no backend) |
+| `sidebar.js` | Self-invoking sidebar panel — 6-state controller |
+| `sidebar.css` | Sidebar styles scoped under `#resumeiq-sidebar` |
 
 ---
 
@@ -685,3 +688,141 @@ Three zones:
 ### 36.7 Data Model Compatibility
 
 No data model changes. All accordion components read/write the same `resume.meta` (flat object) and `resume.sections` (typed array) fields used by the API and templates. The `handleMetaChange` and `handleSectionsChange` callbacks are identical to the previous implementation.
+
+---
+
+## Section 37 — Sidebar-First Extension Architecture
+
+### 37.1 Motivation: The UX Gap
+
+The original extension required a two-step user action: (1) click the toolbar icon to open the popup, then (2) click "Analyze Match" to trigger the backend AI pipeline (5–15 seconds). This meant **zero value was delivered until the user remembered to click twice**. The goal of this rebuild is to match and exceed Simplify's UX by delivering instant intelligence the moment a user lands on a job page.
+
+**New flow:**
+```
+User lands on job page
+  → sidebar auto-injects into DOM (<200ms)
+  → instant keyword match shown (<500ms, entirely client-side)
+  → user optionally clicks "Deep AI Analysis"
+      → backend pipeline runs (5-15s)
+      → full score + rewritten bullets appear in sidebar
+```
+
+### 37.2 New Files
+
+| File | Purpose |
+|---|---|
+| `extension/keyword-engine.js` | Pure JS keyword extraction and resume matching — no backend, no latency |
+| `extension/sidebar.js` | Self-invoking sidebar controller — builds DOM, coordinates all states |
+| `extension/sidebar.css` | Sidebar stylesheet — scoped under `#resumeiq-sidebar` to prevent leakage |
+
+### 37.3 Files Modified
+
+| File | Change |
+|---|---|
+| `extension/content.js` | Added `injectSidebar()` and `autoInjectOnLoad()` IIFE |
+| `extension/manifest.json` | Added `web_accessible_resources` for sidebar files |
+| `extension/background.js` | Added `OPEN_DASHBOARD` message handler |
+| `extension/popup.js` | Added "Sidebar Active" status badge check |
+
+### 37.4 keyword-engine.js — Client-Side Matching
+
+**Why client-side?** The deep AI pipeline (embedding + Gemma) is the power feature, but it's slow. A client-side token-frequency match can surface 80% of the signal in <100ms with zero API cost. The keyword engine:
+
+- Strips stop words (curated 70-word list matching standard NLP practice)
+- Normalizes tokens (lowercase, remove punctuation, collapse whitespace)
+- Counts frequency and computes **TF-score** per term
+- Extracts the same keyword set from the loaded resume (read from `localStorage` → `resumeiq_active_resume`)
+- Computes a match percentage: `matched / total * 100`
+- Returns matched, missing, and score values for immediate display
+
+**Resume sourcing:** The engine reads the active resume from `localStorage` (written by the web app's `ResumeContext`). This avoids a background service-worker round-trip for the instant-match path. If no resume is loaded, the sidebar shows a prompt instead of an empty state.
+
+### 37.5 sidebar.js — DOM Injection Strategy
+
+**Why a self-invoking IIFE?** The sidebar is injected into third-party job pages (LinkedIn, Naukri, Indeed, Internshala). Using an IIFE means:
+- No global scope pollution
+- No dependency on ES module bundling in the content script context
+- Idempotency guard (`document.getElementById('resumeiq-sidebar')`) prevents double-injection on SPA navigation
+
+**DOM construction:** All HTML is built via `document.createElement` (not `innerHTML`) to prevent XSS and comply with Chrome Manifest V3's CSP. Event listeners use `addEventListener` — never `onclick` attributes.
+
+**Script loading order:** `sidebar.js` loads `keyword-engine.js` first via a `<script>` tag injected into `<head>`, waits for it to signal readiness, then runs the keyword match. This ensures the engine is always available before the sidebar attempts to score.
+
+**Sidebar states managed:**
+1. `loading` — skeleton UI while job details are extracted
+2. `no-resume` — prompts user to select a resume in the web app
+3. `keyword-match` — shows instant match score, matched/missing keywords, "Deep AI Analysis" CTA
+4. `analyzing` — spinner while backend pipeline runs
+5. `results` — full ATS score, semantic score, keyword breakdown, and top recommendations with approve/dismiss
+6. `error` — displays failure reason with retry option
+
+### 37.6 Injection via content.js
+
+`injectSidebar()` in `content.js`:
+1. Injects `sidebar.css` via `<link>` (using `chrome.runtime.getURL()`)
+2. Injects `keyword-engine.js` via `<script>`
+3. Injects `sidebar.js` via `<script>`
+4. All files are listed in `web_accessible_resources` so `getURL()` resolves them correctly on third-party origins
+
+`autoInjectOnLoad()` handles two cases:
+- **Cold load:** `DOMContentLoaded` fires → inject immediately
+- **SPA navigation (LinkedIn/Naukri):** `MutationObserver` on `document.body` detects URL change → re-inject after 1.5s debounce (enough for the job page to settle)
+
+**Why MutationObserver over `history.pushState` patching?** LinkedIn and Naukri are SPAs that swap content without a full page reload. Patching `pushState` is fragile and can break site navigation. Observing `body` childList changes is more resilient to framework-level routing choices.
+
+### 37.7 manifest.json — web_accessible_resources
+
+MV3 requires explicit declaration of any extension file fetched via `chrome.runtime.getURL()` on a given match pattern. All four job portals are listed. `config.js` and `icons/*` are also included to support branded elements in the sidebar.
+
+### 37.8 background.js — OPEN_DASHBOARD
+
+The sidebar's "View Full Report" button sends `{ action: 'OPEN_DASHBOARD' }` to the background service worker. The service worker opens `{FRONTEND_URL}/dashboard` in a new tab using `chrome.tabs.create`. This pattern is used because:
+- Content scripts cannot call `chrome.tabs.create` directly (restricted API)
+- The service worker already holds the frontend URL via `CONFIG.frontendUrl`
+
+### 37.9 popup.js — Sidebar Status Badge
+
+When the popup opens on a job page, it checks whether the sidebar is already injected by sending `{ action: 'SIDEBAR_STATUS' }` to the active tab's content script. If the sidebar is present, the status badge shows **"Sidebar Active"** in green instead of "Ready". This is a visual confirmation that instant scoring is running — not a functional change to the analysis flow.
+
+### 37.10 Security Considerations
+
+- All DOM construction in `sidebar.js` uses `createElement` / `textContent` — never `innerHTML` with untrusted data
+- `chrome.storage.local` is used for token access — never `localStorage` for auth
+- CORS is not relaxed — the sidebar's deep analysis call uses the same `Authorization: Bearer` header flow as the popup
+- `web_accessible_resources` is scoped to exact job portal match patterns — not `<all_urls>`
+
+### 37.11 chrome.runtime Guard Pattern (ERR_FAILED Fix)
+
+**Problem:** After the extension is reloaded or updated from `chrome://extensions` while a job page is already open, `chrome.runtime.id` becomes `undefined`. Any subsequent call to `chrome.runtime.getURL()` returns the literal string `"chrome-extension://invalid"` instead of a real URL. Every `<script src>` and `<link href>` that uses this URL fails with `net::ERR_FAILED`, causing the sidebar to silently mount an empty black panel stuck on "Initializing...".
+
+**Why it's silent:** The browser loads the scripts but the URLs resolve to nothing — there is no JavaScript exception, only a network-level failure. Without `onerror` handlers, the load chain breaks invisibly.
+
+**Fix applied in three places:**
+
+1. **`content.js` — `injectSidebar()` top guard:**
+   - Checks `chrome.runtime?.id` before calling `getURL()`. If undefined, logs a warning and returns immediately. No broken URLs ever enter the DOM.
+
+2. **`content.js` — load chain `onerror` handlers:**
+   - Each `<script>` and `<link>` tag now has an `onerror` callback that logs a named warning so DevTools clearly identify which resource failed.
+   - `config.js` failure is explicitly non-fatal: the `onerror` path calls `loadKeywordEngineAndSidebar()` with the default config already set on `window.__riqConfig`.
+
+3. **`sidebar.js` — IIFE top guard + `checkAuth()` guard:**
+   - Top of IIFE: checks `chrome.runtime?.id` before any DOM work — exits cleanly if context is invalid.
+   - `checkAuth()`: checks `chrome.runtime?.id` again (context could be invalidated between injection and execution), then also checks `chrome.runtime.lastError` inside the `sendMessage` callback (covers the background service worker being unreachable). Both failure paths call `renderErrorState()` with a human-readable message.
+
+**Why two guard locations in `sidebar.js`?** The IIFE guard covers the case where the extension is reloaded before `sidebar.js` executes. The `checkAuth()` guard covers the rarer case where execution began normally but the context was torn down before the async `sendMessage` callback fired.
+
+**User-visible result:** Instead of a black panel, the user now sees either nothing (if the context was invalidated before the sidebar mounted) or an error message ("Extension disconnected. Please reload the page.") with actionable guidance.
+
+### 37.12 Content Script chrome.tabs Restriction (OPEN_URL Fix)
+
+**Problem:** `sidebar.js` is injected into job pages as a content script via `<script>` tag. Content scripts run in an isolated world and **do not have access to the `chrome.tabs` API**. Calling `chrome.tabs.create()` from a content script throws a silent runtime error — the login button appeared to do nothing.
+
+**Fix:** All tab-opening operations are routed through the background service worker via `chrome.runtime.sendMessage`:
+
+- **`sidebar.js` → `renderLoginState()`:** Sends `{ action: 'OPEN_URL', url: <frontendUrl> }` to background.
+- **`background.js` → `OPEN_URL` handler:** Receives the message and calls `chrome.tabs.create({ url })` — the background has full `chrome.tabs` access.
+
+**Why not just give the content script the `tabs` permission?** The `tabs` permission is a sensitive permission that increases user trust friction at install time. The routing pattern adds zero overhead and keeps the permission surface minimal.
+
+**Existing pattern used for consistency:** `OPEN_DASHBOARD` already used this same routing pattern — `OPEN_URL` follows the same convention, just with a dynamic URL instead of hardcoded `/dashboard`.

@@ -1,7 +1,7 @@
 # Credentials — NEVER commit these
 backend/.env
 frontend/.env.local
-extension/config.js
+
 *.serviceAccountKey.json
 firebase-adminsdk*.json
 .env

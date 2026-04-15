@@ -265,3 +265,52 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
   return true;
 });
+
+/**
+ * Auto-trigger sidebar when running as a content script on job pages.
+ * content.js, keyword-engine.js and sidebar-ui.js all run in the same
+ * content script context so they share scope directly.
+ */
+(function initResumeIQOnJobPage() {
+  // Wait a moment for LinkedIn's SPA to render the job content
+  let initAttempts = 0;
+  
+  function tryInit() {
+    initAttempts++;
+    const details = extractJobDetails();
+    const hasJobContext = details && (
+      details.jdText?.length > 100 ||
+      (details.jobTitle && details.jobTitle !== 'Unknown Position') ||
+      (details.company && details.company !== 'Unknown Company')
+    );
+    
+    if (hasJobContext) {
+      // Pass to sidebar-ui.js which runs in same content script scope
+      if (typeof initResumeIQSidebar === 'function') {
+        initResumeIQSidebar(details);
+      }
+    } else if (initAttempts < 8) {
+      // Retry — LinkedIn SPA may still be loading
+      setTimeout(tryInit, 1200);
+    }
+  }
+  
+  // Initial attempt after DOM idle
+  setTimeout(tryInit, 800);
+  
+  // Re-init on LinkedIn SPA navigation (URL change without page reload)
+  let lastUrl = location.href;
+  const navObserver = new MutationObserver(() => {
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      initAttempts = 0;
+      // Tear down old sidebar UI
+      if (typeof destroyResumeIQSidebar === 'function') {
+        destroyResumeIQSidebar();
+      }
+      // Re-init after new content loads
+      setTimeout(tryInit, 1400);
+    }
+  });
+  navObserver.observe(document.body, { childList: true, subtree: true });
+})();
