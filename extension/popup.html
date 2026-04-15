@@ -38,9 +38,9 @@
 
     <!-- State 3: Job Detected (Ready to Analyze) -->
     <div id="state-job" class="state hidden">
-      <div class="job-card" style="padding: 10px; background: #fff; border: 1px solid #ccc; border-radius: 8px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px;">
-        <input type="text" id="job-title" class="title" style="font-weight: 600; font-size: 13px; border: 1px solid transparent; border-bottom: 1px solid #eee; padding-bottom: 4px; width: 100%; outline: none;" placeholder="Job Title" />
-        <input type="text" id="job-company" class="company" style="color: #666; font-size: 12px; border: 1px solid transparent; width: 100%; outline: none;" placeholder="Company Name" />
+      <div class="job-card">
+        <input type="text" id="job-title" class="title" placeholder="Job Title" />
+        <input type="text" id="job-company" class="company" placeholder="Company Name" />
       </div>
       <div class="form-group">
         <label for="resume-select">Select Resume to Match</label>
@@ -50,9 +50,6 @@
       </div>
       <div class="form-group">
         <label for="jd-text">Review / Edit Job Description</label>
-        <div class="jd-actions">
-          <button id="btn-clean-jd" class="btn btn-outline btn-small" type="button">Auto-clean JD</button>
-        </div>
         <textarea id="jd-text" class="jd-textarea" placeholder="Extracted JD text will appear here..."></textarea>
         <p id="jd-meta" class="jd-meta">0 characters</p>
       </div>
@@ -70,9 +67,16 @@
 
     <!-- State 4: Analyzing (Loading) -->
     <div id="state-analyzing" class="state hidden">
-      <div class="spinner"></div>
-      <h2>AI Analyzing Match...</h2>
-      <p>Computing semantics & scoring ATS</p>
+      <div class="loading-animation">
+        <div class="glow-ring"></div>
+        <div class="glow-core"></div>
+      </div>
+      <h2 style="color: var(--accent-purple); font-weight: 600; font-size: 18px; margin-bottom: 4px;">Deep AI Analysis</h2>
+      <p style="margin-bottom: 24px; opacity: 0.8;">Computing semantics & ATS scores</p>
+      <div class="loading-tips-card" id="loading-tips">
+        <div class="tip-icon">✨</div>
+        <p class="tip-text" id="tip-text">Scanning job description for required skills...</p>
+      </div>
     </div>
 
     <!-- State 5: Results Ready -->

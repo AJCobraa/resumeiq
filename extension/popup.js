@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnDashboard: document.getElementById('btn-dashboard'),
     btnReset: document.getElementById('btn-reset'),
     btnForceRetry: document.getElementById('btn-force-retry'),
-    btnCleanJd: document.getElementById('btn-clean-jd'),
+    btnForceRetry: document.getElementById('btn-force-retry'),
     
     jobTitle: document.getElementById('job-title'),
     jobCompany: document.getElementById('job-company'),
@@ -47,49 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  function autoCleanJdText(rawText, selectedTitle = '') {
-    let cleaned = (rawText || '').trim();
-    if (!cleaned) return '';
 
-    const tailPatterns = [
-      /Get job alerts for this search[\s\S]*$/i,
-      /Are these results helpful\?[\s\S]*$/i,
-      /About Accessibility Help Center Privacy[\s\S]*$/i,
-      /LinkedIn Corporation © \d{4}[\s\S]*$/i,
-      /Reactivate Premium[\s\S]*$/i,
-      /Job search faster with Premium[\s\S]*$/i,
-      /Interested in working with us in the future\?[\s\S]*$/i,
-    ];
-
-    for (const pattern of tailPatterns) {
-      cleaned = cleaned.replace(pattern, '').trim();
-    }
-
-    const anchors = ['About the job', 'What Do We Do', 'Key Responsibilities', 'Requirements', 'Tech Stack'];
-    let anchorIndex = -1;
-    for (const anchor of anchors) {
-      const idx = cleaned.toLowerCase().indexOf(anchor.toLowerCase());
-      if (idx !== -1 && (anchorIndex === -1 || idx < anchorIndex)) {
-        anchorIndex = idx;
-      }
-    }
-    if (anchorIndex > 0) {
-      cleaned = cleaned.slice(anchorIndex).trim();
-    }
-
-    const title = (selectedTitle || '').trim();
-    if (title) {
-      const titleIdx = cleaned.toLowerCase().indexOf(title.toLowerCase());
-      if (titleIdx > 0) {
-        const before = cleaned.slice(0, titleIdx);
-        if (/99\+\s+results|promoted jobs are ranked|Viewed · Posted on|Easy Apply/i.test(before)) {
-          cleaned = cleaned.slice(titleIdx).trim();
-        }
-      }
-    }
-
-    return cleaned.replace(/\s+/g, ' ').trim();
-  }
 
   // 1. Get Token from Background
   chrome.runtime.sendMessage({ action: 'GET_TOKEN' }, async (response) => {
@@ -160,12 +118,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   UI.jdText?.addEventListener('input', updateJdMeta);
-  UI.btnCleanJd?.addEventListener('click', () => {
-    const source = UI.jdText?.value || '';
-    const cleaned = autoCleanJdText(source, UI.jobTitle?.value || '');
-    UI.jdText.value = cleaned;
-    updateJdMeta();
-  });
 
   // ── Proxy Fetch Helper (Bypass CORS) ──────────────────────────
   async function riqFetch(url, options = {}) {
@@ -231,7 +183,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         resumes.forEach(r => {
           const opt = document.createElement('option');
           opt.value = r.resumeId;
-          opt.textContent = `${r.meta?.title || 'Untitled'} (${r.meta?.name || 'No Name'})`;
+          opt.textContent = r.resumeTitle || r.meta?.title || 'Untitled';
           UI.resumeSelect.appendChild(opt);
         });
         UI.btnAnalyze.disabled = false;
@@ -257,6 +209,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     showState(UI.stateAnalyzing);
     UI.errorMsg.classList.add('hidden');
 
+    const tipText = document.getElementById('tip-text');
+    const tips = [
+      "Scanning job description for required skills...",
+      "Mapping your experiences to ATS constraints...",
+      "Extracting missing keywords from requirements...",
+      "Generating tailored bullet recommendations...",
+      "Finalizing ATS match score computation..."
+    ];
+    let tipIndex = 0;
+    const tipInterval = setInterval(() => {
+      tipIndex = (tipIndex + 1) % tips.length;
+      if (tipText) {
+        tipText.style.opacity = 0;
+        setTimeout(() => {
+          tipText.textContent = tips[tipIndex];
+          tipText.style.opacity = 1;
+        }, 300);
+      }
+    }, 4500);
+
     try {
       const response = await riqFetch(`${getRiqBackendUrl()}/api/analyze`, {
         method: 'POST',
@@ -275,6 +247,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
 
       const result = await response.json();
+      clearInterval(tipInterval);
       
       // Update UI
       UI.scoreVal.textContent = `${result.atsScore}%`;
@@ -289,10 +262,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       UI.recoCount.textContent = `Found ${result.recommendations?.length || 0} recommendations to improve.`;
       
       showState(UI.stateResults);
-    } catch (e) {
-      console.error('Analyze request failed', e);
+    } catch (err) {
+      clearInterval(tipInterval);
       showState(UI.stateJob);
-      UI.errorMsg.textContent = `Analysis failed: ${e.message || 'Unknown error'}`;
+      UI.errorMsg.textContent = `Analysis failed: ${err.message}`;
       UI.errorMsg.classList.remove('hidden');
     }
   });
