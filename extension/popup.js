@@ -167,18 +167,45 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateJdMeta();
   });
 
+  // ── Proxy Fetch Helper (Bypass CORS) ──────────────────────────
+  async function riqFetch(url, options = {}) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ action: 'PROXY_FETCH', url, options }, (response) => {
+        if (chrome.runtime.lastError) {
+          return reject(new Error(chrome.runtime.lastError.message));
+        }
+        if (!response || response.ok === false) {
+          return reject(new Error(response?.error || `Fetch failed (${response?.status || 'unknown'})`));
+        }
+        // Mocked response object compatible with fetch API
+        resolve({
+          ok: response.ok,
+          status: response.status,
+          json: async () => response.json,
+          text: async () => response.text
+        });
+      });
+    });
+  }
+
+  function getRiqBackendUrl() {
+    const config = globalThis.CONFIG || {};
+    return (config.backendUrl || 'http://localhost:8000').replace(/\/$/, '');
+  }
+
   async function checkPreviousAnalysis(url) {
     try {
-      const res = await fetch(`${CONFIG.backendUrl}/api/jobs/check?url=${encodeURIComponent(url)}`, {
+      const res = await riqFetch(`${getRiqBackendUrl()}/api/jobs/check?url=${encodeURIComponent(url)}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!res.ok) return;
       const data = await res.json();
       if (data.found) {
         UI.cachedScore.textContent = `${data.atsScore}%`;
         UI.cachedNotice.classList.remove('hidden');
         // Wire buttons
-        UI.btnViewCached.onclick = () => chrome.tabs.create({ url: `${CONFIG.frontendUrl || 'http://localhost:5173'}/dashboard` });
+        const config = globalThis.CONFIG || {};
+        const frontendUrl = config.frontendUrl || 'http://localhost:5173';
+        UI.btnViewCached.onclick = () => chrome.tabs.create({ url: `${frontendUrl}/dashboard` });
         UI.btnReanalyze.onclick = () => {
           UI.cachedNotice.classList.add('hidden');
           UI.btnAnalyze.click();
@@ -191,10 +218,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function fetchResumes() {
     try {
-      const res = await fetch(`${CONFIG.backendUrl}/api/resumes`, {
+      const res = await riqFetch(`${getRiqBackendUrl()}/api/resumes`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error('Auth failed');
       resumes = await res.json();
       
       UI.resumeSelect.innerHTML = '';
@@ -232,7 +258,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     UI.errorMsg.classList.add('hidden');
 
     try {
-      const response = await fetch(`${CONFIG.backendUrl}/api/analyze`, {
+      const response = await riqFetch(`${getRiqBackendUrl()}/api/analyze`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -247,17 +273,6 @@ document.addEventListener('DOMContentLoaded', async () => {
           portal: jobDetails.portal
         })
       });
-
-      if (!response.ok) {
-        let detail = `HTTP ${response.status}`;
-        try {
-          const data = await response.json();
-          detail = data?.detail || JSON.stringify(data);
-        } catch {
-          detail = await response.text();
-        }
-        throw new Error(detail || `HTTP ${response.status}`);
-      }
 
       const result = await response.json();
       

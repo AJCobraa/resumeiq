@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ResumeIQ",
-  "version": "1.0",
-  "description": "Extract job descriptions and match with your ATS resume using AI.",
+  "version": "1.1",
+  "description": "Instant keyword matching and AI resume analysis for job listings.",
   "permissions": [
     "activeTab",
     "storage",
@@ -29,7 +29,14 @@
         "*://internshala.com/job/*",
         "*://internshala.com/internship/*"
       ],
-      "js": ["content.js"]
+      "js": [
+        "config.js",
+        "keyword-engine.js",
+        "content.js",
+        "sidebar-ui.js"
+      ],
+      "css": ["sidebar.css"],
+      "run_at": "document_idle"
     },
     {
       "matches": ["http://localhost:5173/*"],
@@ -51,21 +58,8 @@
   },
   "web_accessible_resources": [
     {
-      "resources": [
-        "sidebar.js",
-        "sidebar.css",
-        "keyword-engine.js",
-        "config.js",
-        "popup.html",
-        "popup.css",
-        "icons/*"
-      ],
-      "matches": [
-        "*://*.linkedin.com/*",
-        "*://*.naukri.com/*",
-        "*://*.indeed.com/*",
-        "*://internshala.com/*"
-      ]
+      "resources": ["icons/*"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

@@ -267,111 +267,50 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 /**
- * Inject sidebar into current page if not already injected.
- * Called after successful job extraction.
+ * Auto-trigger sidebar when running as a content script on job pages.
+ * content.js, keyword-engine.js and sidebar-ui.js all run in the same
+ * content script context so they share scope directly.
  */
-function injectSidebar(jobDetails) {
-  if (document.getElementById('resumeiq-sidebar')) return; // already injected
-
-  // CRITICAL: Guard against invalidated extension context.
-  // chrome.runtime.getURL() returns "chrome-extension://invalid" when the
-  // extension was reloaded/updated mid-session, which causes ERR_FAILED on
-  // every subsequent script/link tag load. Bail out early in this case.
-  if (!chrome.runtime?.id) {
-    console.warn('[ResumeIQ] Extension context invalidated. Reload the extension.');
-    return;
-  }
-
-  // Store job details for sidebar.js to pick up
-  window.__riqJobDetails = jobDetails;
-
-  // Set a safe default config immediately so sidebar.js never hangs waiting
-  // for config.js to load. Will be overwritten if config.js loads successfully.
-  window.__riqConfig = window.__riqConfig || {
-    backendUrl: 'http://localhost:8000',
-    frontendUrl: 'http://localhost:5173',
-  };
-
-  // Loads keyword-engine.js then sidebar.js in strict order.
-  // Called after config.js resolves (or fails — config is optional).
-  function loadKeywordEngineAndSidebar() {
-    // Load sidebar CSS (independent of JS chain)
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = chrome.runtime.getURL('sidebar.css');
-    link.onerror = () => console.warn('[ResumeIQ] sidebar.css failed to load — check web_accessible_resources');
-    document.head.appendChild(link);
-
-    // Load keyword engine, then sidebar.js only after engine is ready
-    const engineScript = document.createElement('script');
-    engineScript.src = chrome.runtime.getURL('keyword-engine.js');
-    engineScript.onerror = () => console.warn('[ResumeIQ] keyword-engine.js failed to load');
-    engineScript.onload = () => {
-      const sidebarScript = document.createElement('script');
-      sidebarScript.src = chrome.runtime.getURL('sidebar.js');
-      sidebarScript.onerror = () => console.warn('[ResumeIQ] sidebar.js failed to load');
-      document.head.appendChild(sidebarScript);
-    };
-    document.head.appendChild(engineScript);
-  }
-
-  // Attempt to load config.js. If it fails (file missing or context issue),
-  // fall through to loadKeywordEngineAndSidebar() with the default config set above.
-  const configScript = document.createElement('script');
-  configScript.src = chrome.runtime.getURL('config.js');
-  configScript.onload = () => {
-    // Prefer the real CONFIG global; fall back to the default we already set
-    window.__riqConfig = window.CONFIG || window.__riqConfig;
-    loadKeywordEngineAndSidebar();
-  };
-  configScript.onerror = () => {
-    // config.js is optional — default values are already in window.__riqConfig
-    console.warn('[ResumeIQ] config.js not found or failed to load. Using defaults.');
-    loadKeywordEngineAndSidebar();
-  };
-  document.head.appendChild(configScript);
-}
-
-// Auto-inject on page load for supported job portals
-(function autoInjectOnLoad() {
-  const host = window.location.hostname;
-  const isJobPage = (
-    host.includes('linkedin.com') ||
-    host.includes('naukri.com') ||
-    host.includes('indeed.com') ||
-    host.includes('internshala.com')
-  );
-  if (!isJobPage) return;
-
-  // Wait for page to settle then extract and inject
-  setTimeout(() => {
+(function initResumeIQOnJobPage() {
+  // Wait a moment for LinkedIn's SPA to render the job content
+  let initAttempts = 0;
+  
+  function tryInit() {
+    initAttempts++;
     const details = extractJobDetails();
-    if (details && (details.jdText || details.jobTitle !== 'Unknown Position')) {
-      injectSidebar(details);
+    const hasJobContext = details && (
+      details.jdText?.length > 100 ||
+      (details.jobTitle && details.jobTitle !== 'Unknown Position') ||
+      (details.company && details.company !== 'Unknown Company')
+    );
+    
+    if (hasJobContext) {
+      // Pass to sidebar-ui.js which runs in same content script scope
+      if (typeof initResumeIQSidebar === 'function') {
+        initResumeIQSidebar(details);
+      }
+    } else if (initAttempts < 8) {
+      // Retry — LinkedIn SPA may still be loading
+      setTimeout(tryInit, 1200);
     }
-  }, 1500);
-
-  // Re-inject on URL change (LinkedIn SPA navigation)
+  }
+  
+  // Initial attempt after DOM idle
+  setTimeout(tryInit, 800);
+  
+  // Re-init on LinkedIn SPA navigation (URL change without page reload)
   let lastUrl = location.href;
-  const observer = new MutationObserver(() => {
+  const navObserver = new MutationObserver(() => {
     if (location.href !== lastUrl) {
       lastUrl = location.href;
-      setTimeout(() => {
-        // Remove old sidebar elements
-        const oldSidebar = document.getElementById('resumeiq-sidebar');
-        if (oldSidebar) oldSidebar.remove();
-        const oldBtn = document.getElementById('resumeiq-toggle-btn');
-        if (oldBtn) oldBtn.remove();
-        document.body.style.marginRight = '';
-        window.__riqJobDetails = null;
-
-        // Re-extract and inject
-        const details = extractJobDetails();
-        if (details && (details.jdText || details.jobTitle !== 'Unknown Position')) {
-          injectSidebar(details);
-        }
-      }, 1500);
+      initAttempts = 0;
+      // Tear down old sidebar UI
+      if (typeof destroyResumeIQSidebar === 'function') {
+        destroyResumeIQSidebar();
+      }
+      // Re-init after new content loads
+      setTimeout(tryInit, 1400);
     }
   });
-  observer.observe(document, { subtree: true, childList: true });
+  navObserver.observe(document.body, { childList: true, subtree: true });
 })();

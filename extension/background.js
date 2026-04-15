@@ -35,6 +35,43 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.url) {
       chrome.tabs.create({ url: request.url });
     }
+
+  } else if (request.action === 'OPEN_POPUP') {
+    if (chrome.action.openPopup) {
+      chrome.action.openPopup().catch(() => {
+        chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
+      });
+    } else {
+      chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
+    }
+
+  } else if (request.action === 'PROXY_FETCH') {
+    // Proxy fetch for content scripts (to bypass LinkedIn CSP/CORS)
+    const { url, options } = request;
+    
+    fetch(url, options)
+      .then(async (res) => {
+        const text = await res.text();
+        let json = null;
+        try { json = JSON.parse(text); } catch (e) {}
+
+        sendResponse({
+          ok: res.ok,
+          status: res.status,
+          statusText: res.statusText,
+          text: text,
+          json: json
+        });
+      })
+      .catch((err) => {
+        console.error('Background Fetch Error:', err);
+        sendResponse({ 
+          ok: false, 
+          status: 0,
+          error: err.message || 'Network error or blocked request' 
+        });
+      });
+    return true; // Keep message channel open for async response
   }
 });
 

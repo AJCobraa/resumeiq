@@ -3,6 +3,7 @@
  * Pure JavaScript keyword extraction and resume matching.
  * Runs entirely in the browser — no backend, no latency.
  */
+'use strict';
 
 // Common English stop words to filter out
 const STOP_WORDS = new Set([
@@ -152,8 +153,8 @@ function rankResumesAgainstJD(jdText, resumeList) {
       resumeId: resume.resumeId,
       resumeTitle: resume.resumeTitle || resume.meta?.title || 'Untitled',
       score,
-      matched: matched.slice(0, 20),
-      missing: missing.slice(0, 20),
+      matched: matched,
+      missing: missing,
       totalKeywords: keywords.length,
     };
   });
@@ -199,7 +200,3 @@ function resumeToText(resume) {
   return lines.join(' ').toLowerCase();
 }
 
-// Export for use in content script and sidebar
-if (typeof window !== 'undefined') {
-  window.ResumeIQKeywordEngine = { extractKeywords, matchKeywordsAgainstResume, rankResumesAgainstJD, resumeToText };
-}
