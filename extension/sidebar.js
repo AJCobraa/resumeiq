@@ -415,8 +415,11 @@
     const loginBtn = document.getElementById('riq-login-open-btn');
     if (loginBtn) {
       loginBtn.addEventListener('click', function () {
-        const url = (window.__riqConfig && window.__riqConfig.frontendUrl) ? window.__riqConfig.frontendUrl : 'http://localhost:5173';
-        chrome.tabs.create({ url: url });
+        // Content scripts cannot call chrome.tabs directly — route through background.
+        const url = (window.__riqConfig && window.__riqConfig.frontendUrl)
+          ? window.__riqConfig.frontendUrl
+          : 'http://localhost:5173';
+        chrome.runtime.sendMessage({ action: 'OPEN_URL', url: url });
       });
     }
   }
@@ -438,9 +441,20 @@
   }
 
   // ─── API helper ────────────────────────────────────────────
-  async function apiCall(path, method, body) {
+  async function apiCall(path, method, bodyData) {
     method = method || 'GET';
     const CONFIG = window.__riqConfig || { backendUrl: 'http://localhost:8000' };
+    // Strip trailing slash so path joins are always clean
+    const backendUrl = (CONFIG.backendUrl || 'http://localhost:8000').replace(/\/$/, '');
+
+    // Validate URL before fetching — prevents "Failed to construct 'URL'" TypeError
+    let fullUrl;
+    try {
+      fullUrl = new URL(path, backendUrl);
+    } catch (e) {
+      throw new Error('[ResumeIQ] Invalid API URL: ' + backendUrl + path);
+    }
+
     const opts = {
       method: method,
       headers: {
@@ -448,12 +462,12 @@
         'Content-Type': 'application/json',
       },
     };
-    if (body) opts.body = JSON.stringify(body);
-    const res = await fetch(CONFIG.backendUrl + path, opts);
+    if (bodyData) opts.body = JSON.stringify(bodyData);
+    const res = await fetch(fullUrl.toString(), opts);
     if (!res.ok) {
       const text = await res.text();
       let detail = text;
-      try { detail = JSON.parse(text).detail || text; } catch (e) { /* keep raw text */ }
+      try { detail = JSON.parse(text).detail || text; } catch (e2) { /* keep raw text */ }
       throw new Error(detail || 'HTTP ' + res.status);
     }
     return res.json();

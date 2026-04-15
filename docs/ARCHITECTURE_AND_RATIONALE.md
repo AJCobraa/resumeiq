@@ -813,3 +813,16 @@ When the popup opens on a job page, it checks whether the sidebar is already inj
 **Why two guard locations in `sidebar.js`?** The IIFE guard covers the case where the extension is reloaded before `sidebar.js` executes. The `checkAuth()` guard covers the rarer case where execution began normally but the context was torn down before the async `sendMessage` callback fired.
 
 **User-visible result:** Instead of a black panel, the user now sees either nothing (if the context was invalidated before the sidebar mounted) or an error message ("Extension disconnected. Please reload the page.") with actionable guidance.
+
+### 37.12 Content Script chrome.tabs Restriction (OPEN_URL Fix)
+
+**Problem:** `sidebar.js` is injected into job pages as a content script via `<script>` tag. Content scripts run in an isolated world and **do not have access to the `chrome.tabs` API**. Calling `chrome.tabs.create()` from a content script throws a silent runtime error — the login button appeared to do nothing.
+
+**Fix:** All tab-opening operations are routed through the background service worker via `chrome.runtime.sendMessage`:
+
+- **`sidebar.js` → `renderLoginState()`:** Sends `{ action: 'OPEN_URL', url: <frontendUrl> }` to background.
+- **`background.js` → `OPEN_URL` handler:** Receives the message and calls `chrome.tabs.create({ url })` — the background has full `chrome.tabs` access.
+
+**Why not just give the content script the `tabs` permission?** The `tabs` permission is a sensitive permission that increases user trust friction at install time. The routing pattern adds zero overhead and keeps the permission surface minimal.
+
+**Existing pattern used for consistency:** `OPEN_DASHBOARD` already used this same routing pattern — `OPEN_URL` follows the same convention, just with a dynamic URL instead of hardcoded `/dashboard`.
