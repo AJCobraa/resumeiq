@@ -562,6 +562,10 @@ Jobs are linked to the resume used for their analysis. If a resume is deleted, t
 
 **Why this works:** Firestore billing is driven by read/write counts. By moving the "compute" burden to a single write at log-time (cheap), we eliminate thousands of repeated reads at view-time (expensive), leading to instant dashboard loading states and significantly lower cloud costs.
 
+> [!IMPORTANT]
+> **Technical Note: Firestore Dot-Notation Gotcha**
+> In the Python Firebase Admin SDK, `summary_ref.set(data, merge=True)` treats keys containing dots (e.g., `"operations.score_ats.calls"`) as literal flat field names. This prevents proper nesting. To correctly update nested structures using dot-notation, `summary_ref.update(data)` must be used. Our `model_logger.py` implements a robust `update()` → `set()` fallback pattern to handle this SDK nuance safely for both new and existing users.
+
 ---
 
 ---
