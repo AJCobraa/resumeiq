@@ -98,6 +98,15 @@ export default function Dashboard() {
         setJobs(prev => prev.map(j => j.jobId === jobId ? refreshed : j))
       }
       toast.success(action === 'approve' ? 'Applied to resume!' : 'Recommendation updated')
+
+      // Pulse the View Resume button to hint user to check the resume
+      if (action === 'approve') {
+        const btn = document.getElementById('view-resume-btn')
+        if (btn) {
+          btn.classList.add('animate-pulse-glow')
+          setTimeout(() => btn.classList.remove('animate-pulse-glow'), 800)
+        }
+      }
     } catch {
       toast.error('Failed to update recommendation')
     }
@@ -289,6 +298,70 @@ export default function Dashboard() {
           onClose={() => { setSelectedJob(null); setJobDetail(null) }}
           title={jobDetail?.jobTitle || 'Job Analysis'}
           size="lg"
+          headerAction={
+            jobDetail?.jdUrl ? (
+              <a
+                href={jobDetail.jdUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border border-border/50 text-muted-foreground bg-secondary hover:bg-secondary/80 hover:border-border hover:text-foreground transition-all duration-200"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                View Listing
+              </a>
+            ) : null
+          }
+          headerEnd={
+            jobDetail?.resumeTitle && jobDetail.resumeTitle !== '__deleted__' && jobDetail.resumeId ? (
+              <a
+                href={`/resumes/${jobDetail.resumeId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                id="view-resume-btn"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 hover:border-primary/50 hover:shadow-sm hover:shadow-primary/20 transition-all duration-200"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                View Resume
+              </a>
+            ) : null
+          }
+          headerMeta={jobDetail ? (() => {
+            const portal = getPortalInfo(jobDetail.portal)
+            return (
+              <div className="flex flex-col gap-1">
+                {/* Company + portal */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium text-slate-700">{jobDetail.company}</span>
+                  {portal.label && (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${portal.color}`}>
+                      {portal.label}
+                    </span>
+                  )}
+                </div>
+                {/* Resume name */}
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {jobDetail.resumeTitle && jobDetail.resumeTitle !== '__deleted__'
+                    ? <span className="font-medium text-foreground">{jobDetail.resumeTitle}</span>
+                    : jobDetail.resumeTitle === '__deleted__'
+                      ? <span className="italic text-orange-400">Resume deleted</span>
+                      : <span className="italic text-muted-foreground">Original Resume</span>
+                  }
+                </p>
+              </div>
+            )
+          })() : null}
         >
           {detailLoading ? (
             <div className="flex justify-center py-20"><Spinner size="lg" /></div>
@@ -299,7 +372,7 @@ export default function Dashboard() {
               onStatusChange={(s) => handleStatusChange(jobDetail.jobId, s)}
               onRecommendation={(id, a, t) => handleRecommendation(jobDetail.jobId, id, a, t)}
               onReanalyze={(jobObj) => handleReanalyze(jobObj || jobDetail)}
-              onPrepUpdate={setJobDetail}
+              onPrepUpdate={(prepResult) => setJobDetail(prev => ({ ...prev, ...prepResult }))}
               isReanalyzing={isReanalyzing}
             />
           ) : null}
@@ -385,83 +458,57 @@ function JobDetailPanel({ job, resumes, onStatusChange, onRecommendation, onRean
   return (
     <div className="flex flex-col">
 
-      {/* ── Sub-header ── */}
-      <div className="flex items-start justify-between mb-5 flex-shrink-0">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            {job.company}{job.company && portal.label ? ' • ' : ''}{portal.label}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
-            <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            {job.resumeTitle && job.resumeTitle !== '__deleted__'
-              ? <span className="font-medium text-foreground">{job.resumeTitle}</span>
-              : job.resumeTitle === '__deleted__'
-                ? <span className="italic text-orange-400">Resume deleted</span>
-                : <span className="italic text-muted-foreground">Original Resume</span>
-            }
-          </p>
-          {job.jdUrl && (
-            <a
-              href={job.jdUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-primary hover:underline mt-0.5 inline-block"
-            >
-              View original listing →
-            </a>
-          )}
-        </div>
-        <div className="flex items-center gap-2.5 flex-shrink-0">
-          {job.resumeTitle === '__deleted__' ? (
-            <ResumePickerReanalyze job={job} onReanalyze={onReanalyze} isReanalyzing={isReanalyzing} />
-          ) : (
-            <Button
-              onClick={() => onReanalyze(job)}
-              disabled={isReanalyzing}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-1.5 rounded-full border-border/60 text-foreground text-xs px-3"
-            >
-              {isReanalyzing ? (
-                <Spinner size="sm" />
-              ) : (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Re-Analyze
-                </>
-              )}
-            </Button>
-          )}
-          <select
-            value={job.status}
-            onChange={(e) => onStatusChange(e.target.value)}
-            className="px-3 py-1.5 text-xs bg-secondary border border-border/40 rounded-xl text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring"
+      {/* ── Actions row ── */}
+      <div className="flex justify-end items-center gap-2 mb-5 flex-shrink-0">
+        {job.resumeTitle === '__deleted__' ? (
+          <ResumePickerReanalyze job={job} onReanalyze={onReanalyze} isReanalyzing={isReanalyzing} />
+        ) : (
+          <Button
+            onClick={() => onReanalyze(job)}
+            disabled={isReanalyzing}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-1.5 rounded-full border-border/60 text-foreground text-xs px-3"
           >
-            {STATUS_OPTIONS.map(s => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
-        </div>
+            {isReanalyzing ? (
+              <Spinner size="sm" />
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Re-Analyze
+              </>
+            )}
+          </Button>
+        )}
+        <select
+          value={job.status}
+          onChange={(e) => onStatusChange(e.target.value)}
+          className="px-3 py-1.5 text-xs bg-secondary border border-border/40 rounded-xl text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring"
+        >
+          {STATUS_OPTIONS.map(s => (
+            <option key={s.value} value={s.value}>{s.label}</option>
+          ))}
+        </select>
       </div>
+
 
       {/* ── Score Rings ── */}
       <div className="bg-secondary/30 rounded-2xl border border-border/40 p-6 mb-5 flex-shrink-0">
-        <div className="flex items-center justify-center gap-16">
-          <ScoreRing
-            score={job.atsScore}
-            label="ATS Keyword Score"
-            color={getScoreColor(job.atsScore)}
+        <div className="flex items-center justify-center gap-12 py-4">
+          <ScoreRing 
+            key={`ats-${job.atsScore}`}
+            score={job.atsScore} 
+            label="ATS Keyword Score" 
+            color={getScoreColor(job.atsScore)} 
           />
-          <ScoreRing
-            score={job.semanticScore || 0}
-            label="Semantic Match"
-            color={getScoreColor(job.semanticScore)}
+          <ScoreRing 
+            key={`sem-${job.semanticScore}`}
+            score={job.semanticScore || 0} 
+            label="Semantic Match" 
+            color={getScoreColor(job.semanticScore)} 
           />
         </div>
       </div>

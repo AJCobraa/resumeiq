@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 const gentleSpring = { type: 'spring', stiffness: 200, damping: 24 }
 
-export default function Modal({ isOpen, onClose, title, size = 'md', children }) {
+export default function Modal({ isOpen, onClose, title, headerAction, headerEnd, headerMeta, size = 'md', children }) {
   // Expanded sizes to give the dashboard more horizontal space
   const widths = { 
     sm: 'max-w-md', 
@@ -51,16 +51,28 @@ export default function Modal({ isOpen, onClose, title, size = 'md', children })
             
             {/* Header (Sticky at top) */}
             {title && (
-              <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100/80 shrink-0 bg-white z-10">
-                <h2 className="text-lg font-semibold tracking-tight text-slate-900">{title}</h2>
-                <button
-                  onClick={onClose}
-                  className="text-slate-400 hover:text-slate-900 transition-colors p-1.5 rounded-xl hover:bg-slate-50 cursor-pointer"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+              <div className="flex flex-col px-6 pt-5 pb-4 border-b border-slate-100/80 shrink-0 bg-white z-10">
+                {/* Row 1: title + headerAction (View Listing) + headerEnd (View Resume) + close */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <h2 className="text-lg font-semibold tracking-tight text-slate-900 truncate">{title}</h2>
+                    {headerAction && <div className="flex-shrink-0">{headerAction}</div>}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {headerEnd && <div>{headerEnd}</div>}
+                    <button
+                      onClick={onClose}
+                      className="text-slate-400 hover:text-slate-900 transition-colors p-1.5 rounded-xl hover:bg-slate-50 cursor-pointer"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Row 2 & 3: headerMeta (company · portal · resume) */}
+                {headerMeta && <div className="mt-2 text-balance">{headerMeta}</div>}
               </div>
             )}
             
