@@ -133,6 +133,6 @@ export const api = {
   getJob:               (id)   => request(`/api/jobs/${id}`),
   updateJobStatus:      (id, body) => request(`/api/jobs/${id}/status`, 'PATCH', body),
   approveRecommendation:(id, body) => request(`/api/jobs/${id}/recommendation`, 'PATCH', body),
-  generateInterviewPrep:(id)       => request(`/api/jobs/${id}/interview-prep`, 'POST'),
+  generateInterviewPrep:(id, mode = 'fresh') => request(`/api/jobs/${id}/interview-prep`, 'POST', { mode }),
   deleteJob:            (id)   => request(`/api/jobs/${id}`, 'DELETE'),
 }

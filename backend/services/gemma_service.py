@@ -474,6 +474,7 @@ async def generate_interview_prep(
     company:          str,
     company_tier:     dict = None,
     user_id:          str = "",
+    already_asked:    list[str] = [],
 ) -> list[dict]:
     """
     Predict likely interview questions based on resume gaps and company tier.
@@ -505,6 +506,15 @@ CANDIDATE BACKGROUND (from their resume):
 
 RESUME GAPS TO PROBE:
 {gaps_formatted}
+"""
+
+    if already_asked:
+        prompt += (
+            "\nDo NOT repeat or overlap with these previously asked questions:\n"
+            + "\n".join(f"- {q}" for q in already_asked)
+        )
+
+    prompt += f"""
 
 For each gap listed above, generate one interview question and one coached strategic answer.
 

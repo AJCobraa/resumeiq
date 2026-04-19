@@ -33,6 +33,7 @@ export default function Dashboard() {
   const [isReanalyzing, setIsReanalyzing] = useState(false)
   const [showExtensionGuide, setShowExtensionGuide] = useState(false)
   const [resumes, setResumes] = useState([])
+  const [reanalyzeWarning, setReanalyzeWarning] = useState(false)
 
   const fetchResumes = useCallback(async () => {
     try {
@@ -89,39 +90,76 @@ export default function Dashboard() {
 
   const handleRecommendation = async (jobId, recId, action, editedText = '') => {
     try {
-      await api.approveRecommendation(jobId, {
+      const updatedRec = await api.approveRecommendation(jobId, {
         recommendationId: recId, action, editedText,
       })
-      const refreshed = await api.getJob(jobId)
-      if (refreshed) {
-        setJobDetail(refreshed)
-        setJobs(prev => prev.map(j => j.jobId === jobId ? refreshed : j))
-      }
-      toast.success(action === 'approve' ? 'Applied to resume!' : 'Recommendation updated')
 
-      // Pulse the View Resume button to hint user to check the resume
+      // Merge only the updated rec into jobDetail state — no extra read needed
+      setJobDetail(prev => ({
+        ...prev,
+        recommendations: prev.recommendations.map(r =>
+          r.recommendationId === recId ? { ...r, ...updatedRec } : r
+        )
+      }))
+
+      // Update approvedCount in the jobs list summary
+      setJobs(prev => prev.map(j =>
+        j.jobId === jobId
+          ? { ...j, approvedCount: (j.approvedCount || 0) + (action === 'approve' ? 1 : 0) }
+          : j
+      ))
+
+      // KEY FIX: Approving a recommendation triggers a resume bullet edit in the
+      // backend (BackgroundTask). This invalidates embeddingsCache on the resume doc.
+      // We optimistically mark hasEmbeddingsCache = false in resumes[] state immediately
+      // so the re-analyze guard correctly allows re-analysis without requiring
+      // the user to close and reopen the modal.
+      // Dismiss does NOT change resume content — only approve does.
       if (action === 'approve') {
+        const resumeId = jobDetail?.resumeId
+        if (resumeId) {
+          setResumes(prev => prev.map(r =>
+            r.resumeId === resumeId
+              ? { ...r, hasEmbeddingsCache: false }
+              : r
+          ))
+        }
+        // Pulse the View Resume button to hint user to check the resume
         const btn = document.getElementById('view-resume-btn')
         if (btn) {
           btn.classList.add('animate-pulse-glow')
           setTimeout(() => btn.classList.remove('animate-pulse-glow'), 800)
         }
       }
+
+      toast.success(action === 'approve' ? 'Applied to resume!' : 'Recommendation updated')
     } catch {
       toast.error('Failed to update recommendation')
     }
   }
 
   const handleReanalyze = async (jobOrEvent) => {
-    // Guard: if a DOM Event was passed instead of a job object, use current jobDetail
     const job = (jobOrEvent && typeof jobOrEvent === 'object' && jobOrEvent.resumeId)
       ? jobOrEvent
       : jobDetail
-
     if (!job) return
 
+    // Guard: check hasEmbeddingsCache from already-loaded resumes[] state.
+    // Zero extra Firestore reads — resumes[] is loaded on mount and kept updated
+    // by Fix 1 (optimistic update on recommendation approval).
+    const resumeInState = resumes.find(r => r.resumeId === job.resumeId)
+    if (resumeInState?.hasEmbeddingsCache) {
+      setReanalyzeWarning(true)
+      return  // Stop. No API call. No credits used.
+    }
+
+    await _doReanalyze(job)
+  }
+
+  const _doReanalyze = async (job) => {
     try {
       setIsReanalyzing(true)
+      setReanalyzeWarning(false)
       const result = await api.analyze({
         resumeId: job.resumeId,
         jdText: job.jdText,
@@ -134,6 +172,10 @@ export default function Dashboard() {
       toast.success('Resume re-analyzed!')
       setJobDetail(result)
       setJobs(prev => prev.map(j => j.jobId === result.jobId ? result : j))
+      // After successful re-analyze, backend recomputes and saves fresh embeddingsCache.
+      // Refresh resumes[] so hasEmbeddingsCache is correct for future guard checks.
+      const freshResumes = await api.getResumes()
+      setResumes(freshResumes)
     } catch (e) {
       toast.error('Analysis failed: ' + e.message)
     } finally {
@@ -295,7 +337,11 @@ export default function Dashboard() {
 
         <Modal 
           isOpen={!!selectedJob} 
-          onClose={() => { setSelectedJob(null); setJobDetail(null) }}
+          onClose={() => {
+            setSelectedJob(null)
+            setJobDetail(null)
+            setReanalyzeWarning(false)
+          }}
           title={jobDetail?.jobTitle || 'Job Analysis'}
           size="lg"
           headerAction={
@@ -366,15 +412,41 @@ export default function Dashboard() {
           {detailLoading ? (
             <div className="flex justify-center py-20"><Spinner size="lg" /></div>
           ) : jobDetail ? (
-            <JobDetailPanel 
-              job={jobDetail}
-              resumes={resumes}
-              onStatusChange={(s) => handleStatusChange(jobDetail.jobId, s)}
-              onRecommendation={(id, a, t) => handleRecommendation(jobDetail.jobId, id, a, t)}
-              onReanalyze={(jobObj) => handleReanalyze(jobObj || jobDetail)}
-              onPrepUpdate={(prepResult) => setJobDetail(prev => ({ ...prev, ...prepResult }))}
-              isReanalyzing={isReanalyzing}
-            />
+            <>
+              {reanalyzeWarning && (
+                <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 mb-4">
+                  <svg className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <p className="font-semibold mb-0.5">No resume changes detected</p>
+                    <p className="text-amber-700">
+                      Your resume hasn't been updated since the last analysis. 
+                      Re-analyzing would return identical results and consume AI credits.
+                      Edit your resume first, then re-analyze for fresh results.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setReanalyzeWarning(false)}
+                    className="ml-auto text-amber-400 hover:text-amber-600 shrink-0"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+
+              <JobDetailPanel 
+                job={jobDetail} 
+                resumes={resumes}
+                onStatusChange={(status) => handleStatusChange(jobDetail.jobId, status)}
+                onRecommendation={(recId, action, text) => handleRecommendation(jobDetail.jobId, recId, action, text)}
+                onReanalyze={handleReanalyze}
+                onPrepUpdate={(prepResult) => setJobDetail(prev => ({ ...prev, ...prepResult }))}
+                isReanalyzing={isReanalyzing}
+              />
+            </>
           ) : null}
         </Modal>
 
@@ -720,7 +792,11 @@ function JobDetailPanel({ job, resumes, onStatusChange, onRecommendation, onRean
 
         {/* ════ TAB: Interview Coach ════ */}
         {activeTab === 'interview' && (
-          <InterviewPrepPanel job={job} onUpdate={onPrepUpdate} />
+          <InterviewPrepPanel 
+            job={job} 
+            onUpdate={onPrepUpdate} 
+            hasEmbeddingsCache={resumes.find(r => r.resumeId === job.resumeId)?.hasEmbeddingsCache ?? true}
+          />
         )}
 
       </div>

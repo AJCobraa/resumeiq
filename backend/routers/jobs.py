@@ -6,7 +6,7 @@ Section 18.1 addition: GET /api/jobs/check?url= for extension pre-check
 Section 19.2 fix: _apply_recommendation_to_resume now uses sectionId + bulletId
   (falls back to text matching for backwards compatibility with old recs)
 """
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Body
 from pydantic import BaseModel
 from firebase_admin_init import db, verify_token
 from services import resume_service, gemma_service
@@ -26,6 +26,10 @@ class UpdateRecommendationRequest(BaseModel):
     recommendationId: str
     action: str  # approve | dismiss | edit
     editedText: str = ""
+
+
+class InterviewPrepRequest(BaseModel):
+    mode: str = "fresh"  # "fresh" | "more"
 
 
 # ── Helpers ──────────────────────────────────────────
@@ -278,7 +282,11 @@ def _apply_recommendation_to_resume(
 
 
 @router.post("/jobs/{job_id}/interview-prep", response_model=InterviewPrepResponse)
-async def generate_job_interview_prep(job_id: str, uid: str = Depends(verify_token)):
+async def generate_job_interview_prep(
+    job_id: str,
+    body: InterviewPrepRequest = Body(default=InterviewPrepRequest()),
+    uid: str = Depends(verify_token),
+):
     """
     Generate or retrieve interview prep questions for a specific job.
     Calibrates questions based on company tier and resume gaps.
@@ -287,54 +295,67 @@ async def generate_job_interview_prep(job_id: str, uid: str = Depends(verify_tok
     job_doc = job_ref.get()
     if not job_doc.exists:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     job_data = job_doc.to_dict()
     resume_id = job_data.get("resumeId")
     if not resume_id:
         raise HTTPException(status_code=400, detail="Job has no associated resume")
 
-    # 1. Check Cache
-    # If already generated for this specific resume version, return cached
-    cached_prep = job_data.get("interviewPrep")
-    cached_at = job_data.get("interviewPrepGeneratedAt")
-    cached_resume_id = job_data.get("interviewPrepResumeId")
-    
-    if cached_prep and cached_resume_id == resume_id:
-        return {
-            "interviewPrep": cached_prep,
-            "cached": True,
-            "generatedAt": cached_at,
-            "companyTier": job_data.get("interviewPrepTier", "standard"),
-            "companyLabel": job_data.get("interviewPrepTierLabel", "Tech Company"),
-        }
+    # 1. Mode "fresh": Check Cache Shortcut
+    if body.mode == "fresh":
+        cached_prep = job_data.get("interviewPrep")
+        cached_resume_id = job_data.get("interviewPrepResumeId")
+        if cached_prep and cached_resume_id == resume_id:
+            return {
+                "interviewPrep": cached_prep,
+                "cached": True,
+                "generatedAt": job_data.get("interviewPrepGeneratedAt"),
+                "companyTier": job_data.get("interviewPrepTier", "standard"),
+                "companyLabel": job_data.get("interviewPrepTierLabel", "Tech Company"),
+            }
 
     # 2. Fetch Context
     resume_data = await resume_service.get_resume(uid, resume_id)
     if not resume_data:
         raise HTTPException(status_code=404, detail="Resume not found")
-    
+
     resume_summary = resume_service.summarize_resume(resume_data)
     missing_keywords = job_data.get("missingKeywords", [])
     job_title = job_data.get("jobTitle", "Target Role")
     company = job_data.get("company", "Tech Company")
 
+    already_asked = []
+    if body.mode == "more":
+        already_asked = [
+            item.get("question", "")
+            for item in job_data.get("interviewPrep", [])
+        ]
+
     # 3. Classify and Generate
     company_tier = gemma_service.classify_company_tier(company)
-    
+
     try:
-        prep_list = await gemma_service.generate_interview_prep(
+        new_prep = await gemma_service.generate_interview_prep(
             missing_keywords=missing_keywords,
             resume_summary=resume_summary,
             job_title=job_title,
             company=company,
             company_tier=company_tier,
-            user_id=uid
+            user_id=uid,
+            already_asked=already_asked
         )
-        
+
         # 4. Save to Firestore
         now = datetime.now(timezone.utc).isoformat()
+        if body.mode == "more":
+            # Append
+            final_prep = (job_data.get("interviewPrep") or []) + new_prep
+        else:
+            # Fresh / Replace
+            final_prep = new_prep
+
         job_ref.update({
-            "interviewPrep": prep_list,
+            "interviewPrep": final_prep,
             "interviewPrepGeneratedAt": now,
             "interviewPrepResumeId": resume_id,
             "interviewPrepTier": company_tier["tier"],
@@ -342,7 +363,7 @@ async def generate_job_interview_prep(job_id: str, uid: str = Depends(verify_tok
         })
 
         return {
-            "interviewPrep": prep_list,
+            "interviewPrep": final_prep,
             "cached": False,
             "generatedAt": now,
             "companyTier": company_tier["tier"],

@@ -830,3 +830,20 @@ When the popup opens on a job page, it checks whether the sidebar is already inj
 **Why not just give the content script the `tabs` permission?** The `tabs` permission is a sensitive permission that increases user trust friction at install time. The routing pattern adds zero overhead and keeps the permission surface minimal.
 
 **Existing pattern used for consistency:** `OPEN_DASHBOARD` already used this same routing pattern — `OPEN_URL` follows the same convention, just with a dynamic URL instead of hardcoded `/dashboard`.
+## Section 38 — Persistent & Multi-Mode Interview Prep
+
+**Problem:** Re-analyzing a job (e.g., to see updated scores after approving recommendations) was wiping out existing interview prep data. Additionally, users were limited to the initial 3 questions and couldn't request more depth.
+
+**Decision:** Implement a non-destructive analysis pipeline and a state-aware "Give Me More" generation mode.
+
+**Implementation:**
+- **Persistence (`analysis_pipeline.py`):** Added a collection-merge step where `interviewPrep` fields from an existing job document are explicitly preserved into the new `job_doc` object before the Firestore `set()` operation. This decouple's match-scoring re-runs from interview prep status.
+- **Generation Modes (`routers/jobs.py` & `gemma_service.py`):**
+    - `fresh`: Wipes existing prep and generates 3 brand new questions. Toggled by "Start Fresh" modal in UI.
+    - `more`: Appends 3 *different* questions to the existing list. The backend extracts `already_asked` questions from the current document and injects them into the LLM prompt as a "negative constraints" list to ensure variety.
+- **Frontend State Machine (`InterviewPrepPanel.jsx`):** 
+    - Transitioned from a binary `loading` state to a 3-state machine (`idle`, `confirming`, `loading`).
+    - Added a **Confirmation Modal** for "Start Fresh" to prevent accidental data loss.
+    - Added a **Cache Status Banner** that detects if the current prep was generated for a previous resume version or if a resume change has occurred, providing clear "re-calibrate" signals to the user.
+
+**Why this works:** It transforms the Interview Coach from a static one-off generation into a dynamic, persistent workspace that evolves with the user's resume edits and preparation needs.

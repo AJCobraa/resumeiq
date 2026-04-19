@@ -235,6 +235,7 @@ async def list_resumes(uid: str) -> list[dict]:
             "sections":    d.get("sections", []),    # return full sections — needed for thumbnail render
             "updatedAt":   d.get("updatedAt"),
             "createdAt":   d.get("createdAt"),
+            "hasEmbeddingsCache": d.get("embeddingsCache") is not None,
         })
     return results
 

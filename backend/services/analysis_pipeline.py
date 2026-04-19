@@ -332,6 +332,20 @@ async def analyze_resume_vs_jd(
         },
     }
 
+    # PERSISTENCE FIX: Preserve interview prep fields if they exist in the existing job doc.
+    # This prevents re-analysis from wiping out previous interviewer prep.
+    if existing_job:
+        prep_fields = [
+            "interviewPrep", 
+            "interviewPrepGeneratedAt", 
+            "interviewPrepResumeId", 
+            "interviewPrepTier", 
+            "interviewPrepTierLabel"
+        ]
+        for field in prep_fields:
+            if field in existing_job:
+                job_doc[field] = existing_job[field]
+
     db.collection("users").document(user_id).collection("jobs").document(final_job_id).set(job_doc)
     
     # Update totalJobs counter if it's a new job
