@@ -47,15 +47,6 @@ def _clean_url(url: str) -> str:
     return urlunparse((p.scheme, p.netloc, p.path, "", "", ""))
 
 
-def _cosine_similarity(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    norm_a = math.sqrt(sum(x * x for x in a))
-    norm_b = math.sqrt(sum(x * x for x in b))
-    if norm_a == 0 or norm_b == 0:
-        return 0.0
-    return dot / (norm_a * norm_b)
-
-
 def _resume_to_text(resume: dict) -> str:
     lines = []
     meta = resume.get("meta", {})
@@ -228,16 +219,32 @@ async def analyze_resume_vs_jd(
     semanticDetails = []    
     if chunks and cached_reqs:
         all_best_scores = []
+
+        # ⚡ Bolt Optimization: Precompute vector norms
+        # Calculating the norm of a 3072-dimensional vector is expensive.
+        # By precomputing them outside the nested loops and using math.hypot (which is implemented in C),
+        # we avoid calculating the same norms hundreds/thousands of times.
+        chunk_norms = []
+        for chunk in chunks:
+            emb = chunk.get("embedding", [])
+            chunk_norms.append(math.hypot(*emb) if emb else 0.0)
+
         for req in cached_reqs:
             req_emb = req.get("embedding")
             if not req_emb:
                 continue
+
+            req_norm = math.hypot(*req_emb)
+            if req_norm == 0.0:
+                continue
                 
             best_score = -1.0
-            for chunk in chunks:
+            for i, chunk in enumerate(chunks):
                 emb = chunk.get("embedding", [])
-                if emb:
-                    sim = _cosine_similarity(emb, req_emb)
+                c_norm = chunk_norms[i]
+                if emb and c_norm > 0.0:
+                    dot = sum(x * y for x, y in zip(emb, req_emb))
+                    sim = dot / (c_norm * req_norm)
                     if sim > best_score:
                         best_score = sim
             
