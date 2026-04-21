@@ -206,7 +206,7 @@ function renderMainCard() {
               stroke-dasharray="${circ.toFixed(1)}"
               stroke-dashoffset="${offset.toFixed(1)}"/>
           </svg>
-          <span class="riq-ring-label" style="color:${scoreColor}">${score}%</span>
+          <span class="riq-ring-label" style="color:${scoreColor}">${riqEscape(score)}%</span>
         </div>
         <!-- Text summary -->
         <div class="riq-card-text">
@@ -214,7 +214,7 @@ function renderMainCard() {
             <span class="riq-card-version-badge">AI</span>
           </div>
           <div class="riq-card-sub" style="color:${scoreColor}">
-            <strong>${matched} of ${total} keywords</strong> are present in your resume
+            <strong>${riqEscape(matched)} of ${riqEscape(total)} keywords</strong> are present in your resume
           </div>
           ${riqState.resumes.length > 1 ? `
           <div class="riq-card-resume-name">
@@ -241,13 +241,13 @@ function renderMainCard() {
             const rc = rank.score >= 75 ? '#0a9d76' : rank.score >= 50 ? '#b35900' : '#c0392b';
             const isActive = rank.resumeId === riqState.currentResumeId;
             return `<div class="riq-resume-row ${isActive ? 'riq-resume-active' : ''}" 
-                         data-resume-id="${rank.resumeId}">
-              <span class="riq-resume-rank-num">${i + 1}</span>
+                         data-resume-id="${riqEscape(rank.resumeId)}">
+              <span class="riq-resume-rank-num">${riqEscape(i + 1)}</span>
               <span class="riq-resume-rank-title">${riqEscape(rank.resumeTitle)}</span>
               <div class="riq-resume-rank-bar-outer">
-                <div class="riq-resume-rank-bar-inner" style="width:${rank.score}%;background:${rc}"></div>
+                <div class="riq-resume-rank-bar-inner" style="width:${riqEscape(rank.score)}%;background:${rc}"></div>
               </div>
-              <span class="riq-resume-rank-score" style="color:${rc}">${rank.score}%</span>
+              <span class="riq-resume-rank-score" style="color:${rc}">${riqEscape(rank.score)}%</span>
             </div>`;
           }).join('')}
         </div>
@@ -258,7 +258,7 @@ function renderMainCard() {
         <div class="riq-panel-section">
           <div class="riq-panel-label">
             ✓ MATCHED KEYWORDS
-            <span class="riq-kw-badge riq-kw-badge-matched">${current.matched.length}</span>
+            <span class="riq-kw-badge riq-kw-badge-matched">${riqEscape(current.matched.length)}</span>
           </div>
           <div class="riq-pill-wrap">
             ${current.matched.map(k =>
@@ -273,7 +273,7 @@ function renderMainCard() {
         <div class="riq-panel-section">
           <div class="riq-panel-label">
             ✕ MISSING KEYWORDS
-            <span class="riq-kw-badge riq-kw-badge-missing">${current.missing.length}</span>
+            <span class="riq-kw-badge riq-kw-badge-missing">${riqEscape(current.missing.length)}</span>
           </div>
           <div class="riq-pill-wrap">
             ${current.missing.map(k =>
@@ -408,16 +408,16 @@ function renderPreviousResult(result) {
       <div class="riq-panel-label">⚡ AI ANALYSIS RESULT</div>
       <div style="display:flex;gap:16px;align-items:center;margin-top:8px;">
         <div style="text-align:center;">
-          <div style="font-size:22px;font-weight:800;color:${atsColor};font-family:monospace;">${ats}%</div>
+          <div style="font-size:22px;font-weight:800;color:${atsColor};font-family:monospace;">${riqEscape(ats)}%</div>
           <div style="font-size:10px;color:#6b7280;">ATS Score</div>
         </div>
         ${sem !== undefined ? `
         <div style="text-align:center;">
-          <div style="font-size:22px;font-weight:800;color:${atsColor};font-family:monospace;">${sem}%</div>
+          <div style="font-size:22px;font-weight:800;color:${atsColor};font-family:monospace;">${riqEscape(sem)}%</div>
           <div style="font-size:10px;color:#6b7280;">Semantic</div>
         </div>` : ''}
         <div style="flex:1;">
-          ${recs > 0 ? `<div style="font-size:12px;color:#374151;">${recs} pending improvements</div>` : ''}
+          ${recs > 0 ? `<div style="font-size:12px;color:#374151;">${riqEscape(recs)} pending improvements</div>` : ''}
           <div class="riq-view-report-btn" id="riq-view-report">View Full Report →</div>
         </div>
       </div>
@@ -440,10 +440,11 @@ function showRiqToast(msg, type = 'success') {
 }
 
 function riqEscape(str) {
-  if (!str) return '';
+  if (str == null) return '';
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
