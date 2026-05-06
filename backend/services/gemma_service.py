@@ -3,8 +3,7 @@ Gemma AI service — handles all AI model interactions.
 Uses google-genai (NOT google-generativeai) per AGENTS.md.
 
 Functions:
-  - score_ats: quantitative ATS scoring via keyword/section analysis
-  - generate_recommendations: resume improvement recommendations
+  - analyze_resume_and_recommend: combined ATS scoring and recommendation generation
   - rewrite_bullet: rewrite a specific bullet for ATS optimization
   - parse_resume_from_text: parse raw PDF text into ResumeIQ JSON schema
   - generate_interview_prep: predict interview questions based on company tier and gaps
@@ -54,20 +53,21 @@ def _fire_log(user_id: str, operation: str, input_tokens: int, output_tokens: in
     t.start()
 
 
-async def score_ats(resume_text: str, jd_text: str, user_id: str = "") -> dict:
-    """
-    Score resume against a job description (0-100).
-    Returns { atsScore, breakdown: { keywordMatch, experienceMatch, skillsMatch, formatScore } }
-    """
-    prompt = f"""You are an expert ATS (Applicant Tracking System) analyst.
 
-Score the following RESUME against the JOB DESCRIPTION on a scale of 0-100.
+async def analyze_resume_and_recommend(
+    resume_text: str,
+    jd_text: str,
+    user_id: str = ""
+) -> dict:
+    """
+    Single combined Gemma call that replaces score_ats + generate_recommendations.
+    Returns {
+        atsScore, breakdown, missingKeywords, strongMatches, recommendations
+    }
+    """
+    prompt = f"""You are an expert ATS analyst and resume coach.
 
-Provide a detailed breakdown with these categories (each 0-100):
-- keywordMatch: How well does the resume's keywords match the JD's required keywords?
-- experienceMatch: Does the resume's experience level and type match the JD requirements?
-- skillsMatch: Do the resume's technical/soft skills match what the JD requires?
-- formatScore: Is the resume well-structured and ATS-readable?
+Analyze the RESUME against the JOB DESCRIPTION and return a single JSON object.
 
 RESUME:
 ---
@@ -88,58 +88,39 @@ Return ONLY valid JSON in this exact format:
     "skillsMatch": <number 0-100>,
     "formatScore": <number 0-100>
   }},
-  "missingKeywords": ["keyword1", "keyword2", ...],
-  "strongMatches": ["match1", "match2", ...]
-}}"""
+  "missingKeywords": ["keyword1", "keyword2"],
+  "strongMatches": ["match1", "match2"],
+  "recommendations": [
+    {{
+      "type": "rewrite_bullet" | "add_skill" | "add_section",
+      "section": "experience" | "projects" | "skills" | "education",
+      "currentText": "exact current text being changed (empty string if adding new)",
+      "suggestedText": "the improved rewritten text",
+      "reason": "why this change improves ATS matching",
+      "impact": "high" | "medium" | "low",
+      "keywordsAdded": ["keyword1", "keyword2"]
+    }}
+  ]
+}}
 
-    return await _call_model_json(prompt, user_id=user_id, operation="score_ats")
+RULES FOR ATS SCORING:
+- atsScore is 0-100 overall score
+- breakdown scores are each 0-100 independently based on these criteria:
+  - keywordMatch: How well does the resume's keywords match the JD's required keywords?
+  - experienceMatch: Does the resume's experience level and type match the JD requirements?
+  - skillsMatch: Do the resume's technical/soft skills match what the JD requires?
+  - formatScore: Is the resume well-structured and ATS-readable?
 
+RULES FOR RECOMMENDATIONS (generate 3-7):
+- Identify the EXACT bullet point or section to change
+- Provide a REWRITTEN version that naturally incorporates missing keywords
+- Rewrites must be truthful — never fabricate experience or skills
+- Each rewrite must be specific, quantified where possible, action-verb-led
+- Explain WHY this change improves ATS compatibility
+- Do NOT simplify or shorten bullet points — make them MORE detailed and keyword-rich
+- currentText must match the resume EXACTLY (used for programmatic lookup)"""
 
-async def generate_recommendations(
-    resume_text: str, jd_text: str, missing_keywords: list, ats_score: int, user_id: str = ""
-) -> list[dict]:
-    """
-    Generate specific, actionable recommendations to improve resume-JD match.
-    Returns list of { type, section, currentText, suggestedText, reason, impact, keywordsAdded }
-    """
-    prompt = f"""You are an expert resume coach helping a candidate optimize their resume for ATS systems.
-
-CURRENT ATS SCORE: {ats_score}/100
-MISSING KEYWORDS: {', '.join(missing_keywords)}
-
-RESUME:
----
-{resume_text}
----
-
-JOB DESCRIPTION:
----
-{jd_text}
----
-
-Generate 3-7 specific, actionable recommendations to improve the ATS score. For each recommendation:
-1. Identify the EXACT bullet point or section that should be changed
-2. Provide a REWRITTEN version that naturally incorporates missing keywords
-3. The rewrite must be truthful — never fabricate experience or skills
-4. Each rewrite should be specific, quantified where possible, and action-verb-led
-5. Explain WHY this change improves ATS compatibility
-
-IMPORTANT: Do NOT simplify or shorten bullet points. Make them MORE detailed and keyword-rich.
-
-Return ONLY valid JSON as a list:
-[
-  {{
-    "type": "rewrite_bullet" | "add_skill" | "add_section",
-    "section": "experience" | "projects" | "skills" | "education",
-    "currentText": "the exact current text being changed (empty if adding)",
-    "suggestedText": "the improved rewritten text",
-    "reason": "why this change helps ATS matching",
-    "impact": "high" | "medium" | "low",
-    "keywordsAdded": ["keyword1", "keyword2"]
-  }}
-]"""
-
-    return await _call_model_json(prompt, user_id=user_id, operation="generate_recs")
+    return await _call_model_json(prompt, user_id=user_id, operation="analyze_and_recommend")
 
 
 async def rewrite_bullet(
@@ -306,7 +287,7 @@ async def _call_model_json(prompt: str, user_id: str = "", operation: str = "") 
             return json.loads(response.text)
         except Exception:
             if attempt == 0:
-                time.sleep(2)
+                await asyncio.sleep(2)
             else:
                 raise
 
@@ -342,7 +323,7 @@ async def _call_model_text(prompt: str, user_id: str = "", operation: str = "") 
             return response.text.strip()
         except Exception:
             if attempt == 0:
-                time.sleep(2)
+                await asyncio.sleep(2)
             else:
                 raise
 

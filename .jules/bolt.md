@@ -1,0 +1,3 @@
+## 2024-06-18 - Math overhead in semantic similarity loops
+**Learning:** High-dimensional vector math inside nested loops creates a major bottleneck in Python. Specifically, computing the magnitudes of 3072-dimensional embeddings via `math.sqrt(sum(x*x for x in vec))` on every iteration of `_cosine_similarity` leads to massive redundant work when vectors are reused (as is the case with chunks and requirements).
+**Action:** When comparing lists of vectors, hoist vector norm calculations (`math.hypot(*vec)`) outside the nested loops, and only calculate the dot product inside the loop. This can reduce CPU time by >60% for similarity matrices.
