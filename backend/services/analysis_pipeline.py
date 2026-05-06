@@ -180,14 +180,6 @@ async def analyze_resume_vs_jd(
     resume_cache = resume.get("embeddingsCache") or {}
     chunks = resume_cache.get("chunks") or []
     resume_embeddings_computed_on_demand = False
-    if not chunks:
-        chunks = await embedding_service.compute_embeddings(resume, user_id=user_id)
-        resume_embeddings_computed_on_demand = True
-        # Write embeddings back to Firestore so the next analysis is a cache hit.
-        # Fire-and-forget — do not await, do not block analysis response.
-        asyncio.ensure_future(
-            embedding_service.update_embeddings_cache(user_id, resume_id, resume)
-        )
 
     jd_embedding_computed = False
     cached_reqs = []
@@ -199,13 +191,42 @@ async def analyze_resume_vs_jd(
         # Fallback if cache is somehow invalid
         is_jd_cache_hit = False
 
+    # 1. Schedule the Gemma analysis task to run concurrently
+    gemma_analysis_task = asyncio.create_task(
+        gemma_service.analyze_resume_and_recommend(resume_text, jd_text, user_id=user_id)
+    )
+
+    # 2. Schedule embedding tasks if needed
+    resume_emb_task = None
+    if not chunks:
+        resume_emb_task = asyncio.create_task(
+            embedding_service.compute_embeddings(resume, user_id=user_id)
+        )
+
+    jd_emb_task = None
+    sentences = []
     if not is_jd_cache_hit:
         sentences = _split_jd_into_sentences(jd_text)
         if not sentences:
             # Fallback if no valid sentences found
             sentences = [jd_text[:1000]]
             
-        sentence_embeddings = await embedding_service.get_jd_sentence_embeddings(sentences, user_id=user_id)
+        jd_emb_task = asyncio.create_task(
+            embedding_service.get_jd_sentence_embeddings(sentences, user_id=user_id)
+        )
+
+    # 3. Await embedding tasks and compute semantic score
+    if resume_emb_task:
+        chunks = await resume_emb_task
+        resume_embeddings_computed_on_demand = True
+        # Write embeddings back to Firestore so the next analysis is a cache hit.
+        # Fire-and-forget — do not await, do not block analysis response.
+        asyncio.ensure_future(
+            embedding_service.update_embeddings_cache(user_id, resume_id, resume)
+        )
+
+    if jd_emb_task:
+        sentence_embeddings = await jd_emb_task
         jd_embedding_computed = True
         
         cached_reqs = []
@@ -258,15 +279,13 @@ async def analyze_resume_vs_jd(
             
         semantic_score = int(round((sum(all_best_scores) / len(all_best_scores)) * 100)) if all_best_scores else 0
 
-    ats_result = await gemma_service.score_ats(resume_text, jd_text, user_id=user_id)
-    ats_score = ats_result.get("atsScore", 0)
-    breakdown = ats_result.get("breakdown", {})
-    missing_keywords = ats_result.get("missingKeywords", [])
-    strong_matches = ats_result.get("strongMatches", [])
-
-    raw_recs = await gemma_service.generate_recommendations(
-        resume_text, jd_text, missing_keywords, ats_score, user_id=user_id
-    )
+    # 4. Await the Gemma analysis task
+    analysis_result = await gemma_analysis_task
+    ats_score = analysis_result.get("atsScore", 0)
+    breakdown = analysis_result.get("breakdown", {})
+    missing_keywords = analysis_result.get("missingKeywords", [])
+    strong_matches = analysis_result.get("strongMatches", [])
+    raw_recs = analysis_result.get("recommendations", [])
     recommendations = []
     for rec in (raw_recs if isinstance(raw_recs, list) else []):
         current_text = rec.get("currentText", "")

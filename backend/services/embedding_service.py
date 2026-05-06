@@ -152,7 +152,7 @@ async def compute_embeddings(resume: dict, user_id: str = "") -> list[dict]:
             break
         except Exception:
             if attempt == 0:
-                time.sleep(2)  # retry once with 2s sleep
+                await asyncio.sleep(2)  # retry once with 2s sleep
             else:
                 raise
 
@@ -221,7 +221,7 @@ async def get_jd_embedding(text: str, user_id: str = "") -> list[float]:
             return result.embeddings[0].values
         except Exception:
             if attempt == 0:
-                time.sleep(2)
+                await asyncio.sleep(2)
             else:
                 raise
 
@@ -256,7 +256,7 @@ async def get_jd_sentence_embeddings(texts: list[str], user_id: str = "") -> lis
             return [e.values for e in result.embeddings]
         except Exception:
             if attempt == 0:
-                time.sleep(2)
+                await asyncio.sleep(2)
             else:
                 raise
 
