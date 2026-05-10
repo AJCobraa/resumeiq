@@ -24,8 +24,12 @@ EMBEDDING_DIM = 3072  # 3072-dimensional vectors for gemini-embedding-001
 def _get_client():
     global _client
     if _client is None:
-        api_key = os.environ.get("GOOGLE_AI_STUDIO_API_KEY", "")
-        _client = genai.Client(api_key=api_key)
+        app_env = os.environ.get("APP_ENV", "dev")
+        if app_env == "prod":
+            _client = genai.Client(vertexai=True)
+        else:
+            api_key = os.environ.get("GOOGLE_AI_STUDIO_API_KEY", "")
+            _client = genai.Client(api_key=api_key)
     return _client
 
 
@@ -33,15 +37,13 @@ def _fire_embed_log(user_id: str, operation: str, input_tokens: int, latency_ms:
     """Fire-and-forget embedding usage log."""
     def _log():
         try:
-            from services.model_logger import log_model_call
-            log_model_call(
+            from services.model_logger import fire_log_model_call_sync
+            fire_log_model_call_sync(
                 user_id=user_id,
                 model=EMBEDDING_MODEL,
                 operation=operation,
                 input_tokens=input_tokens,
                 output_tokens=0,  # Embedding models have no output tokens
-                latency_ms=latency_ms,
-                is_cache_hit=is_cache_hit,
             )
         except Exception:
             pass

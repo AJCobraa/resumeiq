@@ -8,3 +8,7 @@ python-multipart
 python-dotenv
 pydantic
 aiofiles
+
+asyncpg
+sqlalchemy
+pgvector
