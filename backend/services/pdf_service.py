@@ -54,12 +54,12 @@ def _find_node() -> str:
     )
 
 
-async def export_resume_pdf(user_id: str, resume_id: str, template_id: str = "cobra") -> bytes:
+async def export_resume_pdf(db, user_id: str, resume_id: str, template_id: str = "cobra") -> bytes:
     """
     Export a resume as a text-selectable PDF.
 
     Flow:
-      1. Load resume from Firestore
+      1. Load resume from PostgreSQL
       2. Build full self-contained HTML using inline CSS
       3. Write HTML to a temp file (in /tmp — containers are stateless)
       4. Invoke Puppeteer via: node <absolute/path/to/pdf_render.js> <html> <pdf>
@@ -67,7 +67,7 @@ async def export_resume_pdf(user_id: str, resume_id: str, template_id: str = "co
       6. Read and return PDF bytes
     """
     # 1 — Load resume
-    resume = await resume_service.get_resume(user_id, resume_id)
+    resume = await resume_service.get_resume(db, user_id, resume_id)
     if not resume:
         raise ValueError("Resume not found")
 
