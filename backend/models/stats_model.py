@@ -11,8 +11,6 @@ class OperationStat(BaseModel):
     avgLatency: float
 
 class UserStatsResponse(BaseModel):
-    coinsBalance: int
-    totalResumes: int
     totalJobs: int
     totalInputTokens: int
     totalOutputTokens: int

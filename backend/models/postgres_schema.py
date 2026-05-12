@@ -17,13 +17,11 @@ class PlanType(enum.Enum):
 class User(Base):
     __tablename__ = 'users'
 
-    uid = Column(String, primary_key=True)  # Matches Firebase Auth UID
+    uid = Column(String, primary_key=True) # Matches Firebase Auth UID
     email = Column(String, nullable=False)
-    display_name = Column(String, default="")
-    photo_url = Column(String, default="")
     plan_type = Column(Enum(PlanType), default=PlanType.free)
     razorpay_customer_id = Column(String, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     credits = relationship("UserCredit", back_populates="user", uselist=False)
     transactions = relationship("CoinTransaction", back_populates="user")
@@ -35,7 +33,7 @@ class UserCredit(Base):
 
     user_id = Column(String, ForeignKey('users.uid'), primary_key=True)
     coins_balance = Column(Integer, default=0, nullable=False)
-    billing_cycle_end = Column(DateTime(timezone=True), nullable=True)
+    billing_cycle_end = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="credits")
 
@@ -49,7 +47,7 @@ class CoinTransaction(Base):
     input_tokens = Column(Integer, nullable=True)
     output_tokens = Column(Integer, nullable=True)
     actual_cost_usd = Column(Numeric, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="transactions")
 
@@ -59,8 +57,7 @@ class Resume(Base):
     resume_id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey('users.uid'), nullable=False)
     resume_data = Column(JSONB, nullable=False)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc))
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="resumes")
     embeddings = relationship("ResumeEmbedding", back_populates="resume", cascade="all, delete-orphan")
@@ -80,9 +77,8 @@ class Job(Base):
 
     job_id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey('users.uid'), nullable=False)
-    resume_id = Column(String, nullable=True) # Formal link to resume (nullable to preserve history)
     job_data = Column(JSONB, nullable=False)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="jobs")
     embeddings = relationship("JDEmbedding", back_populates="job", cascade="all, delete-orphan")

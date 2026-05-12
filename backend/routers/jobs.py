@@ -1,20 +1,16 @@
 """
-Jobs CRUD router — manages job analyses.
-List, get, status update, recommendation approve/dismiss, delete, interview prep.
+Jobs CRUD router — Phase 5 full implementation.
+Manages job analyses: list, get, status update, recommendation approve/dismiss, delete.
 
-All data operations use PostgreSQL via AsyncSession.
-Job data stored in `jobs.job_data` JSONB column.
+Section 18.1 addition: GET /api/jobs/check?url= for extension pre-check
+Section 19.2 fix: _apply_recommendation_to_resume now uses sectionId + bulletId
+  (falls back to text matching for backwards compatibility with old recs)
 """
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
-from firebase_admin_init import verify_token
-from core.database import get_db_session
-from sqlalchemy.orm.attributes import flag_modified
-from models.postgres_schema import Job, Resume
+from firebase_admin_init import db, verify_token
 from services import resume_service, gemma_service
-from core import budget_guard
+from models.job_model import InterviewPrepResponse, InterviewPrepItem
 from datetime import datetime, timezone
 import asyncio
 
@@ -32,12 +28,16 @@ class UpdateRecommendationRequest(BaseModel):
     editedText: str = ""
 
 
+# ── Helpers ──────────────────────────────────────────
+def _job_ref(uid: str, job_id: str):
+    return db.collection("users").document(uid).collection("jobs").document(job_id)
+
+
 # ── Routes ───────────────────────────────────────────
 @router.get("/jobs/check")
 async def check_job(
     url: str = Query(..., description="The job URL to check"),
     uid: str = Depends(verify_token),
-    db: AsyncSession = Depends(get_db_session),
 ):
     """
     Check if a job URL has already been analyzed by this user.
@@ -48,17 +48,17 @@ async def check_job(
         return {"found": False}
 
     try:
-        from sqlalchemy import cast, String
-        result = await db.execute(
-            select(Job)
-            .where(Job.user_id == uid)
-            .where(Job.job_data["jdUrl"].astext == url)
-            .order_by(Job.created_at.desc())
+        query = (
+            db.collection("users")
+            .document(uid)
+            .collection("jobs")
+            .where("jdUrl", "==", url)
+            .order_by("createdAt", direction="DESCENDING")
             .limit(1)
+            .stream()
         )
-        row = result.scalar_one_or_none()
-        if row:
-            d = row.job_data or {}
+        for doc in query:
+            d = doc.to_dict()
             return {
                 "found": True,
                 "jobId": d.get("jobId"),
@@ -76,21 +76,19 @@ async def check_job(
 
 
 @router.get("/jobs")
-async def get_jobs(
-    uid: str = Depends(verify_token),
-    db: AsyncSession = Depends(get_db_session),
-):
+async def get_jobs(uid: str = Depends(verify_token)):
     """List all jobs for authenticated user (summary only)."""
-    result = await db.execute(
-        select(Job)
-        .where(Job.user_id == uid)
-        .order_by(Job.created_at.desc())
+    docs = (
+        db.collection("users")
+        .document(uid)
+        .collection("jobs")
+        .order_by("createdAt", direction="DESCENDING")
         .limit(50)
+        .stream()
     )
-    rows = result.scalars().all()
     results = []
-    for row in rows:
-        d = row.job_data or {}
+    for doc in docs:
+        d = doc.to_dict()
         results.append({
             "jobId": d.get("jobId"),
             "resumeId": d.get("resumeId"),
@@ -110,67 +108,46 @@ async def get_jobs(
 
 
 @router.get("/jobs/{job_id}")
-async def get_job(
-    job_id: str,
-    uid: str = Depends(verify_token),
-    db: AsyncSession = Depends(get_db_session),
-):
+async def get_job(job_id: str, uid: str = Depends(verify_token)):
     """Get full job analysis by ID."""
-    result = await db.execute(
-        select(Job).where(Job.job_id == job_id, Job.user_id == uid)
-    )
-    row = result.scalar_one_or_none()
-    if not row:
+    doc = _job_ref(uid, job_id).get()
+    if not doc.exists:
         raise HTTPException(status_code=404, detail="Job not found")
-    return row.job_data
+    return doc.to_dict()
 
 
 @router.patch("/jobs/{job_id}/status")
-async def update_job_status(
-    job_id: str, body: UpdateStatusRequest,
-    uid: str = Depends(verify_token),
-    db: AsyncSession = Depends(get_db_session),
-):
+async def update_job_status(job_id: str, body: UpdateStatusRequest, uid: str = Depends(verify_token)):
     """Update job application status."""
-    result = await db.execute(
-        select(Job).where(Job.job_id == job_id, Job.user_id == uid)
-    )
-    row = result.scalar_one_or_none()
-    if not row:
+    ref = _job_ref(uid, job_id)
+    doc = ref.get()
+    if not doc.exists:
         raise HTTPException(status_code=404, detail="Job not found")
 
     valid = {"analyzed", "applied", "interview", "offer", "rejected"}
     if body.status not in valid:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid}")
 
-    data = dict(row.job_data)
-    data["status"] = body.status
-    row.job_data = data
-    flag_modified(row, "job_data")
-    await db.commit()
+    ref.update({"status": body.status})
     return {"status": body.status}
 
 
 @router.patch("/jobs/{job_id}/recommendation")
 async def update_recommendation(
     job_id: str, body: UpdateRecommendationRequest,
-    bg: BackgroundTasks,
-    uid: str = Depends(verify_token),
-    db: AsyncSession = Depends(get_db_session),
+    bg: BackgroundTasks, uid: str = Depends(verify_token),
 ):
     """
     Approve, dismiss, or edit a recommendation.
     On approve: applies the suggestedText to update the actual resume bullet.
     Uses sectionId + bulletId for targeting (falls back to text match for old recs).
     """
-    result = await db.execute(
-        select(Job).where(Job.job_id == job_id, Job.user_id == uid)
-    )
-    row = result.scalar_one_or_none()
-    if not row:
+    ref = _job_ref(uid, job_id)
+    doc = ref.get()
+    if not doc.exists:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    data = dict(row.job_data)
+    data = doc.to_dict()
     recs = data.get("recommendations", [])
 
     # Find the recommendation
@@ -210,9 +187,7 @@ async def update_recommendation(
     else:
         raise HTTPException(status_code=400, detail="Invalid action. Must be: approve, dismiss, edit")
 
-    row.job_data = data
-    flag_modified(row, "job_data")
-    await db.commit()
+    ref.update({"recommendations": recs})
     return target
 
 
@@ -228,111 +203,98 @@ def _apply_recommendation_to_resume(
     Background task: update a resume bullet using ID-based targeting.
     Falls back to text matching for backwards compatibility with old recommendation objects
     that don't have sectionId/bulletId.
-    Uses a new DB session since this runs in a background thread.
     """
     try:
-        async def _do():
-            from core.database import async_session
-            async with async_session() as db_session:
-                result = await db_session.execute(
-                    select(Resume).where(Resume.resume_id == resume_id, Resume.user_id == uid)
-                )
-                row = result.scalar_one_or_none()
-                if not row:
-                    return
+        ref = db.collection("users").document(uid).collection("resumes").document(resume_id)
+        doc = ref.get()
+        if not doc.exists:
+            return
 
-                data = dict(row.resume_data)
-                sections = data.get("sections", [])
-                updated = False
+        data = doc.to_dict()
+        sections = data.get("sections", [])\
 
-                # Strategy 1: ID-based targeting (new recommendations have sectionId + bulletId)
-                if section_id and bullet_id:
-                    for section in sections:
-                        if section.get("sectionId") == section_id:
-                            # 1a: Regular bullets (experience, achievements)
-                            for bullet in section.get("bullets", []):
+        updated = False
+
+        # Strategy 1: ID-based targeting (new recommendations have sectionId + bulletId)
+        if section_id and bullet_id:
+            for section in sections:
+                if section.get("sectionId") == section_id:
+                    # 1a: Regular bullets (experience, achievements)
+                    for bullet in section.get("bullets", []):
+                        if bullet.get("bulletId") == bullet_id:
+                            bullet["text"] = new_text
+                            updated = True
+                            break
+                    # 1b: Skills category items — bulletId is the categoryId here
+                    if not updated and section.get("type") == "skills":
+                        for cat in section.get("categories", []):
+                            if cat.get("categoryId") == bullet_id:
+                                # Replace the entire items list with split text
+                                cat["items"] = [s.strip() for s in new_text.split(",") if s.strip()]
+                                updated = True
+                                break
+                    # 1c: Items with nested bullets (projects)
+                    if not updated:
+                        for item in section.get("items", []):
+                            for bullet in item.get("bullets", []):
                                 if bullet.get("bulletId") == bullet_id:
                                     bullet["text"] = new_text
                                     updated = True
                                     break
-                            # 1b: Skills category items — bulletId is the categoryId here
-                            if not updated and section.get("type") == "skills":
-                                for cat in section.get("categories", []):
-                                    if cat.get("categoryId") == bullet_id:
-                                        cat["items"] = [s.strip() for s in new_text.split(",") if s.strip()]
-                                        updated = True
-                                        break
-                            # 1c: Items with nested bullets (projects)
-                            if not updated:
-                                for item in section.get("items", []):
-                                    for bullet in item.get("bullets", []):
-                                        if bullet.get("bulletId") == bullet_id:
-                                            bullet["text"] = new_text
-                                            updated = True
-                                            break
-                                    if updated:
-                                        break
-                            break
+                            if updated:
+                                break
+                    break
 
-                # Strategy 2: Text-based fallback (for old rec objects without IDs)
-                if not updated and current_text:
-                    for section in sections:
-                        for bullet in section.get("bullets", []):
+        # Strategy 2: Text-based fallback (for old rec objects without IDs)
+        if not updated and current_text:
+            for section in sections:
+                for bullet in section.get("bullets", []):
+                    if bullet.get("text") == current_text:
+                        bullet["text"] = new_text
+                        updated = True
+                        break
+                if not updated:
+                    for item in section.get("items", []):
+                        for bullet in item.get("bullets", []):
                             if bullet.get("text") == current_text:
                                 bullet["text"] = new_text
                                 updated = True
                                 break
-                        if not updated:
-                            for item in section.get("items", []):
-                                for bullet in item.get("bullets", []):
-                                    if bullet.get("text") == current_text:
-                                        bullet["text"] = new_text
-                                        updated = True
-                                        break
-                                if updated:
-                                    break
                         if updated:
                             break
-
                 if updated:
-                    data["updatedAt"] = datetime.now(timezone.utc).isoformat()
-                    row.resume_data = data
-                    flag_modified(row, "resume_data")
-                    row.updated_at = datetime.now(timezone.utc)
-                    await db_session.commit()
+                    break
 
-                    # Refresh embeddings after resume update
-                    from services import embedding_service
-                    await embedding_service.update_embeddings_cache(uid, resume_id, data)
+        if updated:
+            from datetime import datetime, timezone
+            ref.update({"sections": sections, "updatedAt": datetime.now(timezone.utc).isoformat()})
 
-        asyncio.run(_do())
+            # Refresh embeddings after resume update
+            from services import embedding_service
+            resume = ref.get().to_dict()
+            asyncio.run(embedding_service.update_embeddings_cache(uid, resume_id, resume))
     except Exception:
         pass  # Background task — never crash
 
 
-@router.post("/jobs/{job_id}/interview-prep")
-async def generate_job_interview_prep(
-    job_id: str,
-    uid: str = Depends(verify_token),
-    db: AsyncSession = Depends(get_db_session),
-):
+@router.post("/jobs/{job_id}/interview-prep", response_model=InterviewPrepResponse)
+async def generate_job_interview_prep(job_id: str, uid: str = Depends(verify_token)):
     """
     Generate or retrieve interview prep questions for a specific job.
     Calibrates questions based on company tier and resume gaps.
     """
-    result = await db.execute(
-        select(Job).where(Job.job_id == job_id, Job.user_id == uid)
-    )
-    job_row = result.scalar_one_or_none()
-    if not job_row:
+    job_ref = _job_ref(uid, job_id)
+    job_doc = job_ref.get()
+    if not job_doc.exists:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    job_data = job_row.job_data or {}
+    job_data = job_doc.to_dict()
     resume_id = job_data.get("resumeId")
     if not resume_id:
         raise HTTPException(status_code=400, detail="Job has no associated resume")
 
     # 1. Check Cache
+    # If already generated for this specific resume version, return cached
     cached_prep = job_data.get("interviewPrep")
     cached_at = job_data.get("interviewPrepGeneratedAt")
     cached_resume_id = job_data.get("interviewPrepResumeId")
@@ -347,7 +309,7 @@ async def generate_job_interview_prep(
         }
 
     # 2. Fetch Context
-    resume_data = await resume_service.get_resume(db, uid, resume_id)
+    resume_data = await resume_service.get_resume(uid, resume_id)
     if not resume_data:
         raise HTTPException(status_code=404, detail="Resume not found")
 
@@ -359,9 +321,6 @@ async def generate_job_interview_prep(
     # 3. Classify and Generate
     company_tier = gemma_service.classify_company_tier(company)
 
-    # 3.5 Deduct Coins (Pre-flight)
-    await budget_guard.deduct_coins(db, uid, "generate_interview_prep")
-
     try:
         prep_list = await gemma_service.generate_interview_prep(
             missing_keywords=missing_keywords,
@@ -372,17 +331,15 @@ async def generate_job_interview_prep(
             user_id=uid
         )
 
-        # 4. Save to PostgreSQL
+        # 4. Save to Firestore
         now = datetime.now(timezone.utc).isoformat()
-        data = dict(job_row.job_data)
-        data["interviewPrep"] = prep_list
-        data["interviewPrepGeneratedAt"] = now
-        data["interviewPrepResumeId"] = resume_id
-        data["interviewPrepTier"] = company_tier["tier"]
-        data["interviewPrepTierLabel"] = company_tier["label"]
-        job_row.job_data = data
-        flag_modified(job_row, "job_data")
-        await db.commit()
+        job_ref.update({
+            "interviewPrep": prep_list,
+            "interviewPrepGeneratedAt": now,
+            "interviewPrepResumeId": resume_id,
+            "interviewPrepTier": company_tier["tier"],
+            "interviewPrepTierLabel": company_tier["label"],
+        })
 
         return {
             "interviewPrep": prep_list,
@@ -396,19 +353,11 @@ async def generate_job_interview_prep(
 
 
 @router.delete("/jobs/{job_id}")
-async def delete_job(
-    job_id: str,
-    uid: str = Depends(verify_token),
-    db: AsyncSession = Depends(get_db_session),
-):
+async def delete_job(job_id: str, uid: str = Depends(verify_token)):
     """Delete a job analysis."""
-    result = await db.execute(
-        select(Job).where(Job.job_id == job_id, Job.user_id == uid)
-    )
-    row = result.scalar_one_or_none()
-    if not row:
+    ref = _job_ref(uid, job_id)
+    doc = ref.get()
+    if not doc.exists:
         raise HTTPException(status_code=404, detail="Job not found")
-
-    await db.delete(row)
-    await db.commit()
+    ref.delete()
     return {"deleted": True}

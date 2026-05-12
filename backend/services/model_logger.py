@@ -3,9 +3,7 @@ Model Logger — logs AI model calls to PostgreSQL.
 Tracks token usage, loaded token cost, model name, and operation type.
 Calculates the `actual_cost_usd` safely according to Method C formulas.
 
-Uses asyncio.create_task() for fire-and-forget logging from within the
-running event loop. Never creates a new event loop (which would conflict
-with asyncpg's connection pool bound to the main loop).
+Runs as an asynchronous background task.
 """
 import asyncio
 from core.database import async_session
@@ -59,7 +57,7 @@ async def log_model_call(
     except Exception as e:
         print(f"Failed to log model call: {e}") # Non-blocking failure
 
-def schedule_log_model_call(
+def fire_log_model_call_sync(
     user_id: str,
     model: str,
     operation: str,
@@ -67,19 +65,11 @@ def schedule_log_model_call(
     output_tokens: int,
 ):
     """
-    Schedule the async logger as a fire-and-forget task on the RUNNING event loop.
-    This replaces fire_log_model_call_sync which broke by creating a new loop.
-    Safe to call from both sync callbacks (in the same thread) and async code.
+    Helper to fire the async logger from synchronous thread-based callbacks
+    (like _fire_log in existing services).
     """
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(
-            log_model_call(user_id, model, operation, input_tokens, output_tokens)
-        )
-    except RuntimeError:
-        # No running loop (shouldn't happen in FastAPI context, but safety fallback)
-        print("Warning: No running event loop for model logging — skipping.")
-
-
-# Keep backward compatibility alias
-fire_log_model_call_sync = schedule_log_model_call
+    loop = asyncio.new_event_loop()
+    loop.run_until_complete(
+        log_model_call(user_id, model, operation, input_tokens, output_tokens)
+    )
+    loop.close()

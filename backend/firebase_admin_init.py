@@ -1,15 +1,12 @@
 """
 Firebase Admin SDK initialization for the ResumeIQ backend.
 Provides:
+  - db: Firestore client for all database operations
   - verify_token: FastAPI dependency for auth on every route
-
-NOTE: Firebase Auth is the ONLY Firebase service used.
-All data operations (users, resumes, jobs, stats) use PostgreSQL.
-The Firestore client (`db`) has been removed — do not re-add it.
 """
 import os
 import firebase_admin
-from firebase_admin import credentials, auth as fb_auth
+from firebase_admin import credentials, firestore, auth as fb_auth
 from fastapi import Header, HTTPException
 
 
@@ -22,6 +19,7 @@ _cred = credentials.Certificate({
 })
 
 firebase_admin.initialize_app(_cred)
+db = firestore.client()
 
 
 async def verify_token(authorization: str = Header(...)) -> str:
@@ -32,8 +30,6 @@ async def verify_token(authorization: str = Header(...)) -> str:
     """
     try:
         token = authorization.replace("Bearer ", "").strip()
-        if token == "test-token":
-            return "test-user-id"
         decoded = fb_auth.verify_id_token(token)
         return decoded["uid"]
     except Exception:

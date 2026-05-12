@@ -1,6 +1,5 @@
 """
 Analysis pipeline — 3-layer process for resume-to-JD matching.
-All data operations use PostgreSQL via AsyncSession.
 """
 import uuid
 import math
@@ -8,9 +7,8 @@ import hashlib
 import re
 import asyncio
 from datetime import datetime, timezone
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from models.postgres_schema import Job, Resume, ResumeEmbedding
+from google.cloud import firestore
+from firebase_admin_init import db
 from services import embedding_service, gemma_service
 
 
@@ -109,49 +107,29 @@ def _find_bullet_ids(resume: dict, current_text: str) -> tuple[str, str]:
     return "", ""
 
 
-async def _find_existing_job(db: AsyncSession, user_id: str, jd_url: str, jd_hash: str) -> tuple:
-    """Find existing job by hash or URL. Returns (Job row, dict data) or (None, None)."""
+def _find_existing_job(user_id: str, jd_url: str, jd_hash: str) -> dict | None:
     try:
+        jobs_ref = db.collection("users").document(user_id).collection("jobs")
+
         if jd_hash:
-            result = await db.execute(
-                select(Job)
-                .where(Job.user_id == user_id)
-                .where(Job.job_data["jdHash"].astext == jd_hash)
-                .limit(1)
-            )
-            row = result.scalar_one_or_none()
-            if row:
-                return row, row.job_data
+            hash_query = jobs_ref.where("jdHash", "==", jd_hash).limit(1).stream()
+            for doc in hash_query:
+                data = doc.to_dict()
+                data["_docId"] = doc.id
+                return data
 
         if jd_url:
-            result = await db.execute(
-                select(Job)
-                .where(Job.user_id == user_id)
-                .where(Job.job_data["jdUrl"].astext == jd_url)
-                .limit(1)
-            )
-            row = result.scalar_one_or_none()
-            if row:
-                return row, row.job_data
+            url_query = jobs_ref.where("jdUrl", "==", jd_url).limit(1).stream()
+            for doc in url_query:
+                data = doc.to_dict()
+                data["_docId"] = doc.id
+                return data
     except Exception:
         pass
-    return None, None
-
-
-async def _get_resume_embeddings_from_db(db: AsyncSession, resume_id: str) -> list[dict]:
-    """Read cached resume embeddings from the resume_embeddings table."""
-    result = await db.execute(
-        select(ResumeEmbedding).where(ResumeEmbedding.resume_id == resume_id)
-    )
-    rows = result.scalars().all()
-    return [
-        {"chunkId": r.chunk_id, "embedding": list(r.embedding)}
-        for r in rows
-    ]
+    return None
 
 
 async def analyze_resume_vs_jd(
-    db: AsyncSession,
     user_id: str,
     resume_id: str,
     jd_text: str,
@@ -163,7 +141,7 @@ async def analyze_resume_vs_jd(
 ) -> dict:
     from services import resume_service
 
-    resume = await resume_service.get_resume(db, user_id, resume_id)
+    resume = await resume_service.get_resume(user_id, resume_id)
     if not resume:
         raise ValueError("Resume not found")
 
@@ -172,19 +150,17 @@ async def analyze_resume_vs_jd(
     normalized_jd_text = _normalize_text(jd_text)
     jd_hash = _md5(normalized_jd_text)
 
-    existing_row = None
     existing_job = None
     cache_lookup_source = "none"
     if job_id:
-        result = await db.execute(
-            select(Job).where(Job.job_id == job_id, Job.user_id == user_id)
-        )
-        existing_row = result.scalar_one_or_none()
-        if existing_row:
-            existing_job = existing_row.job_data
+        doc_ref = db.collection("users").document(user_id).collection("jobs").document(job_id)
+        doc_snap = doc_ref.get()
+        if doc_snap.exists:
+            existing_job = doc_snap.to_dict()
+            existing_job["_docId"] = doc_snap.id
             cache_lookup_source = "jobId"
     else:
-        existing_row, existing_job = await _find_existing_job(db, user_id, jd_url, jd_hash)
+        existing_job = _find_existing_job(user_id, jd_url, jd_hash)
         if existing_job:
             # Prevent catastrophic hash mismatches caused by URL falling back to same base LinkedIn URL.
             # Only allow it if jdHash matches!
@@ -194,7 +170,6 @@ async def analyze_resume_vs_jd(
                 # jdUrl matched, but the TEXT is completely different.
                 # This means it's a completely different job selected on the same Search View URL!
                 # We MUST NOT use this existing_job as a cache hit, otherwise we overwrite the old job in DB!
-                existing_row = None
                 existing_job = None
                 cache_lookup_source = "none"
 
@@ -202,9 +177,8 @@ async def analyze_resume_vs_jd(
     is_jd_cache_hit = cached_jd is not None
 
     semantic_score = 0
-
-    # Read resume embeddings from the resume_embeddings table (Option A)
-    chunks = await _get_resume_embeddings_from_db(db, resume_id)
+    resume_cache = resume.get("embeddingsCache") or {}
+    chunks = resume_cache.get("chunks") or []
     resume_embeddings_computed_on_demand = False
 
     jd_embedding_computed = False
@@ -245,7 +219,7 @@ async def analyze_resume_vs_jd(
     if resume_emb_task:
         chunks = await resume_emb_task
         resume_embeddings_computed_on_demand = True
-        # Write embeddings to resume_embeddings table.
+        # Write embeddings back to Firestore so the next analysis is a cache hit.
         # Fire-and-forget — do not await, do not block analysis response.
         asyncio.ensure_future(
             embedding_service.update_embeddings_cache(user_id, resume_id, resume)
@@ -268,6 +242,9 @@ async def analyze_resume_vs_jd(
         all_best_scores = []
 
         # ⚡ Bolt Optimization: Precompute vector norms
+        # Calculating the norm of a 3072-dimensional vector is expensive.
+        # By precomputing them outside the nested loops and using math.hypot (which is implemented in C),
+        # we avoid calculating the same norms hundreds/thousands of times.
         chunk_norms = []
         for chunk in chunks:
             emb = chunk.get("embedding", [])
@@ -339,7 +316,7 @@ async def analyze_resume_vs_jd(
     if job_id:
         final_job_id = job_id
     elif existing_job:
-        final_job_id = existing_job.get("jobId")
+        final_job_id = existing_job.get("jobId") or existing_job.get("_docId")
     else:
         final_job_id = str(uuid.uuid4())
 
@@ -381,19 +358,11 @@ async def analyze_resume_vs_jd(
         },
     }
 
-    # Upsert job into PostgreSQL
-    if existing_row:
-        existing_row.resume_id = resume_id
-        existing_row.job_data = job_doc
-    else:
-        new_job = Job(
-            job_id=final_job_id,
-            user_id=user_id,
-            resume_id=resume_id,
-            job_data=job_doc,
-        )
-        db.add(new_job)
+    db.collection("users").document(user_id).collection("jobs").document(final_job_id).set(job_doc)
 
-    await db.commit()
+    # Update totalJobs counter if it's a new job
+    if not job_id and not existing_job:
+        summary_ref = db.collection("users").document(user_id).collection("stats").document("summary")
+        summary_ref.set({"totalJobs": firestore.Increment(1)}, merge=True)
 
     return job_doc

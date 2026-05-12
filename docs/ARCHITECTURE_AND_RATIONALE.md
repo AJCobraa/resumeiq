@@ -11,14 +11,14 @@ ResumeIQ is a 3-part SaaS application:
 
 ```
 ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│   Chrome Ext     │────▶│   FastAPI Backend │────▶│   PostgreSQL     │
-│  (Manifest V3)   │     │   (Python 3.11)   │     │  (pgvector:pg16) │
+│   Chrome Ext     │────▶│   FastAPI Backend │────▶│   Firestore DB   │
+│  (Manifest V3)   │     │   (Python 3.11)   │     │   (NoSQL)        │
 └──────────────────┘     └────────┬─────────┘     └──────────────────┘
-                                  │                        │
-┌──────────────────┐              │              ┌─────────┴────────┐
-│   React Web App  │──────────────┘              │   Firebase Auth  │
-│  (Vite + TW)     │                             │   (JWT only)     │
-└──────────────────┘                             └──────────────────┘
+                                  │
+┌──────────────────┐              │
+│   React Web App  │──────────────┘
+│  (Vite + TW)     │
+└──────────────────┘
 ```
 
 #### Job Persistence & Resume Association
@@ -33,30 +33,26 @@ Jobs are linked to the resume used for their analysis. If a resume is deleted, t
 3. Every API call includes this token in the `Authorization` header
 4. Backend verifies the token via Firebase Admin SDK
 5. User creates/edits resumes through the web app
-6. Resume data is stored in PostgreSQL `resumes` table as JSONB
-7. On resume save, embeddings are computed via `gemini-embedding-001` and cached in `resume_embeddings` table
+6. Resume data is stored in Firestore under `users/{userId}/resumes/{resumeId}`
+7. On resume save, embeddings are computed via `gemini-embedding-001` and cached
 8. Chrome Extension detects job descriptions on LinkedIn/Naukri/Indeed/Internshala
 9. Extension triggers the analysis pipeline via `POST /api/analyze`
-10. Budget Guard deducts coins atomically before any AI call
-11. Pipeline uses cached resume embeddings + fresh JD embeddings for semantic matching
-12. Gemma 4 rewrites resume bullets to address missing keywords
-13. Results saved to `jobs` table as JSONB, audit logged to `coin_transactions`
-14. /api/jobs/{jobId}/interview-prep analyzes resume gaps vs JD requirements
-15. Model predicts likely interview questions and coached answers based on company tier
-16. Results are displayed in the dashboard's Interview Prep panel
+10. Pipeline uses cached resume embeddings + fresh JD embeddings for semantic matching
+11. Gemma 4 rewrites resume bullets to address missing keywords
+13. /api/jobs/{jobId}/interview-prep analyzes resume gaps vs JD requirements
+14. Model predicts likely interview questions and coached answers based on company tier
+15. Results are displayed in the dashboard's Interview Prep panel
 
 ---
 
 ## 2. Technology Choices
 
-### Why PostgreSQL (Single-Node Relational DB)?
-- **ACID transactions**: Atomic credit deduction + data writes in one transaction
-- **Row-level locking**: `SELECT ... FOR UPDATE` prevents double-spending
-- **JSONB columns**: Preserves document flexibility while adding relational integrity
-- **pgvector extension**: Native 3072-dim vector storage and similarity search
-- **SQL aggregation**: Live stats queries (no pre-aggregation needed)
-- **Single source of truth**: Eliminates dual-write complexity
-- **Firebase Auth retained**: Google Sign-In + JWT verification only (no Firestore)
+### Why Firestore (NoSQL) over PostgreSQL?
+- **Zero infrastructure**: No server management, migrations, or connection pooling
+- **Real-time ready**: Built-in real-time listeners (future feature)
+- **Nested data model**: Resume sections naturally fit a document model
+- **Free tier**: Spark plan provides 1GB storage + 50K reads/day at no cost
+- **Firebase integration**: Same project as Authentication — single credential
 
 ### Why Gemma 4 (`gemma-4-31b-it`)?
 - Free via Google AI Studio API
@@ -84,18 +80,17 @@ Jobs are linked to the resume used for their analysis. If a resume is deleted, t
 - Never regenerated, never client-provided for new documents
 - This ensures consistency across distributed operations
 
-### Why JSONB Blobs (not Normalized Tables)?
+### Why Array-Nested Sections (not Subcollections)?
 - Resume sections (experience, skills, etc.) are always loaded together
-- Normalizing into 6+ relational tables would require complex joins per resume load
-- JSONB preserves the frontend's expected document shape
-- PostgreSQL JSONB operators allow efficient querying when needed
-- Trade-off: less strict schema enforcement at the DB level (compensated by Pydantic models)
+- A subcollection would require 6+ separate reads per resume load
+- Arrays allow atomic updates and single-document reads
+- Trade-off: max ~55 sections (well within Firestore's 1MB limit)
 
-### Embedding Storage (pgvector)
-- Resume embeddings: `resume_embeddings` table with `Vector(3072)` column
-- JD embeddings: `jd_embeddings` table with `Vector(3072)` column
-- Eliminates the need for external vector databases (Pinecone, Weaviate)
-- pgvector supports cosine similarity searches natively
+### Embedding Cache in Firestore (not Redis)
+- ~55 units × 3072 floats × 4 bytes ≈ 675KB — well under 1MB limit
+- Firestore reads take 20-50ms — fast enough for our use case
+- No extra infrastructure, no extra credentials, no extra cost
+- Cache is recomputed only when resume content changes
 
 ---
 
@@ -176,7 +171,7 @@ Jobs are linked to the resume used for their analysis. If a resume is deleted, t
 | `routers/analysis.py` | AI analysis route |
 | `models/resume_model.py` | Resume Pydantic models |
 | `models/job_model.py` | Job Pydantic models |
-| `services/resume_service.py` | PostgreSQL CRUD for resumes (JSONB) |
+| `services/resume_service.py` | Firestore CRUD for resumes |
 | `services/pdf_service.py` | Puppeteer-based PDF rendering |
 | `services/embedding_service.py` | Caching & Text Embeddings (`google-genai`) |
 | `services/gemma_service.py` | Deep AI scoring and re-writing |
@@ -835,170 +830,3 @@ When the popup opens on a job page, it checks whether the sidebar is already inj
 **Why not just give the content script the `tabs` permission?** The `tabs` permission is a sensitive permission that increases user trust friction at install time. The routing pattern adds zero overhead and keeps the permission surface minimal.
 
 **Existing pattern used for consistency:** `OPEN_DASHBOARD` already used this same routing pattern — `OPEN_URL` follows the same convention, just with a dynamic URL instead of hardcoded `/dashboard`.
-
----
-
-## Section 38 — PostgreSQL Migration & Budget Guard
-
-### 38.1 The Architecture Shift
-
-**Previous:** Hybrid Firestore (NoSQL documents) + Firebase Auth. All user data, resumes, jobs, embeddings, and stats stored in Firestore document collections.
-
-**Current:** Single-node PostgreSQL with `pgvector` for vector storage + Firebase Auth (JWT verification only). All application data now lives in PostgreSQL with ACID guarantees.
-
-**Updated System Diagram:**
-```
-┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│   Chrome Ext     │────▶│   FastAPI Backend │────▶│   PostgreSQL     │
-│  (Manifest V3)   │     │   (Python 3.11)   │     │  (pgvector:pg16) │
-└──────────────────┘     └────────┬─────────┘     └──────────────────┘
-                                  │                        │
-┌──────────────────┐              │              ┌─────────┴────────┐
-│   React Web App  │──────────────┘              │   Firebase Auth  │
-│  (Vite + TW)     │                             │   (JWT only)     │
-└──────────────────┘                             └──────────────────┘
-```
-
-**Why PostgreSQL over Firestore?**
-- **ACID transactions:** Atomic credit deduction and resume updates in a single transaction
-- **Row-level locking:** `SELECT ... FOR UPDATE` prevents double-spending of AI credits
-- **JSONB:** Preserves the flexible document structure the frontend expects while gaining relational integrity
-- **pgvector:** Native vector storage and similarity search, eliminating the need for separate embedding infrastructure
-- **SQL aggregation:** Live stats queries replace pre-aggregated Firestore counter documents
-- **Single source of truth:** No dual-write complexity, no eventual consistency issues
-
-### 38.2 Database Schema
-
-**Tables (7 total):**
-
-| Table | Purpose | Key Design |
-|-------|---------|------------|
-| `users` | User identity & plan info | PK = Firebase Auth `uid` |
-| `user_credits` | Coin balance per user | `SELECT ... FOR UPDATE` for atomic deduction |
-| `coin_transactions` | AI operation audit log | UUID PK, FK to `users` |
-| `resumes` | Resume documents | `JSONB` blob for `resume_data` |
-| `resume_embeddings` | Cached resume vectors | `Vector(3072)` via pgvector |
-| `jobs` | Job analysis results | `JSONB` blob for `job_data` |
-| `jd_embeddings` | JD embedding vectors | `Vector(3072)` via pgvector |
-
-**Schema Source of Truth:** `backend/models/postgres_schema.py`
-
-**JSONB Blob Strategy:** Resumes and Jobs store their full document structure as a single `JSONB` column rather than normalized relational tables. This preserves the flexible nested structure (sections → items → bullets) that the frontend expects while gaining ACID guarantees, foreign key constraints, and SQL queryability via JSONB operators.
-
-### 38.3 Budget Guard (`core/budget_guard.py`)
-
-**Problem:** AI operations cost real money. Without atomic credit control, concurrent requests could overdraw a user's balance.
-
-**Solution:** Row-level locking with `SELECT ... FOR UPDATE`:
-
-```python
-async def deduct_coins(db: AsyncSession, uid: str, cost: int):
-    result = await db.execute(
-        select(UserCredit).where(UserCredit.user_id == uid).with_for_update()
-    )
-    credit = result.scalar_one_or_none()
-    if not credit or credit.coins_balance < cost:
-        raise HTTPException(402, "Insufficient coins")
-    credit.coins_balance -= cost
-    await db.commit()
-```
-
-**Why this works:** `FOR UPDATE` acquires a row-level lock, preventing any other transaction from reading or modifying the same credit row until the current transaction commits. This guarantees atomicity even under concurrent AI requests.
-
-**Cost Constants:** Defined in `core/constants.py` — each AI operation has a fixed coin cost.
-
-### 38.4 Service Layer Changes
-
-| Service | Before (Firestore) | After (PostgreSQL) |
-|---------|--------------------|--------------------|
-| `resume_service.py` | `db.collection('users/{uid}/resumes')` | `select(Resume).where(Resume.user_id == uid)` |
-| `embedding_service.py` | `db.document('users/{uid}/resumes/{id}').update(embeddingsCache)` | `INSERT INTO resume_embeddings` |
-| `analysis_pipeline.py` | `db.collection('users/{uid}/jobs')` | `select(Job).where(Job.user_id == uid)` |
-| `model_logger.py` | `db.document('users/{uid}/stats/summary')` atomic increment | `INSERT INTO coin_transactions` |
-| `stats router` | Read pre-aggregated Firestore counter doc | Live SQL `SUM()/COUNT()/AVG()` on `coin_transactions` |
-
-### 38.5 Firebase Auth Retention
-
-Firebase Auth remains the **only** Firebase service used. The `firebase_admin_init.py` module:
-- Initializes Firebase Admin SDK with service account credentials
-- Provides `verify_token()` FastAPI dependency for JWT verification
-- Does **NOT** export any Firestore client — the `db` variable has been removed
-
-**Why keep Firebase Auth?** Google Sign-In integration, automatic token refresh, and session management are battle-tested. Rolling our own auth would add complexity with no benefit.
-
-### 38.6 New Backend Files
-
-| File | Purpose |
-|------|---------|
-| `core/database.py` | SQLAlchemy async engine + session factory |
-| `core/budget_guard.py` | Atomic coin deduction with row-level locking |
-| `core/constants.py` | Fixed coin costs per AI operation |
-| `models/postgres_schema.py` | Full SQLAlchemy schema (7 tables) |
-| `models/stats_model.py` | Pydantic response models for stats endpoint |
-
-### 38.7 Docker Infrastructure
-
-`docker-compose.yml` now includes three services:
-- `backend`: FastAPI on Python 3.11-slim
-- `frontend`: React build served by nginx:alpine
-- `postgres`: `pgvector/pgvector:pg16` with healthcheck, persistent volume
-
-The backend depends on `postgres` with `condition: service_healthy` to ensure the database is ready before the app starts. Tables are auto-created on startup via `Base.metadata.create_all()`.
-
-### 38.8 Fresh Start Decision
-
-Data migration from Firestore to PostgreSQL was evaluated and rejected in favor of a fresh start. Rationale:
-- The schema shapes differ significantly (nested subcollections vs. JSONB blobs)
-- Embedding format changes (Firestore arrays vs. pgvector columns)
-- User confirmed preference for clean state over complex migration scripting
-- New users automatically receive 100 free coins on first login
-
----
-
-## Section 39 — Resume Deletion FK Cascade Fix
-
-### 39.1 The Bug
-
-**Symptom:** Resumes deleted from the UI appeared to succeed (HTTP 200 returned, local state updated) but persisted in the PostgreSQL `resumes` table. The frontend's `MyResumes` page would show "No resumes yet" after deletion (due to optimistic local state update), but the Dashboard's resume dropdown — which fetches fresh data from the API — would still list the "deleted" resumes.
-
-**Root Cause:** Two interacting issues in `resume_service.delete_resume()`:
-
-1. **AsyncSession lazy-loading failure:** The `Resume` model defines `embeddings = relationship("ResumeEmbedding", ..., cascade="all, delete-orphan")`. When `db.delete(row)` was called, SQLAlchemy attempted to cascade-delete the child `ResumeEmbedding` rows by lazy-loading the `embeddings` relationship. With `AsyncSession` (asyncpg), lazy loading raises `sqlalchemy.exc.MissingGreenlet` — an unrecoverable error.
-
-2. **Missing database-level cascade:** The `ResumeEmbedding.resume_id` ForeignKey was defined without `ondelete="CASCADE"`. Even if the ORM cascade was bypassed, PostgreSQL's default FK behavior (`RESTRICT`) would block the `DELETE` due to referencing rows in `resume_embeddings`.
-
-The combination meant `db.commit()` failed, the transaction was rolled back, and the resume row survived. The HTTP 500 error was caught by the frontend's `catch` block, but the optimistic UI state update in the `try` block (before the `await`) had already removed the resume from the local React state.
-
-### 39.2 The Fix
-
-**Approach:** Explicitly delete child `resume_embeddings` rows using a raw SQL `DELETE` statement before calling `db.delete(row)` on the parent resume. This bypasses both the lazy-loading issue and the FK constraint violation.
-
-```python
-# Explicitly delete child embeddings to avoid FK constraint violation
-await db.execute(
-    delete(ResumeEmbedding).where(ResumeEmbedding.resume_id == resume_id)
-)
-await db.delete(row)
-await db.commit()
-```
-
-**Why not add `ondelete="CASCADE"` to the FK?** That would require an Alembic migration to alter the existing constraint. The explicit delete approach works immediately without schema migration and is more explicit/debuggable. The FK-level cascade can be added as a future hardening step.
-
----
-
-## Section 40 — Formalizing Resume-Job Connections
-
-### 40.1 The Change
-To improve relational integrity and simplify querying, a formal `resume_id` column was added to the `jobs` table. Previously, the link between a job analysis and the resume used was stored exclusively within the `job_data` JSONB blob.
-
-### 40.2 Design Decision: Relational vs. Snapshot
-While the system still uses a **Snapshot Architecture** (copying `resumeTitle` into the job JSON to preserve historical data if a resume is deleted), the addition of a formal (but nullable) `resume_id` column provides:
-1. **Performance:** Efficient SQL-level filtering for jobs by resume (e.g., during resume deletion cleanup).
-2. **Clarity:** A clear database schema that explicitly shows the relationship between analysis results and their source resumes.
-3. **Resilience:** Easier identification of "orphaned" analyses (jobs pointing to non-existent resumes).
-
-### 40.3 Implementation Details
-- **Schema:** `ALTER TABLE jobs ADD COLUMN resume_id VARCHAR`.
-- **Pipeline:** `analyze_resume_vs_jd` now populates this column during both creation and re-analysis.
-- **Service:** `delete_resume` was optimized to use this indexed column for targeting job updates, replacing a previously inefficient Python-side filter.
-
