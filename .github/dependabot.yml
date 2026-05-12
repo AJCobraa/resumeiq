@@ -1,0 +1,139 @@
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+# .github/dependabot.yml
+version: 2
+
+updates:
+  # ─── Root package.json (concurrently) ─────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+    labels:
+      - "dependencies"
+      - "javascript"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      root-devtools:
+        patterns:
+          - "concurrently"
+
+  # ─── Frontend (React + Vite + Tailwind) ───────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+    labels:
+      - "dependencies"
+      - "frontend"
+      - "javascript"
+    commit-message:
+      prefix: "chore(deps/frontend)"
+    ignore:
+      # Firebase major versions are breaking — review manually
+      - dependency-name: "firebase"
+        update-types: ["version-update:semver-major"]
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "react-router-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      vite-toolchain:
+        patterns:
+          - "vite"
+          - "@vitejs/plugin-react"
+          - "esbuild"
+          - "esbuild-*"
+      tailwind:
+        patterns:
+          - "tailwindcss"
+          - "@tailwindcss/*"
+          - "tailwindcss-animate"
+      eslint:
+        patterns:
+          - "eslint"
+          - "@eslint/*"
+          - "eslint-plugin-*"
+          - "globals"
+      dnd-kit:
+        patterns:
+          - "@dnd-kit/*"
+      framer-motion:
+        patterns:
+          - "framer-motion"
+
+  # ─── Backend (Python / pip) ────────────────────────────────────────────────
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+    labels:
+      - "dependencies"
+      - "backend"
+      - "python"
+    commit-message:
+      prefix: "chore(deps/backend)"
+    ignore:
+      # firebase-admin major versions often have breaking Admin SDK changes
+      - dependency-name: "firebase-admin"
+        update-types: ["version-update:semver-major"]
+    groups:
+      google-ai:
+        patterns:
+          - "google-genai"
+          - "google-*"
+      fastapi-core:
+        patterns:
+          - "fastapi"
+          - "uvicorn"
+          - "pydantic"
+      file-handling:
+        patterns:
+          - "pdfplumber"
+          - "aiofiles"
+          - "python-multipart"
+
+  # ─── Docker base images ────────────────────────────────────────────────────
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore(deps/docker)"
+
+  - package-ecosystem: "docker"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore(deps/docker)"
+
+  # ─── GitHub Actions ────────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(deps/actions)"
