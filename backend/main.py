@@ -16,7 +16,21 @@ import sys
 # Force ProactorEventLoop on Windows to support asyncio.create_subprocess_exec (PIPEs)
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+import time
 
+# 🚨 This should trigger the DevSecOps Guard (Hardcoded Secret)
+TEMP_FIREBASE_KEY = "AIzaSyFakeKeyForTestingDoNotUse123"
+
+# 🚀 This should trigger the Performance Architect (No type hints, blocking I/O)
+async def get_user_data_test(user_id):
+    # Performance bug: using a blocking time.sleep() inside an async function
+    time.sleep(2) 
+    
+    # DevSecOps bug: fake raw SQL string instead of SQLAlchemy
+    query = "SELECT * FROM resumes WHERE user_id = " + str(user_id)
+    
+    data = {"status": "success", "query": query}
+    return data
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth, resumes, jobs, analysis, stats
