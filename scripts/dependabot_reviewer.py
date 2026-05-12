@@ -13,11 +13,11 @@ PR_NUMBER = os.environ.get("PR_NUMBER")
 PR_TITLE = os.environ.get("PR_TITLE", "Untitled PR")
 OSV_PATH = os.environ.get("OSV_RESULTS", "/tmp/osv_results.txt")
 
-# Optimized for your specific 500 RPD quota
+# Updated to use guaranteed valid model strings from your quota
 MODELS_TO_TRY = [
     "gemini-3.1-flash-lite", 
     "gemini-1.5-flash", 
-    "gemini-3.0-flash", 
+    "gemini-2.5-flash-lite", 
     "gemma-3-27b"
 ]
 
@@ -32,7 +32,7 @@ def review_dependabot():
         print("❌ Error: /tmp/pr_diff.txt not found.")
         sys.exit(1)
 
-    # 2. Read the OSV Scan Results (Closing the loop)
+    # 2. Read the OSV Scan Results
     try:
         with open(OSV_PATH, "r") as f:
             osv_output = f.read()
