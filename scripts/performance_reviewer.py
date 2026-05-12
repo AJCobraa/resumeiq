@@ -15,9 +15,9 @@ PR_AUTHOR = os.environ.get("PR_AUTHOR", "Unknown")
 
 MODELS_TO_TRY = [
     "gemini-3.1-flash-lite", 
-    "gemini-3-flash", 
-    "gemini-2.5-flash-lite", 
+    "gemini-3.0-flash",  
     "gemini-2.5-flash", 
+    "gemini-1.5-flash", 
     "gemma-3-27b"
 ]
 
