@@ -6,32 +6,31 @@ on:
 
 jobs:
   dependabot-review:
-   # if: github.actor == 'dependabot[bot]'
+    if: github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       pull-requests: write
       contents: read
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4          # ✅ valid version
         with:
           fetch-depth: 0
-        # 🚀 FIX: Uses Go CLI directly to avoid GitHub Action versioning errors
-      - name: Install & Run OSV Scanner (CVE Check)
-        run: |
-          go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
-          ~/go/bin/osv-scanner --recursive --format=table ./ > /tmp/osv_results.txt || true
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Run OSV Scanner (CVE Check)
+        uses: google/osv-scanner-action@v1
         with:
-          python-version: "3.11"
-      # 🚀 FIX: Uses Go CLI directly to avoid GitHub Action versioning errors
-      - name: Install & Run OSV Scanner (CVE Check)
-        run: |
-          go install github.com/google/osv-scanner/v2/cmd/osv-scanner@latest
-          ~/go/bin/osv-scanner --recursive --format=table ./ > /tmp/osv_results.txt || true
+          scan-args: |-
+            --recursive
+            --format=table
+            --output=/tmp/osv_results.txt
+            ./
+        continue-on-error: true
+
+      - name: Ensure OSV output file exists
+        run: touch /tmp/osv_results.txt    # ✅ guard against missing file
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -39,11 +38,12 @@ jobs:
           python-version: "3.11"
 
       - name: Install Dependencies
-        run: pip install google-genai requests
+        run: pip install google-genai==1.16.0 requests==2.32.3  # ✅ pinned
 
       - name: Generate PR Diff
         run: |
-          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > /tmp/pr_diff.txt
+          git diff ${{ github.event.pull_request.base.sha }} ${{ github.sha }} \
+            > /tmp/pr_diff.txt             # ✅ reliable SHA-based diff
 
       - name: Run AI Safety Agent
         env:
