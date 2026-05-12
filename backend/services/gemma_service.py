@@ -22,6 +22,18 @@ from google import genai
 # Lazy init
 _client = None
 MODEL = "gemma-4-31b-it"
+import re
+
+def _clean_json_response(text: str) -> str:
+    """Strip markdown code fences (```json ... ```) if present."""
+    if not text:
+        return ""
+    text = text.strip()
+    # Remove markdown code blocks
+    text = re.sub(r'^```json\s*', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'^```\s*', '', text)
+    text = re.sub(r'\s*```$', '', text)
+    return text.strip()
 
 
 def _get_client():
@@ -38,22 +50,21 @@ def _get_client():
 
 
 def _fire_log(user_id: str, operation: str, input_tokens: int, output_tokens: int, latency_ms: float, is_cache_hit: bool = False):
-    """Fire-and-forget model usage log in a daemon thread."""
-    def _log():
-        try:
-            from services.model_logger import fire_log_model_call_sync
-            fire_log_model_call_sync(
-                user_id=user_id,
-                model=MODEL,
-                operation=operation,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-            )
-        except Exception:
-            pass
+    """Fire-and-forget model usage log on the running event loop."""
+    try:
+        import asyncio
+        from services.model_logger import log_model_call
+        loop = asyncio.get_running_loop()
+        loop.create_task(log_model_call(
+            user_id=user_id,
+            model=MODEL,
+            operation=operation,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        ))
+    except Exception:
+        pass
 
-    t = threading.Thread(target=_log, daemon=True)
-    t.start()
 
 
 
@@ -275,8 +286,12 @@ async def _call_model_json(prompt: str, user_id: str = "", operation: str = "") 
                 },
             )
             latency_ms = (time.monotonic() - t0) * 1000
+            
+            raw_text = response.text
+            cleaned_text = _clean_json_response(raw_text)
+            parsed_json = json.loads(cleaned_text)
 
-            # Log token usage (fire-and-forget)
+            # Log token usage (fire-and-forget) - ONLY AFTER SUCCESSFUL PARSING
             if user_id:
                 meta = response.usage_metadata
                 _fire_log(
@@ -287,7 +302,7 @@ async def _call_model_json(prompt: str, user_id: str = "", operation: str = "") 
                     latency_ms=latency_ms,
                 )
 
-            return json.loads(response.text)
+            return parsed_json
         except Exception:
             if attempt == 0:
                 await asyncio.sleep(2)
@@ -311,8 +326,9 @@ async def _call_model_text(prompt: str, user_id: str = "", operation: str = "") 
                 },
             )
             latency_ms = (time.monotonic() - t0) * 1000
+            result_text = response.text.strip()
 
-            # Log token usage (fire-and-forget)
+            # Log token usage (fire-and-forget) - ONLY AFTER SUCCESSFUL RETRIEVAL
             if user_id:
                 meta = response.usage_metadata
                 _fire_log(
@@ -323,7 +339,7 @@ async def _call_model_text(prompt: str, user_id: str = "", operation: str = "") 
                     latency_ms=latency_ms,
                 )
 
-            return response.text.strip()
+            return result_text
         except Exception:
             if attempt == 0:
                 await asyncio.sleep(2)

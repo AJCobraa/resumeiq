@@ -1,18 +1,17 @@
 """
-Embedding service — generates embeddings for resume text using text-embedding-004.
-Caches embeddings in the Firestore resume document under `embeddingsCache`.
+Embedding service — generates embeddings for resume text using gemini-embedding-001.
+Caches embeddings in the PostgreSQL `resume_embeddings` table.
 
 Cache is recomputed on every resume SAVE — not on every analysis.
 Package: google-genai (NOT google-generativeai) — per AGENTS.md.
 
-Now also logs token usage to modelLogs collection via model_logger.
+Logs token usage to coin_transactions table via model_logger.
 """
 import os
 import time
 import asyncio
 import threading
 from google import genai
-from firebase_admin import firestore as fs
 
 # Lazy-init client
 _client = None
@@ -33,23 +32,20 @@ def _get_client():
     return _client
 
 
-def _fire_embed_log(user_id: str, operation: str, input_tokens: int, latency_ms: float, is_cache_hit: bool = False):
-    """Fire-and-forget embedding usage log."""
-    def _log():
-        try:
-            from services.model_logger import fire_log_model_call_sync
-            fire_log_model_call_sync(
-                user_id=user_id,
-                model=EMBEDDING_MODEL,
-                operation=operation,
-                input_tokens=input_tokens,
-                output_tokens=0,  # Embedding models have no output tokens
-            )
-        except Exception:
-            pass
+async def _log_embedding_usage(user_id: str, operation: str, input_tokens: int):
+    """Awaitable embedding usage log."""
+    try:
+        from services.model_logger import log_model_call
+        await log_model_call(
+            user_id=user_id,
+            model=EMBEDDING_MODEL,
+            operation=operation,
+            input_tokens=input_tokens,
+            output_tokens=0,
+        )
+    except Exception:
+        pass
 
-    t = threading.Thread(target=_log, daemon=True)
-    t.start()
 
 
 def _extract_resume_texts(resume: dict) -> list[dict]:
@@ -145,11 +141,11 @@ async def compute_embeddings(resume: dict, user_id: str = "") -> list[dict]:
             latency_ms = (time.monotonic() - t0) * 1000
             embeddings = [e.values for e in result.embeddings]
 
-            # Log usage (fire-and-forget)
+            # Log usage
             if user_id:
                 # Estimate input tokens: ~1 token per 4 chars
                 est_tokens = sum(len(t) // 4 for t in texts)
-                _fire_embed_log(user_id, "embed_resume", est_tokens, latency_ms)
+                await _log_embedding_usage(user_id, "embed_resume", est_tokens)
 
             break
         except Exception:
@@ -165,35 +161,48 @@ async def compute_embeddings(resume: dict, user_id: str = "") -> list[dict]:
     return chunks
 
 
-async def update_embeddings_cache(user_id: str, resume_id: str, resume: dict):
+async def update_embeddings_cache(user_id: str, resume_id: str, resume_data: dict):
     """
-    Compute embeddings and write them to the Firestore embeddingsCache field.
+    Compute embeddings and write them to the PostgreSQL resume_embeddings table.
     Called on resume save — not on every analysis.
+    Replaces the old Firestore embeddingsCache approach.
     """
-    chunks = await compute_embeddings(resume, user_id=user_id)
+    from core.database import async_session
+    from models.postgres_schema import Resume, ResumeEmbedding
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
 
-    # Shape for Firestore: { chunks: [...], updatedAt }
-    cache_data = {
-        "chunks": [
-            {
-                "chunkId": c["chunkId"],
-                "text": c["text"],
-                "embedding": c["embedding"],
-            }
-            for c in chunks
-        ],
-        "updatedAt": fs.SERVER_TIMESTAMP,
-    }
+    # Yield to let the main request finish its commit/cleanup
+    await asyncio.sleep(0.5)
 
-    # Write to Firestore
-    db = fs.client()
-    doc_ref = db.collection("users").document(user_id).collection("resumes").document(resume_id)
+    chunks = await compute_embeddings(resume_data, user_id=user_id)
 
-    await asyncio.to_thread(
-        doc_ref.update, {"embeddingsCache": cache_data}
-    )
+    async with async_session() as db:
+        async with db.begin():
+            # Load the resume object WITH its embeddings to let SQLAlchemy manage the collection
+            result = await db.execute(
+                select(Resume)
+                .options(selectinload(Resume.embeddings))
+                .where(Resume.resume_id == resume_id, Resume.user_id == user_id)
+            )
+            resume_row = result.scalar_one_or_none()
+            
+            if not resume_row:
+                return chunks
 
-    return cache_data
+            # Clear existing embeddings and add new ones
+            # Because of cascade="all, delete-orphan", clearing the list deletes them from DB
+            resume_row.embeddings = [
+                ResumeEmbedding(
+                    chunk_id=chunk["chunkId"],
+                    embedding=chunk["embedding"],
+                )
+                for chunk in chunks
+            ]
+            # No need for manual db.execute(delete(...)) or db.commit() here 
+            # because db.begin() block will commit automatically on exit.
+
+    return chunks
 
 
 async def get_jd_embedding(text: str, user_id: str = "") -> list[float]:
@@ -218,7 +227,7 @@ async def get_jd_embedding(text: str, user_id: str = "") -> list[float]:
             # Log usage
             if user_id:
                 est_tokens = len(text) // 4
-                _fire_embed_log(user_id, "embed_jd", est_tokens, latency_ms)
+                await _log_embedding_usage(user_id, "embed_jd", est_tokens)
 
             return result.embeddings[0].values
         except Exception:
@@ -253,7 +262,7 @@ async def get_jd_sentence_embeddings(texts: list[str], user_id: str = "") -> lis
             # Log usage
             if user_id:
                 est_tokens = sum(len(t) // 4 for t in texts)
-                _fire_embed_log(user_id, "embed_jd_sentences", est_tokens, latency_ms)
+                await _log_embedding_usage(user_id, "embed_jd_sentences", est_tokens)
 
             return [e.values for e in result.embeddings]
         except Exception:

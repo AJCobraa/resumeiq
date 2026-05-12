@@ -48,8 +48,10 @@ export default function PersonalStats() {
       </div>
 
       {/* Top Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         {[
+          { label: 'Coins Balance', value: stats.coinsBalance, icon: '🪙', color: 'text-yellow-400' },
+          { label: 'Resumes', value: stats.totalResumes, icon: '📄', color: 'text-emerald-400' },
           { label: 'Jobs Analyzed', value: stats.totalJobs, icon: '📋', color: 'text-purple-400' },
           { label: 'Total AI Calls', value: stats.totalAiCalls, icon: '🤖', color: 'text-accent-blue' },
           { label: 'Models Used', value: stats.modelsUsed.split('·').length, icon: '🧠', color: 'text-green' },

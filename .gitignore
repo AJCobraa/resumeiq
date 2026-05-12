@@ -31,3 +31,8 @@ npm-debug.log*
 # Temp PDF files
 /tmp/*.pdf
 /tmp/*.html
+
+# Test & Scratch
+scratch/
+backend/scratch/
+users.json
