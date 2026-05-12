@@ -42,7 +42,7 @@ def review_security():
     """
 
     response = client.models.generate_content(
-        model='gemini-2.0-flash',
+        model='gemini-3.1-flash-lite',
         contents=[system_prompt, f"PR: {PR_TITLE} by {PR_AUTHOR}\n\nDiff:\n{diff}"],
         config=types.GenerateContentConfig(temperature=0.2)
     )
