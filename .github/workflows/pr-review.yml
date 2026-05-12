@@ -1,8 +1,8 @@
-name: Gemini AI PR Reviewer
+name: Gemini AI Reviewer Team
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened]
 
 jobs:
   ai-review:
@@ -15,7 +15,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Essential for accurate git diffs
+          fetch-depth: 0   # Critical: allows git diff to see the history
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -23,18 +23,31 @@ jobs:
           python-version: "3.11"
 
       - name: Install Dependencies
+        # Critical: Uses the modern Google GenAI SDK, NOT the legacy one
         run: pip install google-genai requests
 
-      - name: Generate Accurate Diff
-        # This compares the feature branch specifically against the base branch (main)
+      - name: Generate PR Diff
+        # Saves to /tmp/ to guarantee both scripts can find it regardless of working dir
         run: |
-          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > pr_diff.txt
+          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > /tmp/pr_diff.txt
+          echo "Diff size: $(wc -l < /tmp/pr_diff.txt) lines"
 
-      - name: Execute Gemini Review
+      - name: Run DevSecOps Agent (Security)
         env:
           GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: python scripts/pr_reviewer.py
+
+      - name: Run Performance Agent (Speed)
+        env:
+          GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: python scripts/performance_reviewer.py
