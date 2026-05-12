@@ -1,0 +1,50 @@
+name: CI Docker Build Test
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  build-test:
+    # Now this runs for EVERY pull request
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Create Dummy .env
+        run: |
+          cat > backend/.env <<EOF
+          GOOGLE_AI_STUDIO_API_KEY=dummy
+          FIREBASE_PROJECT_ID=resumeiq-test
+          FIREBASE_CLIENT_EMAIL=test@resumeiq.iam.gserviceaccount.com
+          FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\ndummy\n-----END PRIVATE KEY-----\n"
+          POSTGRES_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/resumeiq
+          APP_ENV=dev
+          EOF
+
+      - name: Docker Compose Build
+        id: docker-build
+        run: docker compose up --build --no-start
+        continue-on-error: true
+
+      - name: Post Build Results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const build = '${{ steps.docker-build.outcome }}';
+            const icon = build === 'success' ? '✅' : '❌';
+            const verdict = build === 'success'
+              ? '### ✅ Docker build passed — safe to merge'
+              : '### ❌ Docker build failed — this PR breaks the app!';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🐳 CI Docker Build Test\n\n| Step | Result |\n|---|---|\n| \`docker compose build\` | ${icon} ${build} |\n\n${verdict}\n\n> ⚠️ *Compile-time check only — runtime behavior is not tested.*`
+            });
