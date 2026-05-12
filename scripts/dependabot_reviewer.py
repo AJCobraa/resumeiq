@@ -17,7 +17,7 @@ OSV_PATH = os.environ.get("OSV_RESULTS", "/tmp/osv_results.txt")
 MODELS_TO_TRY = [
     "gemini-3.1-flash-lite", 
     "gemini-1.5-flash", 
-    "gemini-3-flash", 
+    "gemini-3.0-flash", 
     "gemma-3-27b"
 ]
 
