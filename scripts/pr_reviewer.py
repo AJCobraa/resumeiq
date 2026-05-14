@@ -27,7 +27,7 @@ MODELS_TO_TRY = [
     "gemini-3.0-flash",  
     "gemini-2.5-flash", 
     "gemini-1.5-flash", 
-    "gemma-3-27b
+    "gemma-3-27b"
 ]
 
 MAX_DIFF_CHARS = 1_000_000
