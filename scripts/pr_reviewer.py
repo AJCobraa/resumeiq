@@ -23,8 +23,7 @@ PR_AUTHOR      = os.environ.get("PR_AUTHOR", "Unknown")
 
 # All names verified against the Google GenAI API.
 MODELS_TO_TRY = [
-    "gemini-3.1-flash-lite", 
-    "gemini-3.0-flash",  
+    "gemini-3.1-flash-lite",   
     "gemini-2.5-flash", 
     "gemini-1.5-flash", 
     "gemma-3-27b"
