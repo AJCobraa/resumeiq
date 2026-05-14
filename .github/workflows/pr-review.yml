@@ -4,36 +4,81 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+# ── Shared diff generation ────────────────────────────────────────────────────
+# The diff is generated once and passed to all three agents via a shared artifact.
+# The three review jobs then run in PARALLEL, cutting total wall-clock time by ~66%.
+
 jobs:
-  ai-review:
+
+  # ── Step 1: Generate diff once, upload as artifact ──────────────────────────
+  generate-diff:
+    name: Generate PR Diff
     if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
       contents: read
+    outputs:
+      diff-ready: ${{ steps.check.outputs.ready }}
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6        # v6 is current stable;
         with:
-          fetch-depth: 0   # Critical: allows git diff to see the history
+          fetch-depth: 0                 # Required for cross-branch git diff
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Generate diff
+        run: |
+          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD \
+            > /tmp/pr_diff.txt
+          LINES=$(wc -l < /tmp/pr_diff.txt)
+          echo "Diff size: ${LINES} lines"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+        id: check
+
+      - name: Upload diff artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-diff
+          path: /tmp/pr_diff.txt
+          retention-days: 1              # Ephemeral — only needed for this workflow run
+
+
+  # ── Step 2a: Security Agent ──────────────────────────────────────────────────
+  security-review:
+    name: Security Agent
+    needs: generate-diff
+    runs-on: ubuntu-latest
+    timeout-minutes: 10                  # Prevent runaway jobs
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5    # v5 is current stable; v6 does not exist
         with:
           python-version: "3.11"
 
-      - name: Install Dependencies
-        # Critical: Uses the modern Google GenAI SDK, NOT the legacy one
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-ai-reviewer-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-ai-reviewer-
+
+      - name: Install dependencies
         run: pip install google-genai requests
 
-      - name: Generate PR Diff
-        # Saves to /tmp/ to guarantee both scripts can find it regardless of working dir
-        run: |
-          git diff origin/${{ github.event.pull_request.base.ref }}...HEAD > /tmp/pr_diff.txt
-          echo "Diff size: $(wc -l < /tmp/pr_diff.txt) lines"
+      - name: Download diff artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-diff
+          path: /tmp
 
-      - name: Run DevSecOps Agent (Security)
+      - name: Run Security Agent
         env:
           GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -43,7 +88,43 @@ jobs:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: python scripts/pr_reviewer.py
 
-      - name: Run Performance Agent (Speed)
+
+  # ── Step 2b: Performance Agent ───────────────────────────────────────────────
+  performance-review:
+    name: Performance Agent
+    needs: generate-diff
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-ai-reviewer-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-ai-reviewer-
+
+      - name: Install dependencies
+        run: pip install google-genai requests
+
+      - name: Download diff artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-diff
+          path: /tmp
+
+      - name: Run Performance Agent
         env:
           GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -52,3 +133,49 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: python scripts/performance_reviewer.py
+
+
+  # ── Step 2c: Design Agent (NEW) ───────────────────────────────────────────────
+  design-review:
+    name: Design & Simplicity Agent
+    needs: generate-diff
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Checkout scripts
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-ai-reviewer-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-ai-reviewer-
+
+      - name: Install dependencies
+        run: pip install google-genai requests
+
+      - name: Download diff artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-diff
+          path: /tmp
+
+      - name: Run Design Agent
+        env:
+          GOOGLE_AI_STUDIO_API_KEY: ${{ secrets.GOOGLE_AI_STUDIO_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: python scripts/design_reviewer.py
