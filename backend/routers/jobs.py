@@ -17,6 +17,7 @@ from services import resume_service, gemma_service
 from core import budget_guard
 from datetime import datetime, timezone
 import asyncio
+import uuid
 
 router = APIRouter(prefix="/api", tags=["jobs"])
 
@@ -193,9 +194,12 @@ async def update_recommendation(
             section_id = target.get("sectionId", "")
             bullet_id = target.get("bulletId", "")
             current_text = target.get("currentText", "")
+            # Apply change in background task
+            # Pass rec_type to help background task pick the right strategy
+            rec_type = target.get("type", "")
             bg.add_task(
                 _apply_recommendation_to_resume,
-                uid, resume_id, section_id, bullet_id, current_text, final_text
+                uid, resume_id, section_id, bullet_id, current_text, final_text, rec_type
             )
 
     elif body.action == "dismiss":
@@ -216,98 +220,172 @@ async def update_recommendation(
     return target
 
 
-def _apply_recommendation_to_resume(
-    uid: str,
-    resume_id: str,
-    section_id: str,
-    bullet_id: str,
-    current_text: str,
-    new_text: str,
-):
+async def _apply_recommendation_to_resume(user_id: str, resume_id: str, section_id: str, bullet_id: str, current_text: str, new_text: str, rec_type: str = ""):
     """
-    Background task: update a resume bullet using ID-based targeting.
-    Falls back to text matching for backwards compatibility with old recommendation objects
-    that don't have sectionId/bulletId.
-    Uses a new DB session since this runs in a background thread.
+    Background task to update the resume with the approved recommendation.
+    Uses a 4-strategy approach to target the correct data point.
     """
     try:
-        async def _do():
-            from core.database import async_session
-            async with async_session() as db_session:
-                result = await db_session.execute(
-                    select(Resume).where(Resume.resume_id == resume_id, Resume.user_id == uid)
-                )
-                row = result.scalar_one_or_none()
-                if not row:
-                    return
+        from core.database import async_session
+        from sqlalchemy.orm.attributes import flag_modified
+        from datetime import datetime, timezone
+        from models.postgres_schema import Resume
+        from services import embedding_service
+        
+        async with async_session() as db_session:
+            result = await db_session.execute(
+                select(Resume).where(Resume.resume_id == resume_id, Resume.user_id == user_id)
+            )
+            row = result.scalar_one_or_none()
+            if not row:
+                print(f"[apply_rec] [ERROR] Resume {resume_id} not found for user {user_id}")
+                return
 
-                data = dict(row.resume_data)
-                sections = data.get("sections", [])
-                updated = False
+            data = row.resume_data
+            updated = False
+            sections = data.get("sections", [])
 
-                # Strategy 1: ID-based targeting (new recommendations have sectionId + bulletId)
-                if section_id and bullet_id:
-                    for section in sections:
-                        if section.get("sectionId") == section_id:
-                            # 1a: Regular bullets (experience, achievements)
+            # Strategy 1: Professional Summary (meta.summary)
+            # Direct match on type or explicit IDs
+            if rec_type in ["summary", "add_section"] or section_id == "meta" or bullet_id == "summary":
+                meta = data.get("meta", {})
+                meta["summary"] = new_text
+                data["meta"] = meta
+                updated = True
+                print(f"[apply_rec] Success: Applied summary update via Strategy 1 (Summary Type/ID)")
+
+            # Strategy 2 & 3: ID-based (Experience, Projects, Skills)
+            if not updated and section_id and bullet_id:
+                for section in sections:
+                    if section.get("sectionId") == section_id:
+                        stype = section.get("type", "")
+                        
+                        # Strategy 2: Skills Categories
+                        if stype == "skills" and rec_type in ["skills", "add_skill"]:
+                            found_cat = False
+                            for cat in section.get("categories", []):
+                                if cat.get("categoryId") == bullet_id:
+                                    # Handle potential "Label: Item1, Item2" format in new_text
+                                    clean_text = new_text
+                                    if ":" in new_text and ";" not in new_text:
+                                        # Only split if there's one colon and no semicolon (simple label: items)
+                                        _, clean_text = new_text.split(":", 1)
+                                    
+                                    # Convert comma-separated string back to list for skills
+                                    cat["items"] = [s.strip() for s in clean_text.split(",") if s.strip()]
+                                    updated = True
+                                    found_cat = True
+                                    print(f"[apply_rec] Success: Updated existing skill category via Strategy 2 (ID match)")
+                                    break
+                            
+                            # If no ID match but bid is 'new' or it's an add_skill, try parsing suggestedText
+                            if not found_cat and (bullet_id == "new" or rec_type == "add_skill"):
+                                # Parse "Category: Item1, Item2; Category2: Item3"
+                                skill_parts = new_text.split(";")
+                                for part in skill_parts:
+                                    if ":" in part:
+                                        label, items_str = part.split(":", 1)
+                                        items = [i.strip() for i in items_str.split(",") if i.strip()]
+                                        # Check if category already exists by name
+                                        existing_cat = next((c for c in section.get("categories", []) if c.get("label", "").lower() == label.strip().lower()), None)
+                                        if existing_cat:
+                                            existing_cat["items"] = items
+                                        else:
+                                            section.setdefault("categories", []).append({
+                                                "categoryId": str(uuid.uuid4()),
+                                                "label": label.strip(),
+                                                "items": items
+                                            })
+                                        updated = True
+                                if updated:
+                                    print(f"[apply_rec] Success: Added/Updated skill categories via Strategy 2 (New/Parse)")
+                        
+                        # Strategy 2: Experience/Projects bullets
+                        elif stype in ["experience", "projects"]:
+                            # Check bullets directly in section (experience)
                             for bullet in section.get("bullets", []):
                                 if bullet.get("bulletId") == bullet_id:
                                     bullet["text"] = new_text
                                     updated = True
+                                    print(f"[apply_rec] Success: Applied bullet update via Strategy 2")
                                     break
-                            # 1b: Skills category items — bulletId is the categoryId here
-                            if not updated and section.get("type") == "skills":
-                                for cat in section.get("categories", []):
-                                    if cat.get("categoryId") == bullet_id:
-                                        cat["items"] = [s.strip() for s in new_text.split(",") if s.strip()]
-                                        updated = True
-                                        break
-                            # 1c: Items with nested bullets (projects)
+                            
+                            # Check bullets inside items (projects)
                             if not updated:
                                 for item in section.get("items", []):
                                     for bullet in item.get("bullets", []):
                                         if bullet.get("bulletId") == bullet_id:
                                             bullet["text"] = new_text
                                             updated = True
+                                            print(f"[apply_rec] Success: Applied project bullet update via Strategy 2")
                                             break
-                                    if updated:
-                                        break
-                            break
+                                    if updated: break
+                        if updated: break
 
-                # Strategy 2: Text-based fallback (for old rec objects without IDs)
-                if not updated and current_text:
+            # Strategy 4: Text-based fallback (for robustness)
+            if not updated and current_text:
+                normalized_target = current_text.strip().lower()
+                
+                # Check summary
+                meta = data.get("meta", {})
+                if meta.get("summary") and meta["summary"].strip().lower() == normalized_target:
+                    meta["summary"] = new_text
+                    data["meta"] = meta
+                    updated = True
+                    print(f"[apply_rec] Success: Applied summary update via Strategy 4 (text match)")
+                
+                if not updated:
                     for section in sections:
-                        for bullet in section.get("bullets", []):
-                            if bullet.get("text") == current_text:
-                                bullet["text"] = new_text
-                                updated = True
-                                break
-                        if not updated:
-                            for item in section.get("items", []):
-                                for bullet in item.get("bullets", []):
-                                    if bullet.get("text") == current_text:
-                                        bullet["text"] = new_text
-                                        updated = True
-                                        break
-                                if updated:
+                        stype = section.get("type", "")
+                        
+                        if stype == "skills" and rec_type in ["skills", "add_skill"]:
+                            for cat in section.get("categories", []):
+                                if cat.get("label", "").strip().lower() == normalized_target:
+                                    cat["items"] = [s.strip() for s in new_text.split(",") if s.strip()]
+                                    updated = True
+                                    print(f"[apply_rec] Success: Applied skills update via Strategy 4 (label match)")
                                     break
-                        if updated:
-                            break
+                        
+                        elif stype in ["experience", "projects"]:
+                            for bullet in section.get("bullets", []):
+                                if bullet.get("text", "").strip().lower() == normalized_target:
+                                    bullet["text"] = new_text
+                                    updated = True
+                                    print(f"[apply_rec] Success: Applied bullet update via Strategy 4 (text match)")
+                                    break
+                            
+                            if not updated:
+                                for item in section.get("items", []):
+                                    for bullet in item.get("bullets", []):
+                                        if bullet.get("text", "").strip().lower() == normalized_target:
+                                            bullet["text"] = new_text
+                                            updated = True
+                                            print(f"[apply_rec] Success: Applied project bullet update via Strategy 4 (text match)")
+                                            break
+                                    if updated: break
+                        if updated: break
 
-                if updated:
-                    data["updatedAt"] = datetime.now(timezone.utc).isoformat()
-                    row.resume_data = data
-                    flag_modified(row, "resume_data")
-                    row.updated_at = datetime.now(timezone.utc)
-                    await db_session.commit()
+            if updated:
+                data["updatedAt"] = datetime.now(timezone.utc).isoformat()
+                row.resume_data = data
+                flag_modified(row, "resume_data")
+                row.updated_at = datetime.now(timezone.utc)
+                await db_session.commit()
+                print(f"[apply_rec] Success: Resume {resume_id} updated and committed")
+                
+                # Refresh embeddings - this is important for future analysis
+                try:
+                    await embedding_service.update_embeddings_cache(user_id, resume_id, data)
+                except Exception as e:
+                    print(f"[apply_rec] Warning: Failed to refresh embeddings: {str(e)}")
+            else:
+                print(f"[apply_rec] [WARNING] Could not find target for update: type={rec_type}, sid={section_id}, bid={bullet_id}, text='{current_text[:30]}...'")
 
-                    # Refresh embeddings after resume update
-                    from services import embedding_service
-                    await embedding_service.update_embeddings_cache(uid, resume_id, data)
+    except Exception as e:
+        print(f"[apply_rec] Error in background task: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
-        asyncio.run(_do())
-    except Exception:
-        pass  # Background task — never crash
 
 
 @router.post("/jobs/{job_id}/interview-prep")

@@ -82,17 +82,7 @@ class Job(Base):
     user_id = Column(String, ForeignKey('users.uid'), nullable=False)
     resume_id = Column(String, nullable=True) # Formal link to resume (nullable to preserve history)
     job_data = Column(JSONB, nullable=False)
+    jd_embedding = Column(Vector(3072), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
     user = relationship("User", back_populates="jobs")
-    embeddings = relationship("JDEmbedding", back_populates="job", cascade="all, delete-orphan")
-
-class JDEmbedding(Base):
-    __tablename__ = 'jd_embeddings'
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    job_id = Column(String, ForeignKey('jobs.job_id'), nullable=False)
-    sentence_idx = Column(Integer, nullable=False)
-    embedding = Column(Vector(3072), nullable=False)
-
-    job = relationship("Job", back_populates="embeddings")

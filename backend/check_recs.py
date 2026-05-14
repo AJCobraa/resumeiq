@@ -5,15 +5,17 @@ from sqlalchemy import select
 
 async def main():
     async with async_session() as db:
-        res = await db.execute(select(Job).limit(1))
+        res = await db.execute(select(Job).order_by(Job.created_at.desc()).limit(1))
         job = res.scalar_one_or_none()
         if job:
-            recs = job.job_data.get('recommendations')
-            if recs:
-                print(recs[0].keys())
-            else:
-                print('No recs')
+            print(f"JobID: {job.job_id}")
+            print(f"UserID: {job.user_id}")
+            print(f"ResumeID: {job.resume_id}")
+            print(f"ATS Score: {job.job_data.get('atsScore')}")
+            print(f"Semantic Score: {job.job_data.get('semanticScore')}")
+            print(f"Recommendations count: {len(job.job_data.get('recommendations', []))}")
+            print(f"JD URL: {job.job_data.get('jdUrl')}")
         else:
-            print('No jobs')
+            print('No jobs found')
 
 asyncio.run(main())

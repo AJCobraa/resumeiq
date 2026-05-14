@@ -142,7 +142,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function getRiqBackendUrl() {
     const config = globalThis.CONFIG || {};
-    return (config.backendUrl || 'http://localhost:8000').replace(/\/$/, '');
+    return (config.backendUrl || 'http://localhost:8001').replace(/\/$/, '');
   }
 
   async function checkPreviousAnalysis(url) {

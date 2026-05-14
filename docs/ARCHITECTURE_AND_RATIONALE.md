@@ -223,23 +223,22 @@ Jobs are linked to the resume used for their analysis. If a resume is deleted, t
 
 ---
 
-## Section 18 — JD Caching & Model Monitoring
+## Section 18 — JD Caching & Relational Vector Storage
 
-### 18.1 JD Embedding Cache
+### 18.1 JD Embedding Cache Migration
 
-**Problem:** Every time a user re-analyzes the same job description (e.g., after updating their resume), the system re-ran expensive JD embedding calls costing tokens and latency.
+**Problem:** Initially, JD embeddings were cached in the `jobs.job_data` JSONB blob using a content hash (`jdHash`) as the cache key. This caused significant data bloat (vectors are large) and made it impossible to perform vector similarity searches across job descriptions without loading every job document into memory.
 
-**Decision:** Cache JD embeddings in the job document using a content hash (MD5 of `jdText`) as the cache key.
+**Current Decision (Relational Migration):** Migrate JD embeddings to a dedicated `jd_embeddings` table using `pgvector`.
 
 **Implementation:**
-- `jdHash` field added to `jobs/{jobId}` — MD5 of the raw JD text
-- `jdEmbeddingsCache` field stores `{ computedAt, requirements: [{text, embedding}] }`
-- `analysis_pipeline.py` runs `_check_jd_cache()` before executing JD embedding
-- If hash + URL match, cached embeddings are reused — no AI call made
-- `isCacheHit: true` is stored in the job document for observability
-- `GET /api/jobs/check?url=` lets the extension pre-check if a URL was previously analyzed
+- **Table Schema:** `jd_embeddings` stores `id` (UUID), `job_id` (String FK), `sentence_idx` (Integer), and `embedding` (Vector 3072).
+- **Optimization:** `analysis_pipeline.py` now resolves the job identity early and checks the `jd_embeddings` table before calling the embedding service.
+- **Background Persistence:** On a cache miss, fresh embeddings are computed and a fire-and-forget background task (`update_jd_embeddings_cache`) handles the bulk insertion into PostgreSQL.
+- **Data Cleanup:** The legacy `jdEmbeddingsCache` field is stripped from the `job_data` JSONB payload during the update, reducing document size by ~95%.
+- **Cascading purges:** Using `cascade="all, delete-orphan"` in the SQLAlchemy relationship ensures that deleting a job record automatically cleans up its associated vector embeddings.
 
-**Why MD5 (not SHA256)?** Sufficient collision resistance for JD text; faster and shorter keys in Firestore.
+**Why this works:** It provides a cleaner separation of concerns, enables future vector-based job recommendations (finding jobs similar to a target JD), and maintains a lean `jobs` table for fast dashboard queries.
 
 ### 18.2 Model Usage Monitoring (Legacy)
 **Note:** This section was moved to Personal Stats in Section 26.
@@ -1002,3 +1001,24 @@ While the system still uses a **Snapshot Architecture** (copying `resumeTitle` i
 - **Pipeline:** `analyze_resume_vs_jd` now populates this column during both creation and re-analysis.
 - **Service:** `delete_resume` was optimized to use this indexed column for targeting job updates, replacing a previously inefficient Python-side filter.
 
+---
+
+## Section 38 — Robust Recommendation Application & Multi-Strategy Matching
+
+**Problem:** Approving AI-generated recommendations (bullets, skills, summary) frequently failed when the resume structure drifted from the original analysis snapshot or when dealing with complex nested objects like skill categories.
+
+**Decision:** Implement a multi-strategy application pipeline with ID-priority and text-based fallback, explicitly handling heterogeneous data shapes (bullets vs. skill arrays).
+
+**Implementation (`backend/routers/jobs.py` & `analysis_pipeline.py`):**
+- **ID Resolution (`_find_bullet_ids`):** At analysis time, the pipeline now preemptively resolves `sectionId` and `bulletId` for every recommendation. If a recommendation is an addition (e.g., `add_skill`), it uses a `"new"` sentinel ID.
+- **Strategy 1: Direct Type-Based (Summary):** Recommendations of type `summary` or `add_section` (with sid='meta') bypass searching and update `resume_data["meta"]["summary"]` directly.
+- **Strategy 2: ID-Based (Exact Match):** 
+    - **Experience/Projects:** Matches `bulletId` within section-level or item-level bullet arrays.
+    - **Skills:** Matches `categoryId` within the `categories` array.
+- **Strategy 3: Skills Parsing (Legacy & Additions):** 
+    - If `bulletId == "new"` or `type == "add_skill"`, the pipeline parses the `suggestedText` using a semicolon/colon grammar (e.g., `"Category: Item 1, Item 2; Category 2: Item 3"`).
+    - It performs an upsert: if a category label already exists, it updates the items; otherwise, it appends a new category with a fresh UUID.
+- **Strategy 4: Text-Based Fallback (Drift Protection):** If IDs fail to match (e.g., section was moved or renamed), the pipeline falls back to normalized text matching against `currentText`.
+- **Persistence (SQLAlchemy JSONB):** Explicitly calls `flag_modified(row, "resume_data")` before `db.commit()`. This is critical because SQLAlchemy does not automatically track mutations inside a JSONB blob.
+
+**Why this works:** It provides "graceful degradation" — exact ID matches are fast and precise, while text-based fallbacks and grammar-aware skills parsing ensure that recommendations remain actionable even if the user has made manual edits to the resume since the last analysis run.

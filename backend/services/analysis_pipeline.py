@@ -18,18 +18,6 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def _split_jd_into_sentences(text: str) -> list[str]:
-    lines = re.split(r'\n+', text or "")
-    sentences = []
-    for line in lines:
-        line = line.strip()
-        parts = re.split(r'(?<=[.!?•▪️►➢])\s+', line)
-        for p in parts:
-            p = p.strip()
-            # Filter out very short phrasing/headings to keep token counts & details focused.
-            if len(p) > 25:
-                sentences.append(p)
-    return sentences[:50]  # Max 50 chunks for performance/limits
 
 
 
@@ -47,6 +35,9 @@ def _clean_url(url: str) -> str:
     from urllib.parse import urlparse, urlunparse
     p = urlparse(url)
     return urlunparse((p.scheme, p.netloc, p.path, "", "", ""))
+
+
+
 
 
 def _resume_to_text(resume: dict) -> str:
@@ -88,23 +79,47 @@ def _resume_to_text(resume: dict) -> str:
     return "\n".join(lines)
 
 
-def _find_bullet_ids(resume: dict, current_text: str) -> tuple[str, str]:
+def _find_bullet_ids(resume: dict, current_text: str, rec_type: str = "") -> tuple[str, str]:
+    """
+    Find sectionId and bulletId (or categoryId) for a given text match.
+    Now supports category labels for skills and professional summary matching.
+    """
+    normalized_target = _normalize_text(current_text).lower() if current_text else ""
+
+    # 1. Handle Summary - Always map to meta/summary if type matches
+    if rec_type in ["summary", "add_section"]:
+        return "meta", "summary"
+
+    # 2. Handle Sections
     for section in resume.get("sections", []):
         sid = section.get("sectionId", "")
+        stype = section.get("type", "")
 
-        if section.get("type") == "skills":
+        # 2a. Skills: Match by Category Label or Fallback for 'add_skill'
+        if stype == "skills" and rec_type in ["skills", "add_skill"]:
+            # If we have a category match, use it
             for cat in section.get("categories", []):
-                for item in cat.get("items", []):
-                    if item == current_text:
-                        return sid, cat.get("categoryId", "")
+                if current_text and normalized_target == _normalize_text(cat.get("label", "")).lower():
+                    return sid, cat.get("categoryId", "")
+            
+            # If it's an add_skill with no specific category yet, return the sectionId
+            # and a 'new' sentinel if current_text is empty
+            if rec_type == "add_skill" and not current_text:
+                return sid, "new"
 
-        for bullet in section.get("bullets", []):
-            if bullet.get("text") == current_text:
-                return sid, bullet.get("bulletId", "")
-        for item in section.get("items", []):
-            for bullet in item.get("bullets", []):
-                if bullet.get("text") == current_text:
+        # 2b. Experience/Projects: Match by Bullet Text
+        if stype in ["experience", "projects"] and rec_type in ["experience", "projects", "rewrite_bullet", ""]:
+            if not current_text:
+                continue
+                
+            for bullet in section.get("bullets", []):
+                if normalized_target == _normalize_text(bullet.get("text", "")).lower():
                     return sid, bullet.get("bulletId", "")
+            
+            for item in section.get("items", []):
+                for bullet in item.get("bullets", []):
+                    if normalized_target == _normalize_text(bullet.get("text", "")).lower():
+                        return sid, bullet.get("bulletId", "")
 
     return "", ""
 
@@ -148,6 +163,8 @@ async def _get_resume_embeddings_from_db(db: AsyncSession, resume_id: str) -> li
         {"chunkId": r.chunk_id, "embedding": list(r.embedding)}
         for r in rows
     ]
+
+
 
 
 async def analyze_resume_vs_jd(
@@ -198,31 +215,27 @@ async def analyze_resume_vs_jd(
                 existing_job = None
                 cache_lookup_source = "none"
 
-    cached_jd = existing_job if existing_job and existing_job.get("jdEmbeddingsCache") else None
-    is_jd_cache_hit = cached_jd is not None
+    # Resolve final_job_id early
+    if job_id:
+        final_job_id = job_id
+    elif existing_job:
+        final_job_id = existing_job.get("jobId")
+    else:
+        final_job_id = str(uuid.uuid4())
 
-    semantic_score = 0
+    # Cache hit detection: check Job.jd_embedding column
+    jd_embedding = None
+    is_jd_cache_hit = False
+    if existing_row and existing_row.jd_embedding:
+        jd_embedding = list(existing_row.jd_embedding)
+        is_jd_cache_hit = True
 
-    # Read resume embeddings from the resume_embeddings table (Option A)
-    chunks = await _get_resume_embeddings_from_db(db, resume_id)
-    resume_embeddings_computed_on_demand = False
-
-    jd_embedding_computed = False
-    cached_reqs = []
-
-    if is_jd_cache_hit:
-        cached_reqs = cached_jd["jdEmbeddingsCache"].get("requirements", [])
-
-    if is_jd_cache_hit and not cached_reqs:
-        # Fallback if cache is somehow invalid
-        is_jd_cache_hit = False
-
-    # 1. Schedule the Gemma analysis task to run concurrently
+    # 1. Schedule concurrent tasks
     gemma_analysis_task = asyncio.create_task(
         gemma_service.analyze_resume_and_recommend(resume_text, jd_text, user_id=user_id)
     )
 
-    # 2. Schedule embedding tasks if needed
+    chunks = await _get_resume_embeddings_from_db(db, resume_id)
     resume_emb_task = None
     if not chunks:
         resume_emb_task = asyncio.create_task(
@@ -230,93 +243,64 @@ async def analyze_resume_vs_jd(
         )
 
     jd_emb_task = None
-    sentences = []
     if not is_jd_cache_hit:
-        sentences = _split_jd_into_sentences(jd_text)
-        if not sentences:
-            # Fallback if no valid sentences found
-            sentences = [jd_text[:1000]]
-
         jd_emb_task = asyncio.create_task(
-            embedding_service.get_jd_sentence_embeddings(sentences, user_id=user_id)
+            embedding_service.get_jd_embedding(jd_text, user_id=user_id)
         )
 
-    # 3. Await embedding tasks and compute semantic score
+
+
+    # 2. Await embeddings
     if resume_emb_task:
         chunks = await resume_emb_task
-        resume_embeddings_computed_on_demand = True
-        # Write embeddings to resume_embeddings table.
-        # Fire-and-forget — do not await, do not block analysis response.
-        asyncio.ensure_future(
-            embedding_service.update_embeddings_cache(user_id, resume_id, resume)
-        )
+        await embedding_service.update_embeddings_cache(user_id, resume_id, resume)
 
+    jd_embedding_computed = False
     if jd_emb_task:
-        sentence_embeddings = await jd_emb_task
+        jd_embedding = await jd_emb_task
         jd_embedding_computed = True
+    
 
-        cached_reqs = []
-        for i, emb in enumerate(sentence_embeddings):
-            if emb:
-                cached_reqs.append({
-                    "text": sentences[i],
-                    "embedding": emb
-                })
 
-    semanticDetails = []
-    if chunks and cached_reqs:
-        all_best_scores = []
-
-        # ⚡ Bolt Optimization: Precompute vector norms
-        chunk_norms = []
-        for chunk in chunks:
-            emb = chunk.get("embedding", [])
-            chunk_norms.append(math.hypot(*emb) if emb else 0.0)
-
-        for req in cached_reqs:
-            req_emb = req.get("embedding")
-            if not req_emb:
-                continue
-
-            req_norm = math.hypot(*req_emb)
-            if req_norm == 0.0:
-                continue
-
-            best_score = -1.0
-            for i, chunk in enumerate(chunks):
+    # 3. Compute semantic score (Single Vector Match)
+    semantic_score = 0
+    if chunks and jd_embedding:
+        best_sim = 0.0
+        jd_norm = math.hypot(*jd_embedding)
+        
+        if jd_norm > 0:
+            for chunk in chunks:
                 emb = chunk.get("embedding", [])
-                c_norm = chunk_norms[i]
-                if emb and c_norm > 0.0:
-                    dot = sum(x * y for x, y in zip(emb, req_emb))
-                    sim = dot / (c_norm * req_norm)
-                    if sim > best_score:
-                        best_score = sim
+                if not emb: continue
+                
+                c_norm = math.hypot(*emb)
+                if c_norm > 0:
+                    dot = sum(x * y for x, y in zip(emb, jd_embedding))
+                    sim = dot / (c_norm * jd_norm)
+                    if sim > best_sim:
+                        best_sim = sim
+        
+        semantic_score = int(round(max(0.0, best_sim) * 100))
 
-            score_clamped = max(0.0, best_score)
-            all_best_scores.append(score_clamped)
 
-            semanticDetails.append({
-                "text": req.get("text", ""),
-                "score": int(round(score_clamped * 100))
-            })
 
-        semantic_score = int(round((sum(all_best_scores) / len(all_best_scores)) * 100)) if all_best_scores else 0
-
-    # 4. Await the Gemma analysis task
+    # 4. Await Gemma analysis
     analysis_result = await gemma_analysis_task
     ats_score = analysis_result.get("atsScore", 0)
     breakdown = analysis_result.get("breakdown", {})
     missing_keywords = analysis_result.get("missingKeywords", [])
     strong_matches = analysis_result.get("strongMatches", [])
     raw_recs = analysis_result.get("recommendations", [])
+    
     recommendations = []
     for rec in (raw_recs if isinstance(raw_recs, list) else []):
         current_text = rec.get("currentText", "")
-        section_id, bullet_id = _find_bullet_ids(resume, current_text)
+        rec_type = rec.get("type", "experience")
+        section_id, bullet_id = _find_bullet_ids(resume, current_text, rec_type)
+        
         recommendations.append({
             "recommendationId": str(uuid.uuid4()),
-            "type": rec.get("type", "rewrite_bullet"),
-            "section": rec.get("section", ""),
+            "type": rec_type,
             "sectionId": section_id,
             "bulletId": bullet_id,
             "currentText": current_text,
@@ -326,22 +310,6 @@ async def analyze_resume_vs_jd(
             "keywordsAdded": rec.get("keywordsAdded", []),
             "status": "pending",
         })
-
-    jd_embeddings_cache = None
-    if jd_embedding_computed:
-        jd_embeddings_cache = {
-            "computedAt": _now(),
-            "requirements": cached_reqs,
-        }
-    elif cached_jd:
-        jd_embeddings_cache = cached_jd.get("jdEmbeddingsCache")
-
-    if job_id:
-        final_job_id = job_id
-    elif existing_job:
-        final_job_id = existing_job.get("jobId")
-    else:
-        final_job_id = str(uuid.uuid4())
 
     created_at = (existing_job or {}).get("createdAt") or _now()
     status = (existing_job or {}).get("status", "analyzed")
@@ -358,12 +326,11 @@ async def analyze_resume_vs_jd(
         "jdUrl": jd_url,
         "jdText": jd_text[:5000],
         "jdHash": jd_hash,
-        "jdEmbeddingsCache": jd_embeddings_cache,
         "isCacheHit": is_jd_cache_hit,
         "atsScore": ats_score,
         "initialAtsScore": initial_ats_score,
         "semanticScore": semantic_score,
-        "semanticDetails": semanticDetails,
+
         "breakdown": breakdown,
         "missingKeywords": missing_keywords,
         "strongMatches": strong_matches,
@@ -373,11 +340,8 @@ async def analyze_resume_vs_jd(
         "updatedAt": _now(),
         "debug": {
             "cacheLookupSource": cache_lookup_source,
-            "resolvedJobId": final_job_id,
-            "matchedExistingJob": existing_job is not None,
-            "hasJdEmbeddingsCache": cached_jd is not None,
+            "jdEmbeddingCacheHit": is_jd_cache_hit,
             "jdEmbeddingComputed": jd_embedding_computed,
-            "resumeEmbeddingsComputedOnDemand": resume_embeddings_computed_on_demand,
         },
     }
 
@@ -385,15 +349,16 @@ async def analyze_resume_vs_jd(
     if existing_row:
         existing_row.resume_id = resume_id
         existing_row.job_data = job_doc
+        existing_row.jd_embedding = jd_embedding
     else:
         new_job = Job(
             job_id=final_job_id,
             user_id=user_id,
             resume_id=resume_id,
             job_data=job_doc,
+            jd_embedding=jd_embedding,
         )
         db.add(new_job)
 
     await db.commit()
-
     return job_doc

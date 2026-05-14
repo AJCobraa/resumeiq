@@ -39,7 +39,7 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["http://localhost:5173/*"],
+      "matches": ["http://localhost:5173/*", "http://127.0.0.1:5173/*"],
       "js": ["auth-sync.js"]
     }
   ],

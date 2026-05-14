@@ -106,9 +106,8 @@ Return ONLY valid JSON in this exact format:
   "strongMatches": ["match1", "match2"],
   "recommendations": [
     {{
-      "type": "rewrite_bullet" | "add_skill" | "add_section",
-      "section": "experience" | "projects" | "skills" | "education",
-      "currentText": "exact current text being changed (empty string if adding new)",
+      "type": "experience" | "projects" | "skills" | "summary",
+      "currentText": "the exact text being changed",
       "suggestedText": "the improved rewritten text",
       "reason": "why this change improves ATS matching",
       "impact": "high" | "medium" | "low",
@@ -126,13 +125,16 @@ RULES FOR ATS SCORING:
   - formatScore: Is the resume well-structured and ATS-readable?
 
 RULES FOR RECOMMENDATIONS (generate 3-7):
-- Identify the EXACT bullet point or section to change
+- Identify the EXACT bullet point, skill category, or summary to change
 - Provide a REWRITTEN version that naturally incorporates missing keywords
+- currentText MUST match the resume EXACTLY:
+    - For "experience" or "projects": pick the exact bullet text.
+    - For "skills": use the EXACT category label (e.g. "Languages", "Frameworks").
+    - For "summary": use the EXACT existing professional summary text.
 - Rewrites must be truthful — never fabricate experience or skills
 - Each rewrite must be specific, quantified where possible, action-verb-led
 - Explain WHY this change improves ATS compatibility
-- Do NOT simplify or shorten bullet points — make them MORE detailed and keyword-rich
-- currentText must match the resume EXACTLY (used for programmatic lookup)"""
+- Do NOT simplify or shorten bullet points — make them MORE detailed and keyword-rich"""
 
     return await _call_model_json(prompt, user_id=user_id, operation="analyze_and_recommend")
 

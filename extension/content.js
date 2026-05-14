@@ -45,26 +45,44 @@ function extractLinkedIn() {
     const text = (raw || '').trim();
     if (!text) return '';
 
-    // Remove known UI boilerplate fragments that frequently pollute the right panel extraction.
+    // 1. Per-line filtering for known LinkedIn UI noise
     const boilerplatePatterns = [
-      /Get job alerts for this search[\s\S]*$/i,
-      /Are these results helpful\?[\s\S]*$/i,
-      /About Accessibility Help Center Privacy[\s\S]*$/i,
-      /LinkedIn Corporation © \d{4}[\s\S]*$/i,
-      /Reactivate Premium[\s\S]*$/i,
-      /Job search faster with Premium[\s\S]*$/i,
-      /Interested in working with us in the future\?[\s\S]*$/i,
+      /99\+\s+results/i,
+      /promoted jobs are ranked/i,
+      /Viewed\s+·\s+Posted on/i,
+      /Easy Apply/i,
+      /Get job alerts for this search/i,
+      /Are these results helpful\?/i,
+      /About Accessibility Help Center Privacy/i,
+      /LinkedIn Corporation © \d{4}/i,
+      /Reactivate Premium/i,
+      /Job search faster with Premium/i,
+      /Interested in working with us in the future\?/i,
+      /See who you know at/i,
+      /how promoted jobs are ranked/i,
+      /results matching your search/i,
+      /Save this job/i,
+      /Share this job/i,
+      /Report this job/i,
+      /Show more/i,
+      /See more jobs like this/i
     ];
 
-    let cleaned = text;
-    for (const pattern of boilerplatePatterns) {
-      cleaned = cleaned.replace(pattern, '').trim();
-    }
+    let lines = text.split('\n');
+    let filteredLines = lines.filter(line => {
+      const trimmed = line.trim();
+      if (!trimmed) return true; // Keep empty lines for spacing
+      return !boilerplatePatterns.some(pattern => pattern.test(trimmed));
+    });
 
-    // Prefer slicing from true JD anchors when present.
+    let cleaned = filteredLines.join('\n').trim();
+
+    // 2. Anchor-based trimming: "About the job" is the gold standard anchor.
+    // If we find it, and there's still suspicious noise before it, we slice.
     const anchors = [
       'About the job',
-      'What Do We Do',
+      'Job Description',
+      'The Role',
       'Key Responsibilities',
       'Requirements',
       'Tech Stack',
@@ -78,29 +96,37 @@ function extractLinkedIn() {
       }
     }
 
-    if (anchorIndex > 0) {
-      cleaned = cleaned.slice(anchorIndex).trim();
+    // Only trim if the anchor is relatively early and we suspect noise before it
+    if (anchorIndex > 0 && anchorIndex < 1000) {
+      const before = cleaned.slice(0, anchorIndex);
+      // If the part before anchor contains common noise keywords not caught by per-line (e.g. fragments)
+      if (/results|promoted|posted|apply/i.test(before)) {
+        cleaned = cleaned.slice(anchorIndex).trim();
+      }
     }
 
     return cleaned;
   };
 
-  const container = document.querySelector('.jobs-search__job-details--container')
+  const container = document.querySelector('.jobs-search__job-details--wrapper')
+    || document.querySelector('.jobs-search__job-details--container')
     || document.querySelector('.job-view-layout')
     || document.querySelector('.jobs-details__main-content')
     || document.querySelector('.scaffold-layout__detail')
+    || document.querySelector('.jobs-unified-top-card')
     || document.querySelector('main')
     || document;
 
   let title = firstText([
     '.job-details-jobs-unified-top-card__job-title',
     '.job-details-jobs-unified-top-card__job-title-link',
+    '.jobs-unified-top-card__job-title',
+    'h1.t-24.t-bold.inline',
+    'h1.t-24.t-bold',
     'h1.ember-view',
     '.job-title',
     '.t-24.t-bold',
-    'h1.t-24.t-bold',
     'h2.t-24',
-    '.jobs-unified-top-card__job-title',
     '.jobs-details-top-card__job-title',
     '.jobs-search__job-details--container h1',
     '.jobs-search__job-details--container h2',
@@ -169,12 +195,12 @@ function extractLinkedIn() {
   const cleanedTitle = normalize(title);
   let cleanedJd = normalize(cleanLinkedInJdText(jdText));
 
-  // If search/feed text is prepended, trim to selected title occurrence.
+  // Final sanity check: If search/feed text is still prepended, trim to selected title occurrence.
   if (cleanedTitle) {
     const titleIdx = cleanedJd.toLowerCase().indexOf(cleanedTitle.toLowerCase());
-    if (titleIdx > 0) {
+    if (titleIdx > 0 && titleIdx < 800) {
       const before = cleanedJd.slice(0, titleIdx);
-      if (/99\+\s+results|promoted jobs are ranked|Viewed · Posted on|Easy Apply/i.test(before)) {
+      if (/99\+\s+results|promoted jobs are ranked|Viewed · Posted on|Easy Apply|Save/i.test(before)) {
         cleanedJd = cleanedJd.slice(titleIdx).trim();
       }
     }
