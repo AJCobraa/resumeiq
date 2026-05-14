@@ -24,12 +24,13 @@ PR_TITLE       = os.environ.get("PR_TITLE", "Untitled PR")
 PR_AUTHOR      = os.environ.get("PR_AUTHOR", "Unknown")
 
 MODELS_TO_TRY = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
+    "gemini-3.1-flash-lite",  # Best quality available; use first
+    "gemini-3.0-flash", # Fast, strong fallback
+    "gemini-2.5-flash",    
     "gemini-1.5-flash",
+    "gemma-3-27b"  # Reliable last resort
 ]
-
-MAX_DIFF_CHARS = 100_000
+MAX_DIFF_CHARS = 1_000_000
 
 SYSTEM_PROMPT = """
 You are a Principal Engineer and Tech Lead doing a design & simplicity review
