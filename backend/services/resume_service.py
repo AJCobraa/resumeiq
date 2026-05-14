@@ -1,29 +1,21 @@
 """
-Resume Firestore service — all database operations for resumes.
-Handles CRUD, section management, and data serialization for Firestore.
+Resume PostgreSQL service — all database operations for resumes.
+Handles CRUD, section management, and data serialization via JSONB.
 Used by AI services for context generation.
+
+All data stored in `resumes.resume_data` JSONB column.
 """
 import uuid
 from datetime import datetime, timezone
-from firebase_admin_init import db
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete
+from sqlalchemy.orm.attributes import flag_modified
+from models.postgres_schema import Resume, Job
 from models.resume_model import ResumeMeta
 
 
 def _now():
     return datetime.now(timezone.utc).isoformat()
-
-
-def _invalidate_embeddings_cache(ref) -> None:
-    """
-    Null out embeddingsCache so the next analysis recomputes fresh embeddings.
-    Uses Firestore .update() — only touches embeddingsCache, all other fields
-    including resumeTitle, meta, sections remain completely intact.
-
-    Called only on saves that change embeddable content.
-    NOT called on title-only saves — resumeTitle is not embedded.
-    NOT called on template saves — templateId is visual only.
-    """
-    ref.update({"embeddingsCache": None})
 
 
 def _make_blank_resume(uid: str, title: str, template_id: str = "cobra") -> dict:
@@ -100,19 +92,20 @@ def _make_blank_resume(uid: str, title: str, template_id: str = "cobra") -> dict
     }
 
 
-def _resume_ref(uid: str, resume_id: str):
-    """Get Firestore document reference for a specific resume."""
-    return db.collection("users").document(uid).collection("resumes").document(resume_id)
-
-
-async def create_resume(uid: str, title: str, template_id: str = "cobra") -> dict:
+async def create_resume(db: AsyncSession, uid: str, title: str, template_id: str = "cobra") -> dict:
     """Create a new blank resume for the user."""
     resume_id, data = _make_blank_resume(uid, title, template_id)
-    _resume_ref(uid, resume_id).set(data)
+    row = Resume(
+        resume_id=resume_id,
+        user_id=uid,
+        resume_data=data,
+    )
+    db.add(row)
+    await db.commit()
     return data
 
 
-async def create_resume_from_parsed(uid: str, parsed: dict, title: str = "Imported Resume", template_id: str = "cobra") -> dict:
+async def create_resume_from_parsed(db: AsyncSession, uid: str, parsed: dict, title: str = "Imported Resume", template_id: str = "cobra") -> dict:
     """
     Create a resume populated from Gemma-parsed PDF data.
     `parsed` must contain `meta` and `sections` keys matching the schema.
@@ -211,142 +204,201 @@ async def create_resume_from_parsed(uid: str, parsed: dict, title: str = "Import
         "updatedAt": _now(),
     }
 
-    _resume_ref(uid, resume_id).set(data)
+    row = Resume(
+        resume_id=resume_id,
+        user_id=uid,
+        resume_data=data,
+    )
+    db.add(row)
+    await db.commit()
     return data
 
 
-async def list_resumes(uid: str) -> list[dict]:
-    """List all resumes for a user (summary fields only)."""
-    docs = (
-        db.collection("users")
-        .document(uid)
-        .collection("resumes")
-        .order_by("updatedAt", direction="DESCENDING")
-        .stream()
+async def list_resumes(db: AsyncSession, uid: str) -> list[dict]:
+    """List all resumes for a user (returns full data for thumbnail render)."""
+    result = await db.execute(
+        select(Resume)
+        .where(Resume.user_id == uid)
+        .order_by(Resume.updated_at.desc())
     )
+    rows = result.scalars().all()
     results = []
-    for doc in docs:
-        d = doc.to_dict()
+    for row in rows:
+        d = row.resume_data or {}
         results.append({
             "resumeId":    d.get("resumeId"),
             "resumeTitle": d.get("resumeTitle", "Untitled"),
             "templateId":  d.get("templateId", "cobra"),
-            "meta":        d.get("meta", {}),        # return full meta — needed for thumbnail render
-            "sections":    d.get("sections", []),    # return full sections — needed for thumbnail render
+            "meta":        d.get("meta", {}),
+            "sections":    d.get("sections", []),
             "updatedAt":   d.get("updatedAt"),
             "createdAt":   d.get("createdAt"),
         })
     return results
 
 
-async def get_resume(uid: str, resume_id: str) -> dict | None:
+async def get_resume(db: AsyncSession, uid: str, resume_id: str) -> dict | None:
     """Get a full resume document."""
-    doc = _resume_ref(uid, resume_id).get()
-    if not doc.exists:
+    result = await db.execute(
+        select(Resume).where(Resume.resume_id == resume_id, Resume.user_id == uid)
+    )
+    row = result.scalar_one_or_none()
+    if not row:
         return None
-    return doc.to_dict()
+    return row.resume_data
 
 
-async def update_meta(uid: str, resume_id: str, updates: dict) -> dict:
+async def _get_resume_row(db: AsyncSession, uid: str, resume_id: str) -> Resume | None:
+    """Get the raw Resume ORM row for updates."""
+    result = await db.execute(
+        select(Resume).where(Resume.resume_id == resume_id, Resume.user_id == uid)
+    )
+    return result.scalar_one_or_none()
+
+
+async def update_meta(db: AsyncSession, uid: str, resume_id: str, updates: dict) -> dict:
     """Patch resume meta fields (partial update)."""
-    ref = _resume_ref(uid, resume_id)
-    doc = ref.get()
-    if not doc.exists:
+    row = await _get_resume_row(db, uid, resume_id)
+    if not row:
         return None
 
-    # Build field-level update to avoid overwriting entire meta
-    patch = {"updatedAt": _now()}
+    data = dict(row.resume_data)  # Make a mutable copy
+    meta = dict(data.get("meta", {}))
     for key, val in updates.items():
         if val is not None:
-            patch[f"meta.{key}"] = val
+            meta[key] = val
+    data["meta"] = meta
+    data["updatedAt"] = _now()
 
-    ref.update(patch)
-    _invalidate_embeddings_cache(ref)
-    return (await get_resume(uid, resume_id))
+    row.resume_data = data
+    flag_modified(row, "resume_data")
+    row.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    return data
 
 
-async def update_sections(uid: str, resume_id: str, sections: list[dict]) -> dict:
-    """Replace the entire sections array (used by the editor's auto-save)."""
-    ref = _resume_ref(uid, resume_id)
-    doc = ref.get()
-    if not doc.exists:
+async def update_sections(db: AsyncSession, uid: str, resume_id: str, sections: list[dict]) -> dict:
+    """Replace the entire sections array (used by the editor's save)."""
+    row = await _get_resume_row(db, uid, resume_id)
+    if not row:
         return None
 
-    ref.update({"sections": sections, "updatedAt": _now()})
-    _invalidate_embeddings_cache(ref)
-    return (await get_resume(uid, resume_id))
+    data = dict(row.resume_data)
+    data["sections"] = sections
+    data["updatedAt"] = _now()
+
+    row.resume_data = data
+    flag_modified(row, "resume_data")
+    row.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    return data
 
 
-async def update_bullet(uid: str, resume_id: str, section_id: str, bullet_id: str, text: str) -> dict:
+async def update_bullet(db: AsyncSession, uid: str, resume_id: str, section_id: str, bullet_id: str, text: str) -> dict:
     """Update a single bullet's text within a section."""
-    ref = _resume_ref(uid, resume_id)
-    doc = ref.get()
-    if not doc.exists:
+    row = await _get_resume_row(db, uid, resume_id)
+    if not row:
         return None
 
-    data = doc.to_dict()
+    data = dict(row.resume_data)
     sections = data.get("sections", [])
 
     for section in sections:
         if section.get("sectionId") == section_id:
             # Handle sections with direct bullets (experience, achievements)
             for bullet in section.get("bullets", []):
+                if bullet.get("bulletId") == bullet_id:
                     bullet["text"] = text
-                    ref.update({"sections": sections, "updatedAt": _now()})
-                    _invalidate_embeddings_cache(ref)
-                    return (await get_resume(uid, resume_id))
+                    data["updatedAt"] = _now()
+                    row.resume_data = data
+                    flag_modified(row, "resume_data")
+                    row.updated_at = datetime.now(timezone.utc)
+                    await db.commit()
+                    return data
             # Handle sections with items containing bullets (projects)
             for item in section.get("items", []):
                 for bullet in item.get("bullets", []):
+                    if bullet.get("bulletId") == bullet_id:
                         bullet["text"] = text
-                        ref.update({"sections": sections, "updatedAt": _now()})
-                        _invalidate_embeddings_cache(ref)
-                        return (await get_resume(uid, resume_id))
+                        data["updatedAt"] = _now()
+                        row.resume_data = data
+                        flag_modified(row, "resume_data")
+                        row.updated_at = datetime.now(timezone.utc)
+                        await db.commit()
+                        return data
 
     return None
 
 
-async def update_template(uid: str, resume_id: str, template_id: str) -> dict:
+async def update_template(db: AsyncSession, uid: str, resume_id: str, template_id: str) -> dict:
     """Update the template ID for a resume."""
-    ref = _resume_ref(uid, resume_id)
-    doc = ref.get()
-    if not doc.exists:
+    row = await _get_resume_row(db, uid, resume_id)
+    if not row:
         return None
 
-    ref.update({"templateId": template_id, "updatedAt": _now()})
-    return (await get_resume(uid, resume_id))
+    data = dict(row.resume_data)
+    data["templateId"] = template_id
+    data["updatedAt"] = _now()
+
+    row.resume_data = data
+    flag_modified(row, "resume_data")
+    row.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    return data
 
 
-async def update_resume_title(uid: str, resume_id: str, title: str) -> dict:
+async def update_resume_title(db: AsyncSession, uid: str, resume_id: str, title: str) -> dict:
     """Update the resume title."""
-    ref = _resume_ref(uid, resume_id)
-    doc = ref.get()
-    if not doc.exists:
+    row = await _get_resume_row(db, uid, resume_id)
+    if not row:
         return None
 
-    ref.update({"resumeTitle": title, "updatedAt": _now()})
-    return (await get_resume(uid, resume_id))
+    data = dict(row.resume_data)
+    data["resumeTitle"] = title
+    data["updatedAt"] = _now()
+
+    row.resume_data = data
+    flag_modified(row, "resume_data")
+    row.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    return data
 
 
-async def delete_resume(uid: str, resume_id: str) -> bool:
+async def delete_resume(db: AsyncSession, uid: str, resume_id: str) -> bool:
     """
     Delete a resume.
     Instead of cascade-deleting jobs, mark all affected jobs with
     resumeTitle='__deleted__' so the UI can show a deleted state
     while preserving all analysis history.
+
+    Explicitly deletes child resume_embeddings rows BEFORE the resume
+    to avoid FK constraint violations and AsyncSession lazy-loading
+    issues (MissingGreenlet) with ORM-level cascades.
     """
-    ref = _resume_ref(uid, resume_id)
-    doc = ref.get()
-    if not doc.exists:
+    from models.postgres_schema import ResumeEmbedding
+
+    row = await _get_resume_row(db, uid, resume_id)
+    if not row:
         return False
 
     # Mark all jobs that used this resume as having a deleted resume
-    jobs_ref = db.collection("users").document(uid).collection("jobs")
-    jobs = jobs_ref.where("resumeId", "==", resume_id).stream()
-    for job in jobs:
-        job.reference.update({"resumeTitle": "__deleted__"})
+    jobs_result = await db.execute(
+        select(Job).where(Job.user_id == uid, Job.resume_id == resume_id)
+    )
+    for job_row in jobs_result.scalars().all():
+        job_data = dict(job_row.job_data or {})
+        job_data["resumeTitle"] = "__deleted__"
+        job_row.job_data = job_data
+        flag_modified(job_row, "job_data")
 
-    ref.delete()
+    # Explicitly delete child embeddings to avoid FK constraint violation
+    # (AsyncSession cannot lazy-load the ORM cascade relationship)
+    await db.execute(
+        delete(ResumeEmbedding).where(ResumeEmbedding.resume_id == resume_id)
+    )
+
+    await db.delete(row)
+    await db.commit()
     return True
 
 
@@ -355,7 +407,7 @@ def summarize_resume(data: dict) -> str:
     Summarize resume data into a compact text format for AI context.
     Focuses on role, summary, and experience highlights.
     """
-    meta = data.get("meta", {})
+    meta = data.get("meta") or {}
     summary = [
         f"Name: {meta.get('name')}",
         f"Title: {meta.get('title')}",

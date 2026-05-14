@@ -527,80 +527,50 @@ function JobDetailPanel({ job, resumes, onStatusChange, onRecommendation, onRean
               </div>
             )}
 
-            {/* Matched Keywords */}
-            {job.strongMatches?.length > 0 && (
+            {/* Keyword Match Detail (ATS) */}
+            {(job.strongMatches?.length > 0 || job.missingKeywords?.length > 0) && (
               <div className="bg-card rounded-xl border border-border/60 p-5">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">
-                  Matched Keywords
-                </p>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Keyword Analysis (ATS)
+                  </p>
+                  <div className="flex gap-3 text-[10px] font-medium">
+                    <span className="text-emerald-600 flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Matched
+                    </span>
+                    <span className="text-destructive flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-destructive" /> Missing
+                    </span>
+                  </div>
+                </div>
+                
                 <div className="flex flex-wrap gap-2">
-                  {job.strongMatches.map((kw, i) => (
+                  {job.strongMatches?.map((kw, i) => (
                     <span
-                      key={i}
-                      className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-full"
+                      key={`strong-${i}`}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-emerald-500/5 text-emerald-600 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/10 transition-colors"
                     >
-                      ✓ {kw}
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                      {kw}
+                    </span>
+                  ))}
+                  {job.missingKeywords?.map((kw, i) => (
+                    <span
+                      key={`missing-${i}`}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-destructive/5 text-destructive border border-destructive/20 rounded-lg hover:bg-destructive/10 transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      {kw}
                     </span>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Missing Keywords */}
-            {job.missingKeywords?.length > 0 && (
-              <div className="bg-card rounded-xl border border-border/60 p-5">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">
-                  Missing Keywords
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {job.missingKeywords.map((kw, i) => (
-                    <span
-                      key={i}
-                      className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium bg-destructive/10 text-destructive border border-destructive/20 rounded-full"
-                    >
-                      ✕ {kw}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Semantic JD Match — line by line */}
-            {job.semanticDetails?.length > 0 && (
-              <div className="bg-card rounded-xl border border-border/60 p-5">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">
-                  Semantic JD Match (Line by Line)
-                </p>
-                <div className="space-y-2">
-                  {job.semanticDetails.map((detail, i) => {
-                    let rowColor = 'border-border/30 bg-background'
-                    let badgeColor = 'bg-secondary text-muted-foreground'
-                    let textColor = 'text-muted-foreground'
-                    if (detail.score >= 65) {
-                      rowColor = 'border-emerald-200 bg-emerald-50/40'
-                      badgeColor = 'bg-emerald-100 text-emerald-600'
-                      textColor = 'text-emerald-700'
-                    } else if (detail.score >= 40) {
-                      rowColor = 'border-orange-200 bg-orange-50/40'
-                      badgeColor = 'bg-orange-100 text-orange-500'
-                      textColor = 'text-orange-600'
-                    } else {
-                      rowColor = 'border-red-200 bg-red-50/40'
-                      badgeColor = 'bg-red-100 text-destructive'
-                      textColor = 'text-destructive'
-                    }
-                    return (
-                      <div key={i} className={`text-xs p-3 rounded-xl border ${rowColor} flex gap-3 items-start`}>
-                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold ${badgeColor} shrink-0 font-mono`}>
-                          {detail.score}%
-                        </span>
-                        <span className={`leading-snug ${textColor}`}>{detail.text}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* Dev-only debug diagnostics */}
             {showDebug && (

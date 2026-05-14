@@ -22,35 +22,49 @@ from google import genai
 # Lazy init
 _client = None
 MODEL = "gemma-4-31b-it"
+import re
+
+def _clean_json_response(text: str) -> str:
+    """Strip markdown code fences (```json ... ```) if present."""
+    if not text:
+        return ""
+    text = text.strip()
+    # Remove markdown code blocks
+    text = re.sub(r'^```json\s*', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'^```\s*', '', text)
+    text = re.sub(r'\s*```$', '', text)
+    return text.strip()
 
 
 def _get_client():
     global _client
     if _client is None:
-        api_key = os.environ.get("GOOGLE_AI_STUDIO_API_KEY", "")
-        _client = genai.Client(api_key=api_key)
+        app_env = os.environ.get("APP_ENV", "dev")
+        if app_env == "prod":
+            # Uses standard Google Cloud authentication automatically (Vertex AI)
+            _client = genai.Client(vertexai=True)
+        else:
+            api_key = os.environ.get("GOOGLE_AI_STUDIO_API_KEY", "")
+            _client = genai.Client(api_key=api_key)
     return _client
 
 
 def _fire_log(user_id: str, operation: str, input_tokens: int, output_tokens: int, latency_ms: float, is_cache_hit: bool = False):
-    """Fire-and-forget model usage log in a daemon thread."""
-    def _log():
-        try:
-            from services.model_logger import log_model_call
-            log_model_call(
-                user_id=user_id,
-                model=MODEL,
-                operation=operation,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                latency_ms=latency_ms,
-                is_cache_hit=is_cache_hit,
-            )
-        except Exception:
-            pass
+    """Fire-and-forget model usage log on the running event loop."""
+    try:
+        import asyncio
+        from services.model_logger import log_model_call
+        loop = asyncio.get_running_loop()
+        loop.create_task(log_model_call(
+            user_id=user_id,
+            model=MODEL,
+            operation=operation,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        ))
+    except Exception:
+        pass
 
-    t = threading.Thread(target=_log, daemon=True)
-    t.start()
 
 
 
@@ -92,9 +106,8 @@ Return ONLY valid JSON in this exact format:
   "strongMatches": ["match1", "match2"],
   "recommendations": [
     {{
-      "type": "rewrite_bullet" | "add_skill" | "add_section",
-      "section": "experience" | "projects" | "skills" | "education",
-      "currentText": "exact current text being changed (empty string if adding new)",
+      "type": "experience" | "projects" | "skills" | "summary",
+      "currentText": "the exact text being changed",
       "suggestedText": "the improved rewritten text",
       "reason": "why this change improves ATS matching",
       "impact": "high" | "medium" | "low",
@@ -112,13 +125,16 @@ RULES FOR ATS SCORING:
   - formatScore: Is the resume well-structured and ATS-readable?
 
 RULES FOR RECOMMENDATIONS (generate 3-7):
-- Identify the EXACT bullet point or section to change
+- Identify the EXACT bullet point, skill category, or summary to change
 - Provide a REWRITTEN version that naturally incorporates missing keywords
+- currentText MUST match the resume EXACTLY:
+    - For "experience" or "projects": pick the exact bullet text.
+    - For "skills": use the EXACT category label (e.g. "Languages", "Frameworks").
+    - For "summary": use the EXACT existing professional summary text.
 - Rewrites must be truthful — never fabricate experience or skills
 - Each rewrite must be specific, quantified where possible, action-verb-led
 - Explain WHY this change improves ATS compatibility
-- Do NOT simplify or shorten bullet points — make them MORE detailed and keyword-rich
-- currentText must match the resume EXACTLY (used for programmatic lookup)"""
+- Do NOT simplify or shorten bullet points — make them MORE detailed and keyword-rich"""
 
     return await _call_model_json(prompt, user_id=user_id, operation="analyze_and_recommend")
 
@@ -272,8 +288,12 @@ async def _call_model_json(prompt: str, user_id: str = "", operation: str = "") 
                 },
             )
             latency_ms = (time.monotonic() - t0) * 1000
+            
+            raw_text = response.text
+            cleaned_text = _clean_json_response(raw_text)
+            parsed_json = json.loads(cleaned_text)
 
-            # Log token usage (fire-and-forget)
+            # Log token usage (fire-and-forget) - ONLY AFTER SUCCESSFUL PARSING
             if user_id:
                 meta = response.usage_metadata
                 _fire_log(
@@ -284,7 +304,7 @@ async def _call_model_json(prompt: str, user_id: str = "", operation: str = "") 
                     latency_ms=latency_ms,
                 )
 
-            return json.loads(response.text)
+            return parsed_json
         except Exception:
             if attempt == 0:
                 await asyncio.sleep(2)
@@ -308,8 +328,9 @@ async def _call_model_text(prompt: str, user_id: str = "", operation: str = "") 
                 },
             )
             latency_ms = (time.monotonic() - t0) * 1000
+            result_text = response.text.strip()
 
-            # Log token usage (fire-and-forget)
+            # Log token usage (fire-and-forget) - ONLY AFTER SUCCESSFUL RETRIEVAL
             if user_id:
                 meta = response.usage_metadata
                 _fire_log(
@@ -320,7 +341,7 @@ async def _call_model_text(prompt: str, user_id: str = "", operation: str = "") 
                     latency_ms=latency_ms,
                 )
 
-            return response.text.strip()
+            return result_text
         except Exception:
             if attempt == 0:
                 await asyncio.sleep(2)

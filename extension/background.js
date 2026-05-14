@@ -49,11 +49,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Proxy fetch for content scripts (to bypass LinkedIn CSP/CORS)
     const { url, options } = request;
     
+    console.log(`[ResumeIQ] Proxy Fetching: ${url}`, options);
+
     fetch(url, options)
       .then(async (res) => {
         const text = await res.text();
         let json = null;
         try { json = JSON.parse(text); } catch (e) {}
+
+        console.log(`[ResumeIQ] Fetch Response (${res.status}): ${url}`);
 
         sendResponse({
           ok: res.ok,
@@ -64,7 +68,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
       })
       .catch((err) => {
-        console.error('Background Fetch Error:', err);
+        console.error('[ResumeIQ] Background Fetch Error:', err);
         sendResponse({ 
           ok: false, 
           status: 0,

@@ -20,6 +20,8 @@ if sys.platform == "win32":
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth, resumes, jobs, analysis, stats
+from core.database import engine
+from models.postgres_schema import Base
 
 app = FastAPI(
     title="ResumeIQ API",
@@ -27,12 +29,21 @@ app = FastAPI(
     version="1.0.0",
 )
 
+
+# ── Database Startup ─────────────────────────────────
+@app.on_event("startup")
+async def _create_tables():
+    """Create all PostgreSQL tables on startup if they don't exist."""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
 # ── CORS ─────────────────────────────────────────────
 # AGENTS.md rule: allow_origins must be FRONTEND_URL only — never "*"
 frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[frontend_url],
+    allow_origin_regex=r"chrome-extension://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

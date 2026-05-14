@@ -54,10 +54,10 @@ function destroyResumeIQSidebar() {
 
 function getRiqBackendUrl() {
   const config = globalThis.CONFIG || {};
-  const url = config.backendUrl || 'http://localhost:8000';
+  const url = config.backendUrl || 'http://localhost:8001';
   // Safety: if somehow a bad value crept in, hard-reset to localhost
-  if (!url || url.startsWith('chrome-extension') || url === 'undefined') {
-    return 'http://localhost:8000';
+  if (!url || url.startsWith('chrome-extension') || url === 'undefined' || url === 'null') {
+    return 'http://localhost:8001';
   }
   return url.replace(/\/$/, ''); // strip trailing slash
 }
@@ -117,6 +117,8 @@ function findInjectionPoint() {
   if (host.includes('linkedin.com')) {
     // Try multiple selectors — LinkedIn changes their DOM regularly
     const selectors = [
+      '.jobs-search__job-details--wrapper',
+      '.jobs-unified-top-card',
       '.job-details-jobs-unified-top-card__container--two-pane',
       '.job-details-jobs-unified-top-card__top-buttons',
       '.jobs-apply-button--top-card',
@@ -127,7 +129,7 @@ function findInjectionPoint() {
     ];
     for (const sel of selectors) {
       const el = document.querySelector(sel);
-      if (el) return { element: el, position: 'afterend' };
+      if (el) return { element: el, position: 'afterbegin' };
     }
     // Fallback: find the job title h1 and insert after its parent
     const h1 = document.querySelector(

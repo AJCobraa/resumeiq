@@ -1,11 +1,11 @@
 """
-Resume CRUD router — full implementation for Phase 2 + Phase 3 embedding cache.
-All routes require authentication via verify_token.
+Resume CRUD router — all routes require authentication via verify_token.
+Data operations use PostgreSQL via AsyncSession.
 Embedding cache is recomputed on every resume save (not on every analysis).
 
-PDF Import (Section 19.1):
+PDF Import:
   - POST /api/resumes/import-pdf — accepts UploadFile, extracts text via pdfplumber,
-    parses structure via Gemma, saves to Firestore, triggers embedding cache.
+    parses structure via Gemma, saves to PostgreSQL, triggers embedding cache.
 """
 import os
 import uuid
@@ -13,7 +13,9 @@ import asyncio
 import tempfile
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
+from sqlalchemy.ext.asyncio import AsyncSession
 from firebase_admin_init import verify_token
+from core.database import get_db_session
 from models.resume_model import (
     CreateResumeRequest,
     UpdateMetaRequest,
@@ -27,47 +29,59 @@ router = APIRouter(prefix="/api", tags=["resumes"])
 
 
 # ── Background embedding refresh ────────────────────
-def _refresh_embeddings(uid: str, resume_id: str, resume: dict):
-    """Fire-and-forget embedding cache refresh (runs in background thread)."""
+async def _refresh_embeddings(uid: str, resume_id: str, resume: dict):
+    """Fire-and-forget embedding cache refresh (runs in FastAPI background task on main event loop)."""
     try:
         from services import embedding_service
-        asyncio.run(embedding_service.update_embeddings_cache(uid, resume_id, resume))
-    except Exception:
-        pass  # Background task — never crash the request
+        await embedding_service.update_embeddings_cache(uid, resume_id, resume)
+    except Exception as e:
+        print(f"Embedding refresh failed: {e}")  # Background task — never crash the request
 
 
 @router.get("/resumes")
-async def get_resumes(uid: str = Depends(verify_token)):
-    """List all resumes for authenticated user (summary only)."""
-    return await resume_service.list_resumes(uid)
+async def get_resumes(
+    uid: str = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """List all resumes for authenticated user."""
+    return await resume_service.list_resumes(db, uid)
 
 
 @router.get("/resumes/{resume_id}")
-async def get_resume(resume_id: str, uid: str = Depends(verify_token)):
+async def get_resume(
+    resume_id: str,
+    uid: str = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
+):
     """Get full resume by ID."""
-    resume = await resume_service.get_resume(uid, resume_id)
+    resume = await resume_service.get_resume(db, uid, resume_id)
     if not resume:
         raise HTTPException(status_code=404, detail="Resume not found")
-    resume.pop("embeddingsCache", None)  # Strip large embedding data from frontend response
     return resume
 
 
 @router.post("/resumes", status_code=201)
-async def create_resume(body: CreateResumeRequest, uid: str = Depends(verify_token)):
+async def create_resume(
+    body: CreateResumeRequest,
+    uid: str = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
+):
     """Create a new blank resume."""
-    return await resume_service.create_resume(uid, body.title, body.templateId or "cobra")
+    return await resume_service.create_resume(db, uid, body.title, body.templateId or "cobra")
 
 
 @router.patch("/resumes/{resume_id}/meta")
 async def update_meta(
     resume_id: str, body: UpdateMetaRequest,
-    bg: BackgroundTasks, uid: str = Depends(verify_token),
+    bg: BackgroundTasks,
+    uid: str = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
 ):
     """Update resume meta fields (partial). Refreshes embedding cache."""
     updates = body.model_dump(exclude_none=True)
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
-    result = await resume_service.update_meta(uid, resume_id, updates)
+    result = await resume_service.update_meta(db, uid, resume_id, updates)
     if not result:
         raise HTTPException(status_code=404, detail="Resume not found")
     bg.add_task(_refresh_embeddings, uid, resume_id, result)
@@ -77,13 +91,15 @@ async def update_meta(
 @router.patch("/resumes/{resume_id}/sections")
 async def update_sections(
     resume_id: str, body: dict,
-    bg: BackgroundTasks, uid: str = Depends(verify_token),
+    bg: BackgroundTasks,
+    uid: str = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
 ):
-    """Replace the entire sections array (editor auto-save). Refreshes embedding cache."""
+    """Replace the entire sections array (editor save). Refreshes embedding cache."""
     sections = body.get("sections")
     if sections is None:
         raise HTTPException(status_code=400, detail="Missing 'sections' array")
-    result = await resume_service.update_sections(uid, resume_id, sections)
+    result = await resume_service.update_sections(db, uid, resume_id, sections)
     if not result:
         raise HTTPException(status_code=404, detail="Resume not found")
     bg.add_task(_refresh_embeddings, uid, resume_id, result)
@@ -93,11 +109,13 @@ async def update_sections(
 @router.patch("/resumes/{resume_id}/bullet")
 async def update_bullet(
     resume_id: str, body: UpdateBulletRequest,
-    bg: BackgroundTasks, uid: str = Depends(verify_token),
+    bg: BackgroundTasks,
+    uid: str = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
 ):
     """Update a single bullet's text. Refreshes embedding cache."""
     result = await resume_service.update_bullet(
-        uid, resume_id, body.sectionId, body.bulletId, body.text
+        db, uid, resume_id, body.sectionId, body.bulletId, body.text
     )
     if not result:
         raise HTTPException(status_code=404, detail="Resume or bullet not found")
@@ -106,30 +124,42 @@ async def update_bullet(
 
 
 @router.patch("/resumes/{resume_id}/template")
-async def update_template(resume_id: str, body: UpdateTemplateRequest, uid: str = Depends(verify_token)):
+async def update_template(
+    resume_id: str, body: UpdateTemplateRequest,
+    uid: str = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
+):
     """Update template ID."""
-    result = await resume_service.update_template(uid, resume_id, body.templateId)
+    result = await resume_service.update_template(db, uid, resume_id, body.templateId)
     if not result:
         raise HTTPException(status_code=404, detail="Resume not found")
     return result
 
 
 @router.patch("/resumes/{resume_id}/title")
-async def update_title(resume_id: str, body: dict, uid: str = Depends(verify_token)):
+async def update_title(
+    resume_id: str, body: dict,
+    uid: str = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
+):
     """Update resume title."""
     title = body.get("title")
     if not title:
         raise HTTPException(status_code=400, detail="Missing 'title'")
-    result = await resume_service.update_resume_title(uid, resume_id, title)
+    result = await resume_service.update_resume_title(db, uid, resume_id, title)
     if not result:
         raise HTTPException(status_code=404, detail="Resume not found")
     return result
 
 
 @router.delete("/resumes/{resume_id}")
-async def delete_resume(resume_id: str, uid: str = Depends(verify_token)):
-    """Delete a resume and associated jobs."""
-    deleted = await resume_service.delete_resume(uid, resume_id)
+async def delete_resume(
+    resume_id: str,
+    uid: str = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Delete a resume. Preserves job analysis history."""
+    deleted = await resume_service.delete_resume(db, uid, resume_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Resume not found")
     return {"deleted": True}
@@ -141,6 +171,7 @@ async def import_pdf(
     file: UploadFile = File(...),
     templateId: str = Form("cobra"),
     uid: str = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
 ):
     """
     Import a resume from a PDF file.
@@ -150,7 +181,7 @@ async def import_pdf(
       2. Write to /tmp/ (containers are stateless — no permanent storage)
       3. Extract text via pdfplumber
       4. Parse structure via Gemma 4
-      5. Save to Firestore with server-generated UUIDs
+      5. Save to PostgreSQL with server-generated UUIDs
       6. Trigger background embedding cache
     """
     # Validate file type
@@ -191,6 +222,10 @@ async def import_pdf(
         if len(title) > 60:
             title = title[:60]
 
+        # Check and deduct coins for PDF parsing AND embedding upfront (Batch)
+        from core import budget_guard
+        await budget_guard.deduct_coins_batch(db, uid, ["parse_resume_pdf", "embed_resume"])
+
         # Parse via Gemma
         from services import gemma_service
         parsed = await gemma_service.parse_resume_from_text(raw_text, user_id=uid)
@@ -198,8 +233,8 @@ async def import_pdf(
         if not isinstance(parsed, dict) or "meta" not in parsed:
             raise HTTPException(status_code=422, detail="AI failed to parse resume structure from PDF text")
 
-        # Save to Firestore
-        resume = await resume_service.create_resume_from_parsed(uid, parsed, title=title, template_id=templateId)
+        # Save to PostgreSQL
+        resume = await resume_service.create_resume_from_parsed(db, uid, parsed, title=title, template_id=templateId)
 
         # Trigger embedding cache in background
         bg.add_task(_refresh_embeddings, uid, resume["resumeId"], resume)
@@ -209,6 +244,8 @@ async def import_pdf(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"PDF import failed: {str(e)}")
     finally:
         # Always clean up temp file
@@ -220,11 +257,15 @@ async def import_pdf(
 
 
 @router.post("/resumes/{resume_id}/export-pdf")
-async def export_pdf(resume_id: str, body: ExportPDFRequest, uid: str = Depends(verify_token)):
+async def export_pdf(
+    resume_id: str, body: ExportPDFRequest,
+    uid: str = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
+):
     """Export resume as PDF via Puppeteer."""
     try:
         from services import pdf_service
-        pdf_bytes = await pdf_service.export_resume_pdf(uid, resume_id, body.templateId)
+        pdf_bytes = await pdf_service.export_resume_pdf(db, uid, resume_id, body.templateId)
         return Response(
             content=pdf_bytes,
             media_type="application/pdf",

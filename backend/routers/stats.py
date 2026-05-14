@@ -1,72 +1,110 @@
 """
 Personal Stats router — aggregates personal usage, ROI, and telemetry stats for the user.
+All data sourced from PostgreSQL coin_transactions and jobs tables.
 """
 from fastapi import APIRouter, Depends, HTTPException
-from firebase_admin_init import db, verify_token
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+from firebase_admin_init import verify_token
+from core.database import get_db_session
+from models.postgres_schema import CoinTransaction, Job, UserCredit, Resume
 from models.stats_model import UserStatsResponse, OperationStat
-from google.cloud import firestore
 
 router = APIRouter(prefix="/api/me", tags=["stats"])
 
+
 @router.get("/stats", response_model=UserStatsResponse)
-async def get_my_stats(uid: str = Depends(verify_token)):
+async def get_my_stats(
+    uid: str = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
+):
     """
     Get user ROI and AI telemetry.
-    Uses pre-aggregated summary to save thousands of reads.
+    Aggregates directly from coin_transactions table — no pre-aggregated summary needed.
     """
     try:
-        print(f"DEBUG: uid={uid}, type(uid)={type(uid)}")
-        # 1. Fetch pre-aggregated summary
-        summary_ref = db.collection("users").document(uid).collection("stats").document("summary")
-        doc = summary_ref.get()
-        print(f"DEBUG: doc exists={doc.exists}")
-        summary = doc.to_dict() or {}
-        print(f"DEBUG: summary={summary}, type={type(summary)}")
+        # 1. Overall totals from coin_transactions
+        totals_result = await db.execute(
+            select(
+                func.count(CoinTransaction.id).label("total_calls"),
+                func.coalesce(func.sum(CoinTransaction.input_tokens), 0).label("total_input"),
+                func.coalesce(func.sum(CoinTransaction.output_tokens), 0).label("total_output"),
+            ).where(CoinTransaction.user_id == uid)
+        )
+        totals = totals_result.one()
+        total_calls = totals.total_calls or 0
+        total_input = totals.total_input or 0
+        total_output = totals.total_output or 0
 
-        # Extract overall totals
-        total_calls = summary.get("totalAiCalls", 0)
-        total_input = summary.get("totalInputTokens", 0)
-        total_output = summary.get("totalOutputTokens", 0)
-        total_latency_ms = summary.get("totalLatencyMs", 0)
-        total_cache_hits = summary.get("cacheHits", 0)
-        
-        # Jobs count from summary (requires backfill/increment implementation)
-        total_jobs = summary.get("totalJobs", 0)
+        # 2. Total jobs count
+        jobs_count_result = await db.execute(
+            select(func.count(Job.job_id)).where(Job.user_id == uid)
+        )
+        total_jobs = jobs_count_result.scalar() or 0
 
-        # Calculate derived stats
-        print(f"DEBUG: total_calls={total_calls}, total_latency={total_latency_ms}")
-        avg_latency = round(total_latency_ms / total_calls, 1) if total_calls > 0 else 0
-        cache_hit_rate = round((total_cache_hits / total_calls) * 100, 1) if total_calls > 0 else 0
+        # 2b. Total resumes count
+        resumes_count_result = await db.execute(
+            select(func.count(Resume.resume_id)).where(Resume.user_id == uid)
+        )
+        total_resumes = resumes_count_result.scalar() or 0
 
-        # 2. Build Operation Breakdown
-        ops_dict = summary.get("operations", {})
+        # 3. Operation breakdown
+        ops_result = await db.execute(
+            select(
+                CoinTransaction.operation,
+                func.count(CoinTransaction.id).label("calls"),
+                func.coalesce(func.sum(CoinTransaction.input_tokens), 0).label("input_tokens"),
+                func.coalesce(func.sum(CoinTransaction.output_tokens), 0).label("output_tokens"),
+            )
+            .where(CoinTransaction.user_id == uid)
+            .group_by(CoinTransaction.operation)
+        )
+        ops_rows = ops_result.all()
+
         operation_breakdown = []
         models_used = set()
 
-        for op_id, op_data in ops_dict.items():
-            calls = op_data.get("calls", 0)
-            if calls == 0:
+        # Map operations to models for display
+        OP_MODEL_MAP = {
+            "analyze_and_recommend": "gemma-4-31b-it",
+            "parse_resume_pdf": "gemma-4-31b-it",
+            "rewrite_bullet": "gemma-4-31b-it",
+            "generate_interview_prep": "gemma-4-31b-it",
+            "embed_resume": "gemini-embedding-001",
+            "embed_jd": "gemini-embedding-001",
+            "embed_jd_sentences": "gemini-embedding-001",
+        }
+
+        for row in ops_rows:
+            if row.calls == 0:
                 continue
-                
-            model = op_data.get("model", "unknown")
+            model = OP_MODEL_MAP.get(row.operation, "unknown")
             models_used.add(model)
-            
             operation_breakdown.append(OperationStat(
-                operation=op_id,
+                operation=row.operation,
                 model=model,
-                calls=calls,
-                inputTokens=op_data.get("inputTokens", 0),
-                outputTokens=op_data.get("outputTokens", 0),
-                avgLatency=round(op_data.get("totalLatencyMs", 0) / calls, 1)
+                calls=row.calls,
+                inputTokens=row.input_tokens,
+                outputTokens=row.output_tokens,
+                avgLatency=0,  # Latency tracking was removed in the Postgres migration
             ))
 
+        # 4. Get coin balance
+        credit_result = await db.execute(
+            select(UserCredit).where(UserCredit.user_id == uid)
+        )
+        credit = credit_result.scalar_one_or_none()
+        coins_balance = credit.coins_balance if credit else 0
+
         return UserStatsResponse(
+            coinsBalance=coins_balance,
+            totalResumes=total_resumes,
             totalJobs=total_jobs,
             totalInputTokens=total_input,
             totalOutputTokens=total_output,
             totalAiCalls=total_calls,
-            cacheHitRate=cache_hit_rate,
-            avgLatencyMs=avg_latency,
+            cacheHitRate=0,  # Cache hit tracking simplified
+            avgLatencyMs=0,  # Latency tracking was removed in the Postgres migration
             modelsUsed=" · ".join(sorted(list(models_used))) if models_used else "None",
             operationBreakdown=operation_breakdown
         )
