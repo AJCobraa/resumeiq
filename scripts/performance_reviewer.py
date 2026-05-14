@@ -23,9 +23,9 @@ MODELS_TO_TRY = [
     "gemma-3-27b"  # Reliable last resort
 ]
 
-# Truncate at ~100k chars (~75k tokens) — gives the model more context
+# Truncate at ~1000k chars (~750k tokens) — gives the model more context
 # while still fitting inside flash context windows safely.
-MAX_DIFF_CHARS = 100_000
+MAX_DIFF_CHARS = 1_000_000
 
 SYSTEM_PROMPT = """
 You are a Staff-Level Performance Architect and Clean Code Reviewer for ResumeIQ,
