@@ -45,7 +45,7 @@ jobs:
 
   # ── Step 2a: Security Agent ──────────────────────────────────────────────────
   security-review:
-    name: Security Agent
+    name: Anupam's Security Team Agent
     needs: generate-diff
     runs-on: ubuntu-latest
     timeout-minutes: 10                  # Prevent runaway jobs
@@ -54,7 +54,7 @@ jobs:
 
     steps:
       - name: Checkout scripts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5    # v5 is current stable; v6 does not exist
@@ -91,7 +91,7 @@ jobs:
 
   # ── Step 2b: Performance Agent ───────────────────────────────────────────────
   performance-review:
-    name: Performance Agent
+    name: Anupam's Performance Team Agent
     needs: generate-diff
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -100,7 +100,7 @@ jobs:
 
     steps:
       - name: Checkout scripts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -137,7 +137,7 @@ jobs:
 
   # ── Step 2c: Design Agent (NEW) ───────────────────────────────────────────────
   design-review:
-    name: Design & Simplicity Agent
+    name: Anupam's Design & Simplicity Team Agent
     needs: generate-diff
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -146,7 +146,7 @@ jobs:
 
     steps:
       - name: Checkout scripts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
