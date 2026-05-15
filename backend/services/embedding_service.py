@@ -139,7 +139,7 @@ async def compute_embeddings(resume: dict, user_id: str = "") -> list[dict]:
                 contents=texts,
             )
             latency_ms = (time.monotonic() - t0) * 1000
-            embeddings = [e.values for e in result.embeddings]
+            embeddings = [list(e.values) for e in result.embeddings]
 
             # Log usage
             if user_id:
@@ -229,7 +229,7 @@ async def get_jd_embedding(text: str, user_id: str = "") -> list[float]:
                 est_tokens = len(text) // 4
                 await _log_embedding_usage(user_id, "embed_jd", est_tokens)
 
-            return result.embeddings[0].values
+            return list(result.embeddings[0].values)
         except Exception:
             if attempt == 0:
                 await asyncio.sleep(2)

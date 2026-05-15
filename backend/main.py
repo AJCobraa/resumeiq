@@ -19,8 +19,9 @@ if sys.platform == "win32":
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import auth, resumes, jobs, analysis, stats
+from routers import auth, resumes, jobs, analysis, stats, billing, webhooks
 from core.database import engine
+from core.webhook_config import print_webhook_url
 from models.postgres_schema import Base
 
 app = FastAPI(
@@ -36,6 +37,11 @@ async def _create_tables():
     """Create all PostgreSQL tables on startup if they don't exist."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Seed billing catalog (plans + top-up packs)
+    from services.billing_service import seed_catalog
+    await seed_catalog()
+    # Print webhook URL for local tunnel testing
+    print_webhook_url()
 
 # ── CORS ─────────────────────────────────────────────
 # AGENTS.md rule: allow_origins must be FRONTEND_URL only — never "*"
@@ -63,3 +69,5 @@ app.include_router(resumes.router)
 app.include_router(jobs.router)
 app.include_router(analysis.router)
 app.include_router(stats.router)
+app.include_router(billing.router)
+app.include_router(webhooks.router)

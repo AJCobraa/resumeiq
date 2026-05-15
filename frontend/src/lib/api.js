@@ -135,4 +135,22 @@ export const api = {
   approveRecommendation:(id, body) => request(`/api/jobs/${id}/recommendation`, 'PATCH', body),
   generateInterviewPrep:(id)       => request(`/api/jobs/${id}/interview-prep`, 'POST'),
   deleteJob:            (id)   => request(`/api/jobs/${id}`, 'DELETE'),
+
+  // ── Billing ────────────────────────────────────────
+  getBillingStatus:       ()                        => request('/api/billing/status'),
+  getBillingCatalog:      ()                        => request('/api/billing/plans/catalog'),
+  createSubscriptionOrder:(planId, cycle, currency = 'INR') =>
+    request('/api/billing/subscription/order', 'POST', {
+      plan_id: planId,
+      billing_cycle: cycle,
+      currency,
+    }),
+  createTopUpOrder:       (packId, currency = 'INR') =>
+    request('/api/billing/topup/order', 'POST', {
+      pack_id: packId,
+      currency,
+    }),
+  verifyPayment:          (body) => request('/api/billing/verify', 'POST', body),
+  cancelSubscription:     (reason) =>
+    request('/api/billing/subscription/cancel', 'POST', { reason }),
 }

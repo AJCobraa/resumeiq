@@ -29,8 +29,8 @@ export default function AppLayout() {
         initial={{ opacity: 0, y: 5 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        style={{ marginLeft: SIDEBAR_WIDTH, height: '100vh' }}
-        className="flex flex-col overflow-hidden"
+        style={{ marginLeft: SIDEBAR_WIDTH, minHeight: '100vh' }}
+        className="flex flex-col overflow-y-auto"
       >
         <Outlet />
       </motion.main>

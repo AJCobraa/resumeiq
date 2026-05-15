@@ -8,7 +8,10 @@ from core.constants import FIXED_COST
 async def deduct_coins(db: AsyncSession, user_id: str, operation: str) -> int:
     """
     Pre-flight coin deduction with strict row-level locking to prevent double-spending.
-    Raises HTTPException (402 Payment Required) if insufficient funds.
+    Deduction priority:
+      1. coins_balance (subscription pool)
+      2. topup_coins_balance (never-expiring pool)
+      3. HTTP 402 if both empty
     Returns the amount deducted.
     """
     if operation not in FIXED_COST:
@@ -26,14 +29,21 @@ async def deduct_coins(db: AsyncSession, user_id: str, operation: str) -> int:
     if not user_credit:
         raise HTTPException(status_code=402, detail="Account not found or no credit balance exists. Please contact support.")
 
-    if user_credit.coins_balance < cost:
+    total_available = user_credit.coins_balance + user_credit.topup_coins_balance
+    if total_available < cost:
         raise HTTPException(
             status_code=402,
             detail="Not enough coins — top up or upgrade your plan"
         )
 
-    # Perform deduction
-    user_credit.coins_balance -= cost
+    # Deduct from subscription pool first, then top-up pool
+    if user_credit.coins_balance >= cost:
+        user_credit.coins_balance -= cost
+    else:
+        # Partial from subscription, remainder from top-up
+        remainder = cost - user_credit.coins_balance
+        user_credit.coins_balance = 0
+        user_credit.topup_coins_balance -= remainder
 
     # Log the transaction (Audit trail)
     # Note: tokens will be updated later by model_logger if this is an AI call.
@@ -54,7 +64,7 @@ async def deduct_coins_batch(db: AsyncSession, user_id: str, operations: list[st
     """
     Batch coin deduction for multi-step processes (e.g. PDF import).
     Atomic upfront check and deduction for ALL involved operations.
-    Raises HTTPException (402 Payment Required) if total cost exceeds balance.
+    Deduction priority: subscription pool → top-up pool → HTTP 402.
     Returns the total amount deducted.
     """
     total_cost = 0
@@ -75,14 +85,20 @@ async def deduct_coins_batch(db: AsyncSession, user_id: str, operations: list[st
             detail="Account not found or no credit balance exists. Please contact support."
         )
 
-    if user_credit.coins_balance < total_cost:
+    total_available = user_credit.coins_balance + user_credit.topup_coins_balance
+    if total_available < total_cost:
         raise HTTPException(
             status_code=402,
-            detail=f"Insufficient coins for this operation. Required: {total_cost}, Balance: {user_credit.coins_balance}"
+            detail=f"Insufficient coins for this operation. Required: {total_cost}, Balance: {total_available}"
         )
 
-    # Perform batch deduction
-    user_credit.coins_balance -= total_cost
+    # Deduct from subscription pool first, then top-up pool
+    if user_credit.coins_balance >= total_cost:
+        user_credit.coins_balance -= total_cost
+    else:
+        remainder = total_cost - user_credit.coins_balance
+        user_credit.coins_balance = 0
+        user_credit.topup_coins_balance -= remainder
 
     # Log each operation separately for clear auditing
     for op in operations:

@@ -453,7 +453,22 @@ Jobs are linked to the resume used for their analysis. If a resume is deleted, t
 
 ## Section 26 — Personal Usage & ROI Stats
 
-**Problem:** Users wanted to see the value ResumeIQ brings (ROI) and monitor their own AI usage/telemetry without needing access to global admin dashboards.
+**Problem:** Users wanted to see the value ResumeIQ brings (ROI) and monitor their own AI usage/telemetry without needing access to global admin dashboards. Additionally, the coin balance display was inconsistent, sometimes showing only subscription coins instead of the total balance.
+
+**Decision:** Implement a comprehensive Personal Stats dashboard that aggregates usage data directly from PostgreSQL and calculates a "Total ROI" based on job search activity.
+
+**Implementation:**
+- **Backend (`routers/stats.py`):**
+    - Aggregates `totalAiCalls`, `inputTokens`, and `outputTokens` directly from `coin_transactions` using SQL `func.sum()`.
+    - Calculates `coins_balance` as the atomic sum of `subscription_coins` + `topup_coins`.
+    - Implements a "Total ROI" metric calculated as `totalJobs * $2.00`. This provides a tangible value metric for the user based on the average market cost of manual resume tailoring ($2 per job).
+- **Frontend (`PersonalStats.jsx`):**
+    - Created a 6-card grid layout (using `xl:grid-cols-6` for responsiveness).
+    - Visualizes AI performance using token-count badges and model usage strings.
+    - Displays the "Total ROI" as a primary value metric with a currency symbol.
+- **Data Integrity:** All stats are computed live from PostgreSQL tables (`coin_transactions`, `jobs`, `resumes`, `user_credits`), ensuring the stats page is always the source of truth for account state.
+
+**Why live SQL aggregation?** Unlike the legacy Firestore pre-aggregation (Section 32), the PostgreSQL implementation handles aggregation efficiently on-the-fly for personal usage. This eliminates the risk of "dirty" counters and ensures the UI matches the actual transaction history perfectly.
 
 ## Section 27 — Dynamic Resume Template Selection
 
@@ -1022,3 +1037,261 @@ While the system still uses a **Snapshot Architecture** (copying `resumeTitle` i
 - **Persistence (SQLAlchemy JSONB):** Explicitly calls `flag_modified(row, "resume_data")` before `db.commit()`. This is critical because SQLAlchemy does not automatically track mutations inside a JSONB blob.
 
 **Why this works:** It provides "graceful degradation" — exact ID matches are fast and precise, while text-based fallbacks and grammar-aware skills parsing ensure that recommendations remain actionable even if the user has made manual edits to the resume since the last analysis run.
+
+---
+
+## Section 39 — Billing & Subscription System
+
+**Problem:** ResumeIQ needed a monetization layer with subscription plans, coin management, top-up packs, and payment processing while maintaining the existing coin-based budget guard system.
+
+**Decision:** Implement Razorpay Standard Checkout with a dual coin pool model (subscription coins + top-up coins) and server-side order creation/verification.
+
+### Architecture
+
+**Dual Coin Pools:**
+- `coins_balance` — Subscription coins. Reset each billing cycle. Deducted first.
+- `topup_coins_balance` — Top-up coins. Never expire. Deducted after subscription pool is empty.
+- `budget_guard.py` uses `SELECT ... FOR UPDATE` row-level locking with the deduction priority: subscription → top-up → HTTP 402.
+
+**Subscription Plans:** Free (100 coins/mo, 1 resume) → Starter (₹415/mo) → Pro (₹1245/mo) → Growth (₹2490/mo, unlimited resumes).
+
+**Billing Cycles:** Monthly (1×), Quarterly (1.10× bonus), Biannual (1.15× bonus).
+
+**Top-up Packs:** Small (5K), Medium (12K), Large (25K). Only available on paid plans.
+
+### Payment Flow
+1. Frontend calls `POST /api/billing/subscription/order` or `POST /api/billing/topup/order`.
+2. Backend creates a Razorpay order via SDK (`asyncio.to_thread`), stores a `pending` `PaymentTransaction`.
+3. Frontend opens Razorpay Standard Checkout with the returned `orderId`.
+4. On success, frontend sends `razorpay_order_id`, `razorpay_payment_id`, `razorpay_signature` to `POST /api/billing/verify`.
+5. Backend verifies HMAC-SHA256 signature, credits coins to the correct pool, creates/updates `Subscription`, updates `User.plan_type`.
+6. The `process_verified_payment` function is idempotent — re-processing a `success` transaction returns the cached result.
+
+### New Files
+| File | Purpose |
+|---|---|
+| `backend/models/billing_model.py` | Pydantic request/response models for billing endpoints |
+| `backend/models/postgres_schema.py` | Added `SubscriptionPlan`, `Subscription`, `TopUpPack`, `PaymentTransaction` tables; extended `UserCredit` with `topup_coins_balance`, `coins_granted_this_period`, `period_start`, `ai_cost_usd_total` |
+| `backend/services/billing_service.py` | Core billing logic — Razorpay integration, coin calculation, order creation, payment verification, catalog seeding |
+| `backend/routers/billing.py` | 6 API endpoints: `/status`, `/plans/catalog`, `/subscription/order`, `/topup/order`, `/verify`, `/subscription/cancel` |
+| `backend/scripts/migrate_add_billing_columns.py` | One-time migration for new columns on `user_credits` |
+| `backend/core/budget_guard.py` | Updated with dual-pool deduction logic |
+| `frontend/src/pages/Plans.jsx` | Plans & Billing page with plan cards, top-up packs, payment history, Razorpay checkout |
+| `frontend/src/components/billing/CoinBalance.jsx` | Sidebar coin balance widget |
+| `frontend/src/lib/api.js` | Extended with 6 billing API methods |
+
+### Environment Variables
+- Backend: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`
+- Frontend: `VITE_RAZORPAY_KEY_ID`
+
+### Security
+- Razorpay key secret NEVER exposed to frontend.
+- All billing routes use `verify_token` dependency.
+- Signature verification uses `hmac.compare_digest` (timing-safe).
+- `process_verified_payment` is idempotent to protect against webhook/retry duplicates.
+- Top-ups blocked for free-plan users at the API level.
+
+---
+
+## Section 41 — Razorpay Webhooks
+
+**Problem:** The existing billing system relied solely on the frontend `/verify` callback to confirm payments. This is fragile — if the user closes their browser mid-payment, the backend never processes the successful charge. Razorpay webhooks provide server-to-server notification of payment and subscription lifecycle events, ensuring no payment is missed.
+
+**Decision:** Add a `POST /api/billing/webhook/razorpay` endpoint that receives, verifies, and idempotently processes Razorpay webhook events. This complements (does not replace) the existing frontend verify flow — whichever fires first credits the coins.
+
+### Why Webhooks Are Complementary to Checkout Verification
+
+The frontend `/verify` flow and webhooks serve the same purpose (confirm payment, credit coins) but cover different failure modes:
+
+| Scenario | Frontend /verify | Webhook |
+|---|---|---|
+| User completes checkout normally | ✅ Handles | ✅ Also fires |
+| User closes browser after paying | ❌ Missed | ✅ Handles |
+| Network failure on callback | ❌ Missed | ✅ Handles |
+| Subscription renewal (recurring) | ❌ N/A | ✅ Only source |
+| Subscription cancellation (external) | ❌ N/A | ✅ Only source |
+
+Both paths call the same idempotent coin-credit logic — processing the same payment twice never double-credits.
+
+### Webhook Signature Verification
+
+Per Razorpay docs: the raw request body must NOT be parsed or cast before signature verification.
+
+```
+signature = HMAC-SHA256(raw_body, RAZORPAY_WEBHOOK_SECRET)
+compare_digest(computed_signature, X-Razorpay-Signature header)
+```
+
+- The `X-Razorpay-Signature` header contains the expected HMAC.
+- `RAZORPAY_WEBHOOK_SECRET` is set in the Razorpay Dashboard and stored server-side only.
+- Invalid signatures return HTTP 400 immediately.
+
+### Idempotency Strategy
+
+Duplicate webhook deliveries are expected (Razorpay's documented behavior). Prevention uses three layers:
+
+1. **Event ID uniqueness:** `x-razorpay-event-id` header is stored in `payment_transactions.webhook_event_id` (UNIQUE column). A second delivery of the same event is rejected at the DB level.
+2. **Transaction state guards:** Before crediting coins, the processor checks `PaymentTransaction.status`. If already `success`, it returns a duplicate response without modifying state.
+3. **Period-based renewal guards:** For `subscription.charged`, the processor checks whether a renewal `PaymentTransaction` with the same `razorpay_payment_id` already exists before crediting.
+
+### Events Handled
+
+| Event | Action |
+|---|---|
+| `payment.authorized` | Log only — no coin credit (Standard Checkout handles capture) |
+| `payment.captured` | Credit coins if tx still pending; skip if already success |
+| `payment.failed` | Mark tx failed; never downgrade a success to failed |
+| `order.paid` | Reconciliation — credit if tx still pending |
+| `subscription.activated` | Mark subscription active if in weaker state |
+| `subscription.charged` | **Key renewal event** — reset subscription coins, extend period, create renewal tx |
+| `subscription.cancelled` | Mark cancelled; keep access until `period_end` |
+| `subscription.paused` | Update status to paused |
+| `subscription.resumed` | Reactivate to active |
+| `subscription.halted` | Mark halted (payment problem) |
+| `subscription.completed` | Mark completed/expired, prevent future cycles |
+
+### Subscription Renewal Logic (subscription.charged)
+
+This is the most critical webhook event. When fired:
+
+1. Load the subscription by `razorpay_sub_id`.
+2. Load the plan to compute `calculate_coins_for_period(plan, billing_cycle)`.
+3. Check idempotency — does a renewal tx with the same `razorpay_payment_id` exist?
+4. Lock `UserCredit` with `FOR UPDATE`.
+5. Reset `coins_balance` to the new period's allocation.
+6. Update `coins_granted_this_period`, `period_start`, `billing_cycle_end`.
+7. Extend `Subscription.period_start` and `period_end` by the correct duration.
+8. Create an audit `PaymentTransaction` with `transaction_type = 'subscription_renewal'`.
+
+Billing cycle durations: Monthly = 30 days, Quarterly = 90 days, Biannual = 180 days.
+
+### Database Safety
+
+- All state-changing logic runs inside a single DB transaction.
+- `SELECT ... FOR UPDATE` on `UserCredit` and `Subscription` rows prevents concurrent modifications.
+- A single `commit()` at the end ensures atomicity.
+- On error, the transaction is rolled back and the webhook returns 200 (to prevent Razorpay retry storms that would mask the real issue).
+
+### New/Modified Files
+
+| File | Change |
+|---|---|
+| `backend/services/webhook_service.py` | **Created** — signature verification, event dispatch, all handlers |
+| `backend/routers/webhooks.py` | **Created** — `POST /api/billing/webhook/razorpay` (no auth) |
+| `backend/main.py` | **Modified** — mounted `webhooks.router` |
+| `backend/models/postgres_schema.py` | **Modified** — added `webhook_event_id`, `webhook_event_type`, `webhook_status`, `raw_webhook_json`, `razorpay_invoice_id` to `PaymentTransaction` |
+| `backend/scripts/migrate_add_billing_columns.py` | **Modified** — added ALTER TABLE for new webhook columns |
+
+### Security Notes
+
+- The webhook route does NOT use `verify_token` — it uses HMAC signature verification instead.
+- `RAZORPAY_WEBHOOK_SECRET` is never exposed to the frontend.
+- The route returns 200 even on internal errors to prevent Razorpay from retrying infinitely; errors are logged for investigation.
+- `hmac.compare_digest` is used for timing-safe comparison.
+
+---
+
+## Section 42 — Local Webhook Testing (Cloudflare Tunnel)
+
+**Problem:** Razorpay cannot deliver webhooks to `localhost`. During local development, the backend must be reachable through a public HTTPS URL.
+
+**Decision:** Use Cloudflare Quick Tunnel (`cloudflared tunnel --url http://localhost:8000`) to create a temporary public URL that forwards to the local FastAPI server. The tunnel URL is stored in `WEBHOOK_PUBLIC_URL` and printed at startup for easy copy-paste into the Razorpay Dashboard.
+
+### How It Works
+
+1. Developer starts FastAPI locally on port 8000.
+2. Developer runs `cloudflared tunnel --url http://localhost:8000` in a separate terminal.
+3. Cloudflare generates a temporary `https://xxx.trycloudflare.com` URL.
+4. Developer sets `WEBHOOK_PUBLIC_URL` in `backend/.env` and restarts the backend.
+5. On startup, `core/webhook_config.py` prints the full webhook URL: `https://xxx.trycloudflare.com/api/billing/webhook/razorpay`.
+6. Developer pastes this URL into Razorpay Dashboard webhook settings.
+7. Razorpay sends webhook events to the tunnel, which forwards them to `localhost:8000`.
+
+### Why Cloudflare Quick Tunnel
+
+- No account or login required.
+- Immediate public HTTPS URL.
+- Works on Windows, macOS, and Linux.
+- Free for development use.
+- Tunnel URL changes on each restart (acceptable for dev).
+
+### New/Modified Files
+
+| File | Change |
+|---|---|
+| `backend/core/webhook_config.py` | **Created** — reads `WEBHOOK_PUBLIC_URL`, prints full webhook URL at startup |
+| `backend/main.py` | **Modified** — calls `print_webhook_url()` during startup event |
+| `backend/.env` | **Modified** — added `WEBHOOK_PUBLIC_URL` |
+| `backend/.env.example` | **Modified** — added `WEBHOOK_PUBLIC_URL` template |
+| `docs/LOCAL_WEBHOOK_TESTING.md` | **Created** — step-by-step local testing guide |
+
+---
+
+## Section 38 — Webhook Automation & Environment Resolution
+
+### 38.1 dev_start.py Strategy
+
+**Problem:** The `dev_start.py` script (introduced for webhook automation) used `sys.executable` to start the FastAPI backend. In many local development environments, `sys.executable` points to the system-wide Python interpreter rather than the project's virtual environment (`venv`). This led to `ModuleNotFoundError` for packages like `razorpay` that were only installed inside the `venv`.
+
+**Decision:** Implement explicit virtual environment discovery logic within the automation script.
+
+**Implementation (`dev_start.py`):**
+- **Dynamic Resolution:** The `run_backend()` function now actively looks for the `venv` folder within the `backend/` directory.
+- **Cross-Platform Compatibility:** It checks for `Scripts/python.exe` (Windows) and `bin/python` (Linux/macOS).
+- **Fallback:** If a virtual environment is not found, it gracefully falls back to `sys.executable` as a last resort.
+
+**Why this works:** It ensures that the backend always starts using the correct environment where dependencies are installed, regardless of how the parent script was invoked. This significantly improves the reliability of the local development "one-click" startup experience.
+
+
+
+## Section 38 � Global Layout & Scroll Strategy Fix
+
+**Problem:** The initial dashboard layout used a " contained app\ model where AppLayout was fixed to 100vh and forced internal scrolling on child pages (like Dashboard and My Resumes). However, pages with variable-height content (like the Plans page with new top-up sections or the Settings page) lacked their own internal scroll containers, causing content to be cut off and unreachable.
+
+**Decision:** Transition the global AppLayout from a fixed-height container to a minimum-height container with automatic vertical overflow. This shifts the primary scroll responsibility to the parent layout while remaining backward compatible with pages that still use internal scrolling.
+
+**Implementation (AppLayout.jsx):**
+- Changed height: 100vh to min-height: 100vh on the main content area.
+- Replaced overflow: hidden with overflow-y: auto.
+
+**Why this works:** It provides a universal safety net for all pages. If a page implements its own internal scrolling (like Dashboard.jsx), it continues to work as it fills the 100vh parent. If a page does not implement internal scrolling (like Plans.jsx), the AppLayout parent now correctly handles the overflow, ensuring all content is accessible across the entire application without requiring per-page layout logic.
+
+
+## Plans & Billing Page Redesign (May 2026)
+
+**Context:** The plans and billing page was redesigned to provide a more premium, high-conversion experience, moving away from a flat UI to a more dynamic and visually structured layout.
+
+**Key Changes:**
+
+1. **Redesigned Header & Layout:** Added a clear, centered call-to-action section above the pricing table to improve focus.
+2. **Animated Billing Toggle:** Replaced standard buttons with a pill-style toggle using Framer Motion's `layoutId`. This provides a smooth, tactile transition between billing cycles (Monthly, Quarterly, Biannual).
+3. **Plan Hierarchy & Badges:** 
+   - Introduced visual badges for 'Most Popular' (Pro) and 'Best Value' (Growth).
+   - Used scaling and border accents (`lg:scale-105`, high-contrast borders) to guide the user's eye toward higher-value plans.
+4. **Dynamic Coin Bonus Box:** Added a visualization for bonus coins earned through longer-term commitments (+10% for Quarterly, +15% for 6-Months), making the value proposition immediate.
+5. **Premium Coin Top-Ups:** 
+   - Completely overhauled the top-up packs with a high-contrast card design.
+   - Added a 'Popular' badge and a detailed 'Cost per Operation' table to ensure pricing transparency.
+6. **Interactive FAQ Accordion:** Implemented a Framer Motion-powered accordion to address common billing questions directly on the page, reducing friction.
+
+**Rationale:** These changes align the Plans page with modern SaaS aesthetics (e.g., glassmorphism-lite, smooth spring animations) while explicitly highlighting the 'Commit longer, earn more' strategy through visual feedback. No changes were made to existing API logic or state management to ensure stability.
+
+
+**Architectural Refactor (Code Style Compliance):**
+
+- Following the 'Hard Rules' in AGENTS.md regarding component size (under 200 lines), the redesigned Plans page was refactored into a modular architecture.
+- **Sub-components Created:** `PlanCard.jsx`, `TopUpSection.jsx`, `FaqSection.jsx`, and `BillingComponents.jsx`.
+- **Global Integration:** Migrated local toast state to the global `useToast` hook provided by `ToastProvider` to ensure UI consistency.
+- **Benefit:** This structure significantly improves maintainability and allows for granular testing of pricing logic and UI elements without overloading the main Page component.
+
+### Plans Page UI Redesign (Premium Refresh)
+
+**Objective:** Complete UI overhaul of the Plans & Billing experience to match a premium SaaS aesthetic and improve conversion through visual hierarchy.
+
+**Key Changes:**
+- **PlanCard.jsx:** Rewritten with a theme-based system (Free, Starter, Pro, Growth). Implemented light lavender gradients, bold typography (black for prices, purple for Pro accents), and distinct coin bonus pills as per user-provided pixel spec.
+- **Visual Hierarchy:** Centered and elevated the " Most Popular\ (Pro) and \Best Value\ (Growth) badges using absolute positioning and high-contrast pills.
+- **BillingToggle.jsx:** Redesigned with a spring-animated purple pill and integrated bonus labels (e.g., \Save 15%\) directly into the inactive states to nudge users.
+- **Typography:** Shifted to a more aggressive font-weight hierarchy (black weights for key values) and increased spacing for better readability.
+
+**Rationale:** The previous UI was functional but lacked the \wow factor\ required for a premium tool. The new design uses subtle borders, shadow-glow effects, and theme-consistent colors to create a more trustworthy and high-end feel, directly matching the requested Pro card design.

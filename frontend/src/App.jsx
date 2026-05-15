@@ -9,6 +9,7 @@ import MyResumes from './pages/MyResumes'
 import ResumeEditor from './pages/ResumeEditor'
 import Settings from './pages/Settings'
 import PersonalStats from './pages/PersonalStats'
+import Plans from './pages/Plans'
 
 function AppProviders() {
   return (
@@ -37,6 +38,7 @@ const router = createBrowserRouter([
           { path: '/resumes/:resumeId', element: <ResumeEditor /> },
           { path: '/settings', element: <Settings /> },
           { path: '/stats', element: <PersonalStats /> },
+          { path: '/plans', element: <Plans /> },
         ],
       },
     ],
