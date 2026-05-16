@@ -10,6 +10,7 @@ import ResumeEditor from './pages/ResumeEditor'
 import Settings from './pages/Settings'
 import PersonalStats from './pages/PersonalStats'
 import Plans from './pages/Plans'
+import PrivacyPolicy from './pages/PrivacyPolicy'
 
 function AppProviders() {
   return (
@@ -30,6 +31,7 @@ const router = createBrowserRouter([
       { path: '/', element: <Landing /> },
       { path: '/features', element: <Navigate to="/" replace /> },
       { path: '/pricing', element: <Navigate to="/" replace /> },
+      { path: '/privacy-policy', element: <PrivacyPolicy /> },
       {
         element: <AppLayout />,
         children: [

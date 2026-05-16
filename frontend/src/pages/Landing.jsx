@@ -541,8 +541,8 @@ export default function Landing() {
             <p className="text-sm text-muted-foreground font-medium">© {new Date().getFullYear()} ResumeIQ. All rights reserved.</p>
           </div>
           <div className="flex items-center gap-10">
-            <Link to="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">Privacy Policy</Link>
-            <Link to="/terms" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">Terms of Service</Link>
+            <Link to="/privacy-policy" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">Privacy Policy</Link>
+            {/* <Link to="/terms" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">Terms of Service</Link> */}
           </div>
         </div>
       </footer>

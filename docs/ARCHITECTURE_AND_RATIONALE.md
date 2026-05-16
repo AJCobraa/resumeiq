@@ -1295,3 +1295,24 @@ Billing cycle durations: Monthly = 30 days, Quarterly = 90 days, Biannual = 180 
 - **Typography:** Shifted to a more aggressive font-weight hierarchy (black weights for key values) and increased spacing for better readability.
 
 **Rationale:** The previous UI was functional but lacked the \wow factor\ required for a premium tool. The new design uses subtle borders, shadow-glow effects, and theme-consistent colors to create a more trustworthy and high-end feel, directly matching the requested Pro card design.
+
+### Privacy Policy Implementation (May 16, 2026)
+
+**New File:** rontend/src/pages/PrivacyPolicy.jsx`n
+**Changes:**
+- Created a high-fidelity Privacy Policy page with a hero section, sticky sidebar navigation, and card-based content layout.
+- Added public route /privacy-policy in App.jsx.
+- Updated the landing page footer to link to the new route.
+
+**Rationale:** Required for Google OAuth and Chrome Web Store compliance. The design uses premium aesthetics (glassmorphism, subtle gradients, and sticky navigation) to maintain brand consistency even for legal pages. The content specifically addresses Chrome Extension data collection as requested.
+
+### Collapsible Sidebar Implementation (May 16, 2026)
+
+**Changes:**
+- Modified `AppLayout.jsx` to manage `isCollapsed` state, persisted in `localStorage`.
+- Updated `Sidebar.jsx` with a smooth transition (300ms) and a floating toggle button.
+- Implemented icon-only mode for navigation links and user profile when collapsed.
+- Created a compact variant of `CoinBalance.jsx` showing only coin count status.
+- Dynamically adjusted `marginLeft` of the main content area to prevent layout shifting.
+
+**Rationale:** Improves the user experience by allowing more screen real estate for core tasks like resume editing and job analysis. The persistence ensures that the user's preference is respected across sessions, providing a customizable dashboard feel.

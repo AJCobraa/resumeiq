@@ -58,80 +58,122 @@ const navItems = [
   },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ isCollapsed, onToggle }) {
   const { user, profile, logOut } = useAuth()
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-[240px] bg-bg-card border-r border-border-default flex flex-col z-40">
+    <aside 
+      className={cn(
+        "fixed left-0 top-0 h-screen bg-bg-card border-r border-border-default flex flex-col z-40 transition-all duration-300 ease-in-out",
+        isCollapsed ? "w-[80px]" : "w-[240px]"
+      )}
+    >
+      {/* Toggle Button */}
+      <button
+        onClick={onToggle}
+        className={cn(
+          "absolute -right-3 top-8 w-6 h-6 bg-bg-card border border-border-default rounded-full flex items-center justify-center shadow-sm hover:bg-bg-elevated transition-all duration-200 z-50 cursor-pointer",
+          isCollapsed && "rotate-180"
+        )}
+      >
+        <svg className="w-3.5 h-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
       {/* Logo */}
-      <div className="px-5 py-6 border-b border-border-default">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-blue to-purple-500 flex items-center justify-center">
+      <div className={cn(
+        "px-5 py-6 border-b border-border-default overflow-hidden",
+        isCollapsed && "px-0 flex justify-center"
+      )}>
+        <div className="flex items-center gap-2.5 min-w-max">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-blue to-purple-500 flex items-center justify-center flex-shrink-0">
             <span className="text-white font-bold text-sm">R</span>
           </div>
-          <span className="text-lg font-bold tracking-tight">
-            Resume<span className="text-accent-blue">IQ</span>
-          </span>
+          {!isCollapsed && (
+            <span className="text-lg font-bold tracking-tight whitespace-nowrap animate-in fade-in duration-300">
+              Resume<span className="text-accent-blue">IQ</span>
+            </span>
+          )}
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-x-hidden">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
+            title={isCollapsed ? item.label : ""}
             className={({ isActive }) => cn(
-              'flex items-center gap-3 px-3 py-2.5 rounded-[6px] text-sm font-medium',
-              'transition-all duration-200',
+              'flex items-center gap-3 px-3 py-2.5 rounded-[6px] text-sm font-medium transition-all duration-200',
+              isCollapsed && "justify-center px-0 h-10 w-10 mx-auto",
               isActive
                 ? 'bg-accent-blue/10 text-accent-blue'
                 : 'text-text-muted hover:text-text-primary hover:bg-bg-elevated',
             )}
           >
-            {item.icon}
-            {item.label}
+            <div className="flex-shrink-0">
+              {item.icon}
+            </div>
+            {!isCollapsed && (
+              <span className="whitespace-nowrap animate-in fade-in duration-300">
+                {item.label}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>
 
       {/* Coin Balance */}
-      <CoinBalance />
+      <CoinBalance isCollapsed={isCollapsed} />
 
       {/* User section */}
-      <div className="px-3 py-4 border-t border-border-default">
-        <div className="flex items-center gap-3 px-2 mb-3">
+      <div className={cn(
+        "px-3 py-4 border-t border-border-default",
+        isCollapsed && "px-0"
+      )}>
+        <div className={cn(
+          "flex items-center gap-3 px-2 mb-3",
+          isCollapsed && "justify-center px-0"
+        )}>
           {user?.photoURL ? (
             <img
               src={user.photoURL}
               alt="Avatar"
-              className="w-8 h-8 rounded-full ring-2 ring-border-default"
+              className="w-8 h-8 rounded-full ring-2 ring-border-default flex-shrink-0"
             />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-accent-blue/20 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-accent-blue/20 flex items-center justify-center flex-shrink-0">
               <span className="text-accent-blue text-xs font-bold">
                 {(profile?.displayName || user?.email || '?')[0].toUpperCase()}
               </span>
             </div>
           )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">
-              {profile?.displayName || 'User'}
-            </p>
-            <p className="text-xs text-text-muted truncate">
-              {user?.email || ''}
-            </p>
-          </div>
+          {!isCollapsed && (
+            <div className="flex-1 min-w-0 animate-in fade-in duration-300">
+              <p className="text-sm font-medium truncate">
+                {profile?.displayName || 'User'}
+              </p>
+              <p className="text-xs text-text-muted truncate">
+                {user?.email || ''}
+              </p>
+            </div>
+          )}
         </div>
         <button
           onClick={logOut}
-          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-muted hover:text-red rounded-[6px] hover:bg-red/5 transition-all duration-200 cursor-pointer"
+          title={isCollapsed ? "Sign Out" : ""}
+          className={cn(
+            "w-full flex items-center gap-2 px-3 py-2 text-sm text-text-muted hover:text-red rounded-[6px] hover:bg-red/5 transition-all duration-200 cursor-pointer",
+            isCollapsed && "justify-center px-0"
+          )}
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
               d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
-          Sign Out
+          {!isCollapsed && <span className="animate-in fade-in duration-300">Sign Out</span>}
         </button>
       </div>
     </aside>
