@@ -36,3 +36,6 @@ npm-debug.log*
 scratch/
 backend/scratch/
 users.json
+
+# extension
+extension/config.js

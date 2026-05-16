@@ -83,7 +83,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   UI.btnLogin.addEventListener('click', () => {
-    chrome.tabs.create({ url: 'http://localhost:5173' });
+    const config = globalThis.CONFIG || {};
+    chrome.tabs.create({ url: config.frontendUrl || 'http://localhost:5173' });
   });
 
   async function initializeApp() {
@@ -271,7 +272,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   UI.btnDashboard.addEventListener('click', () => {
-    chrome.tabs.create({ url: 'http://localhost:5173/dashboard' });
+    const config = globalThis.CONFIG || {};
+    chrome.tabs.create({ url: (config.frontendUrl || 'http://localhost:5173') + '/dashboard' });
   });
 
   UI.btnReset.addEventListener('click', () => {
