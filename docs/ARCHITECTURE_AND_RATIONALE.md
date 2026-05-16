@@ -1316,3 +1316,40 @@ Billing cycle durations: Monthly = 30 days, Quarterly = 90 days, Biannual = 180 
 - Dynamically adjusted `marginLeft` of the main content area to prevent layout shifting.
 
 **Rationale:** Improves the user experience by allowing more screen real estate for core tasks like resume editing and job analysis. The persistence ensures that the user's preference is respected across sessions, providing a customizable dashboard feel.
+
+## Section 39 - Email/Password Authentication & AuthModal Refactor
+
+**Context:** Expanded authentication options to include Email/Password alongside Google OAuth. This reduces friction for users who prefer traditional login methods or don't use Google accounts.
+
+**Key Changes:**
+
+1. **AuthContext & Firebase SDK:**
+   - Updated `firebase.js` to include `signInWithEmailAndPassword`, `createUserWithEmailAndPassword`, `sendPasswordResetEmail`, and `updateProfile`.
+   - Enhanced `AuthContext.jsx` with `signInWithEmail`, `signUpWithEmail`, and `resetPassword` methods.
+   - `signUpWithEmail` includes support for `displayName` updates via `updateProfile`, ensuring new users have immediate identification.
+
+2. **AuthModal.jsx Implementation:**
+   - Introduced a unified, premium modal for all authentication flows.
+   - **Features:**
+     - Tabbed interface (Login/Register).
+     - "Forgot Password" flow with success feedback.
+     - Password visibility toggle.
+     - Integration with Google Sign-In as a secondary action (separated by an "OR" divider).
+     - Context-aware error mapping (e.g., "auth/user-not-found" -> user-friendly message).
+   - **Aesthetics:** Uses `framer-motion` for spring-animated entry, `bg-card` for container, and `shadow-glow` for a premium, floating feel.
+
+3. **Landing Page Refactor:**
+   - Replaced direct `signInWithPopup` calls on "Get Started" buttons with a toggle for `AuthModal`.
+   - This provides a more polished "walled garden" entry point where users can choose their preferred method.
+
+**Rationale:** Moving to a modal-based flow centralizes auth logic and prevents the jarring experience of immediate popup triggers. The support for email/password is handled identically to Google OAuth in the backend: `onAuthChange` intercepts the new Firebase user, retrieves the ID token, and `api.getMe()` automatically handles the PostgreSQL user/credit record creation if it's a first-time login. This ensures parity across all authentication providers.
+
+### Firebase Auth Error Handling & Password Hint (2026-05-16)
+
+**Objective:** Improve UX during authentication by providing specific, actionable error messages and clear password requirements.
+
+**Changes:**
+- **Enhanced handleAuthError:** Expanded the error mapping in AuthModal.jsx to cover specific Firebase codes like auth/invalid-credential, auth/password-does-not-meet-requirements, auth/too-many-requests, and auth/network-request-failed.
+- **Password Requirements Hint:** Added a visual hint under the password field during Sign-Up (isSignUp === true) specifying the required complexity (8+ characters, uppercase, number, special char).
+
+**Rationale:** Generic error messages like 'An unexpected error occurred' lead to user frustration. By mapping internal Firebase codes to human-readable strings, users can immediately identify if they need to check their internet, reset a password due to a lock, or fix a typo. The password hint proactively reduces 'Password does not meet requirements' errors by setting expectations before submission.
