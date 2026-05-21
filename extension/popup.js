@@ -270,13 +270,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       clearInterval(tipInterval);
       showState(UI.stateJob);
       
-      const code = err.data?.code;
-      if (err.status === 402 || code === 'INSUFFICIENT_COINS' || err.message?.toLowerCase().includes('coin') || err.message?.toLowerCase().includes('credit')) {
-        UI.errorMsg.textContent = 'Insufficient coins. Please open the Dashboard to top up or upgrade your plan.';
-      } else if (code === 'AI_TIMEOUT') {
-        UI.errorMsg.textContent = 'Our AI took too long to respond. Please try again.';
-      } else if (code === 'AI_OVERLOAD') {
-        UI.errorMsg.textContent = 'The Google AI service is currently overloaded. Please try again in a few moments.';
+      const aiMsg = getFriendlyAiErrorMessage(err, 'dashboard');
+      if (aiMsg) {
+        UI.errorMsg.textContent = aiMsg;
       } else {
         UI.errorMsg.textContent = `Analysis failed: ${err.message}`;
       }

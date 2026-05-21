@@ -78,6 +78,7 @@ async def verify_payment(
         body.razorpay_order_id,
         body.razorpay_payment_id,
         body.razorpay_signature,
+        uid=uid,
     )
 
 

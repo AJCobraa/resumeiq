@@ -262,6 +262,7 @@ async def process_verified_payment(
     razorpay_order_id: str,
     razorpay_payment_id: str,
     razorpay_signature: str,
+    uid: str,
 ):
     """
     Verify Razorpay signature, credit coins, activate subscription if applicable.
@@ -280,6 +281,9 @@ async def process_verified_payment(
     tx = result.scalar_one_or_none()
     if not tx:
         raise HTTPException(404, "Transaction not found.")
+
+    if tx.user_id != uid:
+        raise HTTPException(403, "Transaction does not belong to this user.")
 
     # 3. Idempotency guard
     if tx.status == 'success':
@@ -358,7 +362,6 @@ async def process_verified_payment(
 
     # 6. Mark transaction success
     tx.status = 'success'
-    tx.razorpay_payment_id = razorpay_payment_id
     tx.razorpay_signature = razorpay_signature
 
     # 7. Compute new balance for response

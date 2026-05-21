@@ -4,6 +4,7 @@ import { api } from '../lib/api'
 import { useToast } from '../components/ui/Toast'
 import { formatDate, truncate } from '../lib/utils'
 import { motion } from 'framer-motion'
+import { getFriendlyAiErrorMessage } from '../lib/errorUtils'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Spinner from '../components/ui/Spinner'
@@ -375,15 +376,7 @@ export default function MyResumes() {
       if (fileInputRef.current) fileInputRef.current.value = ''
       navigate(`/resumes/${resume.resumeId}`)
     } catch (err) {
-      if (err.status === 402 || err.message?.toLowerCase().includes('coin') || err.message?.toLowerCase().includes('credit')) {
-        toast.error('Insufficient coins. Please upgrade your plan or top up to import resumes.')
-      } else if (err.code === 'AI_TIMEOUT') {
-        toast.error('Our AI took too long to respond. Please try again.')
-      } else if (err.code === 'AI_OVERLOAD') {
-        toast.error('The Google AI service is currently overloaded. Please try again in a few moments.')
-      } else {
-        toast.error(err.message || 'The Google AI service is currently overloaded. Please try again in a few moments.')
-      }
+      toast.error(getFriendlyAiErrorMessage(err, 'import resumes') || err.message || 'The Google AI service is currently overloaded. Please try again in a few moments.')
     } finally {
       clearInterval(importStepTimer.current)
       setImporting(false)

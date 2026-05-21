@@ -65,7 +65,6 @@ export function AuthProvider({ children }) {
           localStorage.setItem('resumeIqExtToken', token)
           // Also expose refresh token so extension can refresh independently
           localStorage.setItem('resumeIqExtRefreshToken', firebaseUser.refreshToken || '')
-          localStorage.setItem('resumeIqExtApiKey', import.meta.env.VITE_FIREBASE_API_KEY || '')
         }).catch(() => {})
 
         try {
@@ -79,7 +78,6 @@ export function AuthProvider({ children }) {
         setProfile(null)
         localStorage.removeItem('resumeIqExtToken')
         localStorage.removeItem('resumeIqExtRefreshToken')
-        localStorage.removeItem('resumeIqExtApiKey')
       }
       setLoading(false)
     })

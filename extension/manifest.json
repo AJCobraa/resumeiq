@@ -47,6 +47,7 @@
       "js": [
         "config.js",
         "keyword-engine.js",
+        "errorUtils.js",
         "content.js",
         "sidebar-ui.js"
       ],

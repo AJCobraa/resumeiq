@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { api } from '../lib/api'
 import { useToast } from '../components/ui/Toast'
 import { formatDate, getScoreColor, getPortalInfo, truncate } from '../lib/utils'
+import { getFriendlyAiErrorMessage } from '../lib/errorUtils'
 import InterviewPrepPanel from '../components/dashboard/InterviewPrepPanel'
 
 /* UI Components — Assume these exist in the paths above */
@@ -99,11 +100,7 @@ export default function Dashboard() {
       }
       toast.success(action === 'approve' ? 'Applied to resume!' : 'Recommendation updated')
     } catch (e) {
-      if (e.status === 402 || e.message?.toLowerCase().includes('coin') || e.message?.toLowerCase().includes('credit')) {
-        toast.error('Insufficient coins. Please upgrade your plan or top up to update/approve recommendation.')
-      } else {
-        toast.error('Failed to update recommendation')
-      }
+      toast.error(getFriendlyAiErrorMessage(e, 'update/approve recommendation') || 'Failed to update recommendation')
     }
   }
 
@@ -130,15 +127,7 @@ export default function Dashboard() {
       setJobDetail(result)
       setJobs(prev => prev.map(j => j.jobId === result.jobId ? result : j))
     } catch (e) {
-      if (e.status === 402 || e.message?.toLowerCase().includes('coin') || e.message?.toLowerCase().includes('credit')) {
-        toast.error('Insufficient coins. Please upgrade your plan or top up to re-analyze.')
-      } else if (e.code === 'AI_TIMEOUT') {
-        toast.error('Our AI took too long to respond. Please try again.')
-      } else if (e.code === 'AI_OVERLOAD') {
-        toast.error('The Google AI service is currently overloaded. Please try again in a few moments.')
-      } else {
-        toast.error('Analysis failed: ' + e.message)
-      }
+      toast.error(getFriendlyAiErrorMessage(e, 're-analyze') || ('Analysis failed: ' + e.message))
     } finally {
       setIsReanalyzing(false)
     }

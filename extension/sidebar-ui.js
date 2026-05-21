@@ -94,13 +94,7 @@ async function fetchResumesAndBuild() {
     });
     riqState.resumes = await res.json();
   } catch (err) {
-    const code = err.data?.code;
-    let errMsg = err.message;
-    if (code === 'AI_TIMEOUT') {
-      errMsg = 'Our AI took too long to respond. Please try again.';
-    } else if (code === 'AI_OVERLOAD') {
-      errMsg = 'The Google AI service is currently overloaded. Please try again in a few moments.';
-    }
+    const errMsg = getFriendlyAiErrorMessage(err, 'dashboard') || err.message;
     injectCard(renderErrorCard(errMsg));
     return;
   }
@@ -405,13 +399,7 @@ async function checkPreviousAnalysis() {
       renderPreviousResult(data);
     }
   } catch (err) {
-    const code = err.data?.code;
-    let errMsg = err.message;
-    if (code === 'AI_TIMEOUT') {
-      errMsg = 'Our AI took too long to respond. Please try again.';
-    } else if (code === 'AI_OVERLOAD') {
-      errMsg = 'The Google AI service is currently overloaded. Please try again in a few moments.';
-    }
+    const errMsg = getFriendlyAiErrorMessage(err, 'dashboard') || err.message;
     console.error(`Check previous analysis failed: ${errMsg}`);
   }
 }
