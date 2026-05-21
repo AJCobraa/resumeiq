@@ -35,9 +35,20 @@ async function requestWithToken(token, path, method = 'GET', body = null) {
   logger.log(`${method} ${path}`)
   const res = await fetch(`${BASE}${path}`, opts)
   if (!res.ok) {
-    const err = await res.text()
-    logger.error(`API Error: ${method} ${path} → ${res.status}`, err)
-    throw new Error(err || `HTTP ${res.status}`)
+    const raw = await res.text().catch(() => '')
+    let errorData = null
+    try {
+      errorData = JSON.parse(raw)
+    } catch {
+      errorData = { message: raw }
+    }
+    
+    logger.error(`API Error: ${method} ${path} → ${res.status}`, errorData)
+    
+    const error = new Error(errorData.message || errorData.detail || `HTTP ${res.status}`)
+    if (errorData.code) error.code = errorData.code
+    error.status = res.status
+    throw error
   }
   return res.json()
 }
@@ -50,9 +61,20 @@ async function request(path, method = 'GET', body = null) {
 
   const res = await fetch(`${BASE}${path}`, opts)
   if (!res.ok) {
-    const err = await res.text()
-    logger.error(`API Error: ${method} ${path} → ${res.status}`, err)
-    throw new Error(err || `HTTP ${res.status}`)
+    const raw = await res.text().catch(() => '')
+    let errorData = null
+    try {
+      errorData = JSON.parse(raw)
+    } catch {
+      errorData = { message: raw }
+    }
+    
+    logger.error(`API Error: ${method} ${path} → ${res.status}`, errorData)
+    
+    const error = new Error(errorData.message || errorData.detail || `HTTP ${res.status}`)
+    if (errorData.code) error.code = errorData.code
+    error.status = res.status
+    throw error
   }
   return res.json()
 }
@@ -91,7 +113,22 @@ export const api = {
       },
       body: formData, // multipart — no Content-Type header
     })
-    if (!res.ok) throw new Error(await res.text())
+    
+    if (!res.ok) {
+      const raw = await res.text().catch(() => '')
+      let errorData = null
+      try {
+        errorData = JSON.parse(raw)
+      } catch {
+        errorData = { message: raw }
+      }
+      
+      const error = new Error(errorData.message || errorData.detail || `HTTP ${res.status}`)
+      if (errorData.code) error.code = errorData.code
+      error.status = res.status
+      throw error
+    }
+    
     return res.json()
   },
 
@@ -115,7 +152,9 @@ export const api = {
         detail = raw
       }
       logger.error(`API Error: POST /api/resumes/${id}/export-pdf → ${res.status}`, detail)
-      throw new Error(detail || `PDF export failed (HTTP ${res.status})`)
+      const error = new Error(detail || `PDF export failed (HTTP ${res.status})`)
+      error.status = res.status
+      throw error
     }
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)

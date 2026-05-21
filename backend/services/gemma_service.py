@@ -18,11 +18,13 @@ import uuid
 import asyncio
 import threading
 from google import genai
+from google.genai import errors
+from core.exceptions import GemmaOverloadError, is_ai_transient_error
+import re
 
 # Lazy init
 _client = None
 MODEL = "gemma-4-31b-it"
-import re
 
 def _clean_json_response(text: str) -> str:
     """Strip markdown code fences (```json ... ```) if present."""
@@ -305,7 +307,27 @@ async def _call_model_json(prompt: str, user_id: str = "", operation: str = "") 
                 )
 
             return parsed_json
-        except Exception:
+        except Exception as e:
+            # Detect transient errors (overload, rate limit, timeout)
+            is_transient, is_timeout = is_ai_transient_error(e)
+            
+            # If JSON parsing failed, also check the raw response text if available
+            # Overloads often return a plain text error page instead of JSON
+            if not is_transient and isinstance(e, json.JSONDecodeError):
+                # We need to get the raw response text from the scope if possible
+                # But since we're in the try block, we can check the 'raw_text' variable if it was set
+                if 'raw_text' in locals():
+                    is_transient, is_timeout = is_ai_transient_error(locals()['raw_text'])
+
+            if is_transient:
+                if attempt == 0:
+                    await asyncio.sleep(2)
+                    continue
+                
+                msg = "Our AI took too long to respond. Please try again." if is_timeout else \
+                      "The Google AI service is currently overloaded. Please try again in a few moments."
+                raise GemmaOverloadError(message=msg, status_code=504 if is_timeout else 503, is_timeout=is_timeout)
+            
             if attempt == 0:
                 await asyncio.sleep(2)
             else:
@@ -342,7 +364,19 @@ async def _call_model_text(prompt: str, user_id: str = "", operation: str = "") 
                 )
 
             return result_text
-        except Exception:
+        except Exception as e:
+            # Detect transient errors (overload, rate limit, timeout)
+            is_transient, is_timeout = is_ai_transient_error(e)
+
+            if is_transient:
+                if attempt == 0:
+                    await asyncio.sleep(2)
+                    continue
+                
+                msg = "Our AI took too long to respond. Please try again." if is_timeout else \
+                      "The Google AI service is currently overloaded. Please try again in a few moments."
+                raise GemmaOverloadError(message=msg, status_code=504 if is_timeout else 503, is_timeout=is_timeout)
+            
             if attempt == 0:
                 await asyncio.sleep(2)
             else:

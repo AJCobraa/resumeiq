@@ -30,7 +30,6 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <Landing /> },
       { path: '/features', element: <Navigate to="/" replace /> },
-      { path: '/pricing', element: <Navigate to="/" replace /> },
       { path: '/privacy-policy', element: <PrivacyPolicy /> },
       {
         element: <AppLayout />,
@@ -41,6 +40,7 @@ const router = createBrowserRouter([
           { path: '/settings', element: <Settings /> },
           { path: '/stats', element: <PersonalStats /> },
           { path: '/plans', element: <Plans /> },
+          { path: '/pricing', element: <Plans /> },
         ],
       },
     ],

@@ -4,14 +4,16 @@ import uuid
 import sys
 import os
 
+from dotenv import load_dotenv
+load_dotenv(dotenv_path=os.path.join(os.getcwd(), "backend", ".env"))
+
 # Add backend to path
 sys.path.append(os.path.join(os.getcwd(), "backend"))
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import async_session
-from services import resume_service
-from core import budget_guard
-from models.postgres_schema import User, UserCredit, Resume
+from models.postgres_schema import User, UserCredit
+from routers.resumes import import_pdf
 
 async def reproduce():
     user_id = "test_user_" + str(uuid.uuid4())[:8]

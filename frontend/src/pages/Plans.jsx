@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { api } from '../lib/api'
 import { useToast } from '../components/ui/Toast'
@@ -27,6 +28,8 @@ async function loadRazorpayScript() {
 }
 
 export default function Plans() {
+  const [searchParams] = useSearchParams()
+  const highlightPopular = searchParams.get('highlight') === 'popular'
   const [catalog, setCatalog] = useState(null)
   const [billing, setBilling] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -36,6 +39,18 @@ export default function Plans() {
   const [cancelModal, setCancelModal] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const toast = useToast()
+
+  useEffect(() => {
+    if (highlightPopular && !loading && catalog) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById('popular-topup-pack');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightPopular, loading, catalog]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -99,6 +114,39 @@ export default function Plans() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Plans & Billing</h1>
         <p className="text-text-muted mt-1">Manage your subscription and top up coins.</p>
+        
+        {/* Temporary Toast Test Panel */}
+        <div className="mt-4 p-4 bg-slate-100 dark:bg-zinc-800 rounded-xl flex gap-3 flex-wrap items-center border border-slate-200 dark:border-zinc-700/50">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Test Toasts:</span>
+          <button 
+            id="test-toast-success"
+            onClick={() => toast.success('Success! Your billing changes have been premium-redesigned.')}
+            className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            Trigger Success
+          </button>
+          <button 
+            id="test-toast-error"
+            onClick={() => toast.error('Error! The backend was unable to verify the transaction details.')}
+            className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            Trigger Error
+          </button>
+          <button 
+            id="test-toast-warning"
+            onClick={() => toast.warning('Warning! You only have 3 analysis coins left on your starter package.')}
+            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            Trigger Warning
+          </button>
+          <button 
+            id="test-toast-info"
+            onClick={() => toast.info('Info: A new coin package promotion is active this week.')}
+            className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            Trigger Info
+          </button>
+        </div>
       </header>
 
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-bg-card border border-border-default rounded-2xl p-6 flex flex-wrap items-center justify-between gap-4">
@@ -129,7 +177,7 @@ export default function Plans() {
         ))}
       </div>
 
-      <TopUpSection packs={catalog?.packs || []} currency={currency} isOnPaid={isOnPaid} processing={processing} handleTopUp={handleTopUp} />
+      <TopUpSection packs={catalog?.packs || []} currency={currency} isOnPaid={isOnPaid} processing={processing} handleTopUp={handleTopUp} highlightPopular={highlightPopular} />
       
       <FaqSection />
 

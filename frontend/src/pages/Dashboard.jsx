@@ -98,8 +98,12 @@ export default function Dashboard() {
         setJobs(prev => prev.map(j => j.jobId === jobId ? refreshed : j))
       }
       toast.success(action === 'approve' ? 'Applied to resume!' : 'Recommendation updated')
-    } catch {
-      toast.error('Failed to update recommendation')
+    } catch (e) {
+      if (e.status === 402 || e.message?.toLowerCase().includes('coin') || e.message?.toLowerCase().includes('credit')) {
+        toast.error('Insufficient coins. Please upgrade your plan or top up to update/approve recommendation.')
+      } else {
+        toast.error('Failed to update recommendation')
+      }
     }
   }
 
@@ -126,7 +130,15 @@ export default function Dashboard() {
       setJobDetail(result)
       setJobs(prev => prev.map(j => j.jobId === result.jobId ? result : j))
     } catch (e) {
-      toast.error('Analysis failed: ' + e.message)
+      if (e.status === 402 || e.message?.toLowerCase().includes('coin') || e.message?.toLowerCase().includes('credit')) {
+        toast.error('Insufficient coins. Please upgrade your plan or top up to re-analyze.')
+      } else if (e.code === 'AI_TIMEOUT') {
+        toast.error('Our AI took too long to respond. Please try again.')
+      } else if (e.code === 'AI_OVERLOAD') {
+        toast.error('The Google AI service is currently overloaded. Please try again in a few moments.')
+      } else {
+        toast.error('Analysis failed: ' + e.message)
+      }
     } finally {
       setIsReanalyzing(false)
     }

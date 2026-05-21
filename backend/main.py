@@ -17,11 +17,13 @@ import sys
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from routers import auth, resumes, jobs, analysis, stats, billing, webhooks
 from core.database import engine
 from core.webhook_config import print_webhook_url
+from core.exceptions import GemmaOverloadError
 from models.postgres_schema import Base
 
 app = FastAPI(
@@ -29,6 +31,18 @@ app = FastAPI(
     description="Resume builder + ATS analysis backend",
     version="1.0.0",
 )
+
+@app.exception_handler(GemmaOverloadError)
+async def gemma_overload_exception_handler(request: Request, exc: GemmaOverloadError):
+    code = "AI_TIMEOUT" if exc.is_timeout else "AI_OVERLOAD"
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "code": code,
+            "message": exc.message,
+            "detail": "Google AI Studio is under high demand or timed out. This is a temporary transient error."
+        },
+    )
 
 
 # ── Database Startup ─────────────────────────────────

@@ -70,7 +70,10 @@ async function riqFetch(url, options = {}) {
         return reject(new Error(chrome.runtime.lastError.message));
       }
       if (!response || response.ok === false) {
-        return reject(new Error(response?.error || `Fetch failed (${response?.status || 'unknown'})`));
+        const error = new Error(response?.error || `Fetch failed (${response?.status || 'unknown'})`);
+        error.status = response?.status;
+        error.data = response?.json; // Attach parsed JSON
+        return reject(error);
       }
       // Mocked response object
       resolve({
@@ -91,7 +94,14 @@ async function fetchResumesAndBuild() {
     });
     riqState.resumes = await res.json();
   } catch (err) {
-    injectCard(renderErrorCard(err.message));
+    const code = err.data?.code;
+    let errMsg = err.message;
+    if (code === 'AI_TIMEOUT') {
+      errMsg = 'Our AI took too long to respond. Please try again.';
+    } else if (code === 'AI_OVERLOAD') {
+      errMsg = 'The Google AI service is currently overloaded. Please try again in a few moments.';
+    }
+    injectCard(renderErrorCard(errMsg));
     return;
   }
 
@@ -394,7 +404,16 @@ async function checkPreviousAnalysis() {
       riqState.previousAnalysis = data;
       renderPreviousResult(data);
     }
-  } catch {}
+  } catch (err) {
+    const code = err.data?.code;
+    let errMsg = err.message;
+    if (code === 'AI_TIMEOUT') {
+      errMsg = 'Our AI took too long to respond. Please try again.';
+    } else if (code === 'AI_OVERLOAD') {
+      errMsg = 'The Google AI service is currently overloaded. Please try again in a few moments.';
+    }
+    console.error(`Check previous analysis failed: ${errMsg}`);
+  }
 }
 
 function renderPreviousResult(result) {

@@ -375,7 +375,15 @@ export default function MyResumes() {
       if (fileInputRef.current) fileInputRef.current.value = ''
       navigate(`/resumes/${resume.resumeId}`)
     } catch (err) {
-      toast.error('PDF import failed. Make sure the PDF has selectable text.')
+      if (err.status === 402 || err.message?.toLowerCase().includes('coin') || err.message?.toLowerCase().includes('credit')) {
+        toast.error('Insufficient coins. Please upgrade your plan or top up to import resumes.')
+      } else if (err.code === 'AI_TIMEOUT') {
+        toast.error('Our AI took too long to respond. Please try again.')
+      } else if (err.code === 'AI_OVERLOAD') {
+        toast.error('The Google AI service is currently overloaded. Please try again in a few moments.')
+      } else {
+        toast.error(err.message || 'The Google AI service is currently overloaded. Please try again in a few moments.')
+      }
     } finally {
       clearInterval(importStepTimer.current)
       setImporting(false)

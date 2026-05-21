@@ -128,7 +128,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           return reject(new Error(chrome.runtime.lastError.message));
         }
         if (!response || response.ok === false) {
-          return reject(new Error(response?.error || `Fetch failed (${response?.status || 'unknown'})`));
+          const error = new Error(response?.error || `Fetch failed (${response?.status || 'unknown'})`);
+          error.status = response?.status;
+          error.data = response?.json; // Attach parsed JSON for error code checking
+          return reject(error);
         }
         // Mocked response object compatible with fetch API
         resolve({
@@ -266,7 +269,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       clearInterval(tipInterval);
       showState(UI.stateJob);
-      UI.errorMsg.textContent = `Analysis failed: ${err.message}`;
+      
+      const code = err.data?.code;
+      if (err.status === 402 || code === 'INSUFFICIENT_COINS' || err.message?.toLowerCase().includes('coin') || err.message?.toLowerCase().includes('credit')) {
+        UI.errorMsg.textContent = 'Insufficient coins. Please open the Dashboard to top up or upgrade your plan.';
+      } else if (code === 'AI_TIMEOUT') {
+        UI.errorMsg.textContent = 'Our AI took too long to respond. Please try again.';
+      } else if (code === 'AI_OVERLOAD') {
+        UI.errorMsg.textContent = 'The Google AI service is currently overloaded. Please try again in a few moments.';
+      } else {
+        UI.errorMsg.textContent = `Analysis failed: ${err.message}`;
+      }
+      
       UI.errorMsg.classList.remove('hidden');
     }
   });

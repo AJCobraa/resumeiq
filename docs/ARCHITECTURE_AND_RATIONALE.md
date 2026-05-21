@@ -1244,7 +1244,7 @@ Billing cycle durations: Monthly = 30 days, Quarterly = 90 days, Biannual = 180 
 
 
 
-## Section 38 � Global Layout & Scroll Strategy Fix
+## Section 38 � Global Layout & Scroll Strategy Fix
 
 **Problem:** The initial dashboard layout used a " contained app\ model where AppLayout was fixed to 100vh and forced internal scrolling on child pages (like Dashboard and My Resumes). However, pages with variable-height content (like the Plans page with new top-up sections or the Settings page) lacked their own internal scroll containers, causing content to be cut off and unreachable.
 
@@ -1353,3 +1353,106 @@ Billing cycle durations: Monthly = 30 days, Quarterly = 90 days, Biannual = 180 
 - **Password Requirements Hint:** Added a visual hint under the password field during Sign-Up (isSignUp === true) specifying the required complexity (8+ characters, uppercase, number, special char).
 
 **Rationale:** Generic error messages like 'An unexpected error occurred' lead to user frustration. By mapping internal Firebase codes to human-readable strings, users can immediately identify if they need to check their internet, reset a password due to a lock, or fix a typo. The password hint proactively reduces 'Password does not meet requirements' errors by setting expectations before submission.
+
+### AI Service Overload Error Handling (2026-05-16)
+
+**Objective:** Gracefully handle transient failures from Google AI services (429, 500, 503) to prevent cryptic error messages.
+
+- **Backend:** Implemented GemmaOverloadError and a global FastAPI exception handler to return a structured JSON response with code AI_OVERLOAD.
+- **Retry Logic:** Added a single retry with a 2-second sleep in gemma_service.py for transient AI errors before bubbling up the exception.
+- **Frontend:** Updated pi.js to parse structured error codes and modified Dashboard.jsx and InterviewPrepPanel.jsx to catch AI_OVERLOAD and display friendly toast messages.
+
+**Rationale:** AI services often experience transient high demand. Returning a structured AI_OVERLOAD code allows the frontend to distinguish between a broken backend and a busy AI provider, enabling specific UX (like 'Please try again in a few moments') that reduces user panic and support tickets.
+
+
+### AI Error Handling & Resilience (2026-05-17)
+
+**Objective:** Standardize AI service-level and router-level exception handling for transient errors (overloads and timeouts) to ensure seamless API propagation, consistent HTTP mappings, and comprehensive unit/integration test coverage.
+
+#### 1. Status Code Mapping Decisions
+We distinguish between the two primary failure modes of Google AI (GenAI / Gemini):
+*   **HTTP 503 Service Unavailable (`AI_OVERLOAD`):** Triggered by definitive rate limiting or overload indicators (e.g., HTTP status `429` / `503` or keywords like `overloaded`, `quota`, `rate limit`, `high demand`). This indicates that the AI service is functional but has reached its capacity limit.
+*   **HTTP 504 Gateway Timeout (`AI_TIMEOUT`):** Triggered by backend network timeouts, deadline exceedance (e.g., status `504` or keywords like `deadline exceeded`, `timed out`, `timeout`). This indicates that the AI service failed to respond within a reasonable window.
+
+#### 2. Exception Classification & Propagation Flow
+To avoid catching generic 500 server errors as AI overloads (which would misrepresent local bugs as AI outages), a deterministic classification rule is enforced:
+1.  **Parsing & Detection:** The `is_ai_transient_error` helper extracts error codes (`429`, `503`, `504`) and performs lowercase substring checks against specific transient keywords. High-priority checks for timeouts are evaluated first.
+2.  **Transient Resilience:** When a transient error is caught at the service layer (`gemma_service`, `embedding_service`), the pipeline automatically retries **once** after a `2.0 second` asynchronous delay (`asyncio.sleep`).
+3.  **Custom Exception Raising:** If the second attempt fails, a `GemmaOverloadError` exception is raised with the appropriate HTTP status code (`503` or `504`) and standard user-facing message.
+4.  **Bypassing General Catch blocks:** Every relevant endpoint (e.g., `/analyze`, `/resumes/import-pdf`, `/jobs/{job_id}/interview-prep`) explicitly raises `GemmaOverloadError` via `except (HTTPException, GemmaOverloadError): raise` to ensure it isn't swallowed and mapped to a generic `500 Internal Server Error`.
+5.  **Global Exception Handler:** The global FastAPI handler intercepting `GemmaOverloadError` packages the error into a structured JSON response containing:
+    *   `code`: either `"AI_OVERLOAD"` or `"AI_TIMEOUT"`.
+    *   `message`: A friendly, context-specific description.
+    *   `detail`: A clear warning indicating that Google AI Studio is under high demand or timed out, reducing user friction.
+
+#### 3. Verification & Integration Testing
+We implemented robust test cases under `backend/scratch/test_error_handling.py` executing:
+*   **Service-level Mocks:** Mocking `google-genai` content and embedding methods to raise API errors and asserting that retries occur, sleep is called, and `GemmaOverloadError` is correctly raised with code `503` / `504`.
+*   **FastAPI Router Integration:** Using `FastAPI`'s `TestClient` to mock requests triggering the handler and asserting that HTTP statuses are correctly mapped, payload keys (`code`, `message`, `detail`) are verified, and the API contract is fully satisfied.
+
+
+### Premium Toast & Badge Visual Redesign (2026-05-17)
+
+**Objective:** Redesign the Toast notifications and standard label Badges to look highly premium, modern, and prominent, addressing user feedback regarding visibility, transparent blocks, text contrast, and interactivity.
+
+#### 1. Toast Notification Redesign Decisions
+- **Reposition to Top-Center:** Moved the container from the bottom-right corner to the top-center (`fixed top-6 left-1/2 -translate-x-1/2`). This is the industry-standard for prominent, highly-noticeable system feedback.
+- **Glassmorphism Styling:** Applied a modern `backdrop-blur-xl`, subtle borders (`border-emerald-500/20`, etc.), and custom color scales combined with soft shadow glows (`shadow-[0_8px_30px_...]`). This eliminates the low-contrast transparent blocks with black text.
+- **Micro-animations:** Added smooth slide-down and fade-in animations (`animate-in fade-in slide-in-from-top-4 duration-300`) leveraging utility frameworks.
+- **Dedicated ToastItem Sub-component:**
+  - **Pause-on-Hover:** Moved timer logic to a dedicated `ToastItem` component. Hovering over a toast pauses its auto-dismiss timer, and mouse exit resumes the timer with only the remaining duration.
+  - **Early Dismissal:** Added a micro-animated "x" close button on the right for immediate user dismissal.
+  - **Stacking Limit:** Enforced a maximum of **3 active toasts** in the queue to prevent screen flooding.
+- **Extended Durations:** Standard notifications show for 5 seconds (5000ms), while warnings and errors remain for at least 6 seconds (6000ms) to ensure readability.
+
+#### 2. Premium Badge Redesign Decisions
+- Replaced outdated and uncompilable color names (`orange-dim`, `green-dim`, `red-dim`) with vibrant, premium standard CSS color mappings:
+  - **green:** Emerald scale with light border and high-contrast text.
+  - **orange:** Amber scale with subtle background and crisp contrast.
+  - **red:** Rose scale for noticeability.
+  - **blue:** Sky scale.
+- Unified styling across all templates and screens.
+
+
+## Section 30 — Coin Exhaustion UX & Redirection
+
+### 30.1 Global Coin Exhaustion Detection & Redirection
+To improve the upgrade/top-up funnel, we integrated a global "Top Up Coins" action that triggers whenever a coin exhaustion error is encountered:
+- **FastAPI Backend (budget_guard.py):** Returns an `HTTP 402` status with a descriptive error message (`Not enough coins — top up or upgrade your plan`) when user operation budget is exhausted.
+- **Frontend App Navigation (App.jsx & Plans.jsx):**
+  - Updated React routing so `/pricing` maps to the billing `<Plans />` page.
+  - Detects `?highlight=popular` in URL query parameters, automatically scrolls the viewport smoothly down to the Top-Up pack section, and applies a prominent animated border/glow styling to the medium/most popular pack card.
+- **Surface 1: Toast Integration (Toast.jsx):**
+  - If a toast error containing "insufficient coins" or "not enough coins" is rendered, a prominent "Top Up Coins" button is dynamically appended.
+  - Clicking this button invokes the React Router to navigate directly to `/pricing?highlight=popular` and dismisses the toast.
+- **Surface 2: Extension Popup (popup.js):**
+  - Caught 402/coin error codes in the deep analysis catch block, appending a styled "Top Up Coins" button directly into the error container.
+  - Clicking this button calls `chrome.tabs.create` opening `<frontendUrl>/pricing?highlight=popular`.
+- **Surface 3: Extension Sidebar (sidebar-ui.js):**
+  - The `renderErrorCard` function accepts an `isCoinExhaustion` flag and injects a "Top Up Coins" button when true.
+  - `fetchResumesAndBuild` catches credit/coin load failures, passes the coin exhaustion flag, and binds a listener to proxy tab navigation to the pricing page.
+
+
+## Section 31 — Cross-World Token Sync & Live Sidebar Authentication Updates
+
+### 31.1 Isolated-World Token Sync Solution
+In Chrome Extension Manifest V3, content scripts run in an isolated JavaScript context separate from the host page. Consequently, content scripts cannot read variables or `localStorage` set by the main page. To synchronize authentication state between the web app (`localhost:5173`) and content scripts (like `auth-sync.js`):
+- **Web App Auth Context (`AuthContext.jsx`):** Whenever the user logs in, logs out, or refreshes their authentication token, the web app sets a custom attribute `data-resumeiq-token` directly on the `document.documentElement` element (for logouts, it removes the attribute).
+- **Extension Synchronization (`auth-sync.js`):**
+  - Instead of polling `localStorage` periodically, the content script observes attributes on the shared `document.documentElement` using a `MutationObserver`.
+  - When the `data-resumeiq-token` attribute changes, the observer fires and immediately dispatches `SYNC_TOKEN` or `CLEAR_TOKEN` messages to `background.js` to update `chrome.storage.local`.
+
+### 31.2 Live Tab Refresh-Free Sync
+- **Sidebar Real-time Updates (`sidebar-ui.js`):**
+  - Registered a listener for `chrome.storage.onChanged` inside the content script context.
+  - When the background script updates `resumeIqToken` in `chrome.storage.local` (from a login/logout action on the web app tab), all active sidebars on job search sites (LinkedIn, Indeed, etc.) receive the event.
+  - The sidebars automatically re-evaluate their login status, updating and rendering either the resume list or the login card immediately without requiring the user to refresh the page.
+
+### 31.3 Stale Auth / Expiry Protection
+- If the token stored in extension storage expires or is invalid, the backend API requests to `/api/resumes` return `401 Unauthorized` or `403 Forbidden`.
+- The sidebar catch block intercepts these status codes, triggers a `CLEAR_TOKEN` dispatch to invalidate the stale token in storage, and gracefully replaces the error view with the standard Login card.
+
+### 31.4 Context Invalidation Protection
+- **Stale Content Scripts:** When the user reloads or updates the extension from `chrome://extensions`, any content script running in an already opened tab (like LinkedIn, Indeed, Naukri) is immediately disconnected from the background script.
+- **Graceful Failure Handler (`safeSendMessage`):** To prevent constant console errors like `chrome-extension://invalid/` or uncaught exceptions, we wrap all message dispatches in a wrapper function `safeSendMessage`.
+- **Early Exit Guards:** Added `if (!chrome.runtime?.id)` check at the top of content script initialization, navigation listeners, storage change observers, and fetch routines to immediately disconnect observers and cease operations if the extension is reloaded or disabled.

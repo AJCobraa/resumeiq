@@ -14,7 +14,8 @@ export default function TopUpSection({
   currency,
   isOnPaid,
   processing,
-  handleTopUp
+  handleTopUp,
+  highlightPopular
 }) {
   return (
     <div className="space-y-8" id="top-up-section">
@@ -40,17 +41,21 @@ export default function TopUpSection({
           const price = currency === 'INR' ? pack.price_inr : pack.price_usd;
           const symbol = currency === 'INR' ? '₹' : '$';
           const workflows = Math.floor(pack.coins / 89);
+          const highlightThis = isPopular && highlightPopular;
           
           return (
             <motion.div
               key={pack.pack_id}
+              id={isPopular ? 'popular-topup-pack' : undefined}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
               className={`relative bg-white rounded-[2rem] p-8 flex flex-col items-center text-center transition-all duration-500 hover:shadow-2xl hover:-translate-y-1 group
-                ${isPopular 
-                  ? 'border-2 border-violet-600 shadow-xl shadow-violet-100' 
-                  : 'border border-slate-200 shadow-sm hover:border-violet-200'}`}
+                ${highlightThis
+                  ? 'border-2 border-violet-600 shadow-[0_0_30px_rgba(124,58,237,0.55)] ring-4 ring-violet-500/35 scale-[1.03] z-10'
+                  : isPopular 
+                    ? 'border-2 border-violet-600 shadow-xl shadow-violet-100' 
+                    : 'border border-slate-200 shadow-sm hover:border-violet-200'}`}
             >
               {isPopular && (
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-violet-600 text-white px-5 py-1 rounded-full text-xs font-black uppercase tracking-widest shadow-lg z-10">

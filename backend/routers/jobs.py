@@ -469,6 +469,8 @@ async def generate_job_interview_prep(
             "companyTier": company_tier["tier"],
             "companyLabel": company_tier["label"],
         }
+    except (HTTPException, GemmaOverloadError):
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate interview prep: {str(e)}")
 

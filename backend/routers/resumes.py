@@ -16,6 +16,7 @@ from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from firebase_admin_init import verify_token
 from core.database import get_db_session
+from core.exceptions import GemmaOverloadError
 from models.resume_model import (
     CreateResumeRequest,
     UpdateMetaRequest,
@@ -241,7 +242,7 @@ async def import_pdf(
 
         return resume
 
-    except HTTPException:
+    except (HTTPException, GemmaOverloadError):
         raise
     except Exception as e:
         import traceback

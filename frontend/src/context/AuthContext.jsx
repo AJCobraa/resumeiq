@@ -27,6 +27,26 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const isMock = localStorage.getItem('useMockAuth') === 'true'
+    if (isMock) {
+      const mockUser = {
+        uid: 'test-user-id',
+        email: 'test@example.com',
+        displayName: 'Test User',
+        providerData: [],
+        getIdToken: async () => 'test-token'
+      }
+      setUser(mockUser)
+      localStorage.setItem('resumeIqExtToken', 'test-token')
+      api.getMe().then(profileData => {
+        setProfile(profileData)
+      }).catch(err => {
+        logger.error('Failed to fetch mock profile:', err)
+      })
+      setLoading(false)
+      return
+    }
+
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
         // Block unverified email/password users from accessing the app
@@ -40,9 +60,12 @@ export function AuthProvider({ children }) {
         }
 
         setUser(firebaseUser)
-        // Explicitly expose token for Chrome Extension content script
+        // Explicitly expose token + refresh token for Chrome Extension content script
         firebaseUser.getIdToken().then(token => {
           localStorage.setItem('resumeIqExtToken', token)
+          // Also expose refresh token so extension can refresh independently
+          localStorage.setItem('resumeIqExtRefreshToken', firebaseUser.refreshToken || '')
+          localStorage.setItem('resumeIqExtApiKey', import.meta.env.VITE_FIREBASE_API_KEY || '')
         }).catch(() => {})
 
         try {
@@ -55,6 +78,8 @@ export function AuthProvider({ children }) {
         setUser(null)
         setProfile(null)
         localStorage.removeItem('resumeIqExtToken')
+        localStorage.removeItem('resumeIqExtRefreshToken')
+        localStorage.removeItem('resumeIqExtApiKey')
       }
       setLoading(false)
     })
