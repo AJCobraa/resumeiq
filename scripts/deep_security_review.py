@@ -20,7 +20,7 @@ IGNORE_DIRS = {'.git', 'node_modules', 'venv', '__pycache__', 'build', 'dist', '
 VALID_EXTENSIONS = {'.js', '.ts', '.jsx', '.tsx', '.py', '.json', '.yml', '.yaml', '.sql'}
 
 # As requested, the prompt is left blank/generic.
-SYSTEM_PROMPT = f"""
+SYSTEM_PROMPT = """
 You are a principal application security engineer, red-team operator,
 secure code reviewer, cloud security architect, and API penetration tester.
 
@@ -227,12 +227,6 @@ Generate a professional Markdown report with:
 # Final Risk Score
 
 Use tables where appropriate.
-
---------------------------------------------------
-CODEBASE
---------------------------------------------------
-
-{codebase}
 """
 
 # Safe threshold below the 250k TPM limit to account for response tokens
