@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
+import AuthModal from '../components/auth/AuthModal'
 
 /* ─── Spring transition presets ───────────────────────── */
 const spring = { type: 'spring', stiffness: 300, damping: 30 }
@@ -367,9 +368,9 @@ function InterviewPredictorCard() {
 
 /* ── Main Landing Page ────────────────────────────────── */
 export default function Landing() {
-  const { user, loading, signIn } = useAuth()
+  const { user, loading } = useAuth()
   const navigate = useNavigate()
-  const [signingIn, setSigningIn] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
 
   useEffect(() => {
     if (!loading && user) {
@@ -377,12 +378,11 @@ export default function Landing() {
     }
   }, [user, loading, navigate])
 
-  const handleSignIn = async () => {
-    try {
-      setSigningIn(true)
-      await signIn()
-    } catch {
-      setSigningIn(false)
+  const handleGetStarted = () => {
+    if (user) {
+      navigate('/dashboard')
+    } else {
+      setShowAuthModal(true)
     }
   }
 
@@ -407,16 +407,13 @@ export default function Landing() {
           </div>
 
           <button
-            onClick={user ? () => navigate('/dashboard') : handleSignIn}
-            disabled={signingIn}
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-primary to-brand-dark text-primary-foreground text-sm font-semibold rounded-xl px-4 py-2 shadow-sm hover:shadow-glow transition-all duration-300 disabled:opacity-70"
+            onClick={handleGetStarted}
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-primary to-brand-dark text-primary-foreground text-sm font-semibold rounded-xl px-4 py-2 shadow-sm hover:shadow-glow transition-all duration-300"
           >
-            {signingIn ? 'Signing in...' : user ? 'Open Dashboard' : 'Get Started'}
-            {!signingIn && (
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            )}
+            {user ? 'Open Dashboard' : 'Get Started'}
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
           </button>
         </div>
       </nav>
@@ -464,16 +461,13 @@ export default function Landing() {
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
             <button
-              onClick={handleSignIn}
-              disabled={signingIn}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-gradient-to-r from-primary to-brand-dark text-primary-foreground font-bold rounded-2xl px-8 py-4 shadow-glow hover:shadow-[0_12px_40px_hsl(239_84%_67%_/_0.3)] hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-70 active:translate-y-0"
+              onClick={handleGetStarted}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-gradient-to-r from-primary to-brand-dark text-primary-foreground font-bold rounded-2xl px-8 py-4 shadow-glow hover:shadow-[0_12px_40px_hsl(239_84%_67%_/_0.3)] hover:-translate-y-0.5 transition-all duration-300 active:translate-y-0"
             >
-              {signingIn ? 'Please wait...' : 'Get Started Free'}
-              {!signingIn && (
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              )}
+              Get Started Free
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
             </button>
             <button className="w-full sm:w-auto bg-card border border-border/60 text-foreground font-bold rounded-2xl px-8 py-4 hover:bg-surface-hover transition-colors duration-200 shadow-soft">
               Watch Demo
@@ -541,11 +535,20 @@ export default function Landing() {
             <p className="text-sm text-muted-foreground font-medium">© {new Date().getFullYear()} ResumeIQ. All rights reserved.</p>
           </div>
           <div className="flex items-center gap-10">
-            <Link to="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">Privacy Policy</Link>
-            <Link to="/terms" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">Terms of Service</Link>
+            <Link to="/privacy-policy" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">Privacy Policy</Link>
+            {/* <Link to="/terms" className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">Terms of Service</Link> */}
           </div>
         </div>
       </footer>
+
+      <AnimatePresence>
+        {showAuthModal && (
+          <AuthModal 
+            isOpen={showAuthModal} 
+            onClose={() => setShowAuthModal(false)} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -12,6 +12,7 @@ import time
 import asyncio
 import threading
 from google import genai
+from core.exceptions import GemmaOverloadError, is_ai_transient_error
 
 # Lazy-init client
 _client = None
@@ -139,7 +140,7 @@ async def compute_embeddings(resume: dict, user_id: str = "") -> list[dict]:
                 contents=texts,
             )
             latency_ms = (time.monotonic() - t0) * 1000
-            embeddings = [e.values for e in result.embeddings]
+            embeddings = [list(e.values) for e in result.embeddings]
 
             # Log usage
             if user_id:
@@ -148,7 +149,16 @@ async def compute_embeddings(resume: dict, user_id: str = "") -> list[dict]:
                 await _log_embedding_usage(user_id, "embed_resume", est_tokens)
 
             break
-        except Exception:
+        except Exception as e:
+            is_transient, is_timeout = is_ai_transient_error(e)
+            if is_transient:
+                if attempt == 0:
+                    await asyncio.sleep(2)
+                    continue
+                msg = "Our AI took too long to respond. Please try again." if is_timeout else \
+                      "The Google AI service is currently overloaded. Please try again in a few moments."
+                raise GemmaOverloadError(message=msg, status_code=504 if is_timeout else 503, is_timeout=is_timeout)
+
             if attempt == 0:
                 await asyncio.sleep(2)  # retry once with 2s sleep
             else:
@@ -229,8 +239,17 @@ async def get_jd_embedding(text: str, user_id: str = "") -> list[float]:
                 est_tokens = len(text) // 4
                 await _log_embedding_usage(user_id, "embed_jd", est_tokens)
 
-            return result.embeddings[0].values
-        except Exception:
+            return list(result.embeddings[0].values)
+        except Exception as e:
+            is_transient, is_timeout = is_ai_transient_error(e)
+            if is_transient:
+                if attempt == 0:
+                    await asyncio.sleep(2)
+                    continue
+                msg = "Our AI took too long to respond. Please try again." if is_timeout else \
+                      "The Google AI service is currently overloaded. Please try again in a few moments."
+                raise GemmaOverloadError(message=msg, status_code=504 if is_timeout else 503, is_timeout=is_timeout)
+
             if attempt == 0:
                 await asyncio.sleep(2)
             else:

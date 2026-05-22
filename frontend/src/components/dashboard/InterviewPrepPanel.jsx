@@ -4,6 +4,7 @@ import { useToast } from '../ui/Toast'
 import Button from '../ui/Button'
 import Spinner from '../ui/Spinner'
 import { motion, AnimatePresence } from 'framer-motion'
+import { getFriendlyAiErrorMessage } from '../../lib/errorUtils'
 
 const spring = { type: 'spring', stiffness: 300, damping: 30 }
 const gentleSpring = { type: 'spring', stiffness: 200, damping: 24 }
@@ -22,7 +23,7 @@ export default function InterviewPrepPanel({ job, onUpdate }) {
       if (onUpdate) onUpdate(result)
       toast.success('Interview questions generated!')
     } catch (e) {
-      toast.error('Failed to generate prep: ' + e.message)
+      toast.error(getFriendlyAiErrorMessage(e, 'generate prep') || ('Failed to generate prep: ' + e.message))
     } finally {
       setLoading(false)
     }

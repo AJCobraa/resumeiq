@@ -5,26 +5,21 @@
  */
 import './config.js';
 
-let authToken = null;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'SYNC_TOKEN') {
-    authToken = request.token;
-    chrome.storage.local.set({ resumeIqToken: authToken });
+    chrome.storage.local.set({ resumeIqToken: request.token });
+    sendResponse({ success: true });
 
   } else if (request.action === 'CLEAR_TOKEN') {
-    authToken = null;
     chrome.storage.local.remove('resumeIqToken');
+    sendResponse({ success: true });
 
   } else if (request.action === 'GET_TOKEN') {
-    if (authToken) {
-      sendResponse({ token: authToken });
-    } else {
-      chrome.storage.local.get(['resumeIqToken'], (res) => {
-        sendResponse({ token: res.resumeIqToken || null });
-      });
-      return true; // keep channel open for async storage read
-    }
+    chrome.storage.local.get(['resumeIqToken'], (res) => {
+      sendResponse({ token: res.resumeIqToken || null });
+    });
+    return true; // keep channel open for async storage read
 
   } else if (request.action === 'OPEN_DASHBOARD') {
     const base = (typeof CONFIG !== 'undefined' ? CONFIG.frontendUrl : 'http://localhost:5173');
@@ -79,9 +74,3 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Load token from storage on startup
-chrome.storage.local.get(['resumeIqToken'], (res) => {
-  if (res.resumeIqToken) {
-    authToken = res.resumeIqToken;
-  }
-});

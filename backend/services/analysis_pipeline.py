@@ -226,7 +226,7 @@ async def analyze_resume_vs_jd(
     # Cache hit detection: check Job.jd_embedding column
     jd_embedding = None
     is_jd_cache_hit = False
-    if existing_row and existing_row.jd_embedding:
+    if existing_row and existing_row.jd_embedding is not None:
         jd_embedding = list(existing_row.jd_embedding)
         is_jd_cache_hit = True
 
@@ -264,14 +264,14 @@ async def analyze_resume_vs_jd(
 
     # 3. Compute semantic score (Single Vector Match)
     semantic_score = 0
-    if chunks and jd_embedding:
+    if chunks and jd_embedding is not None:
         best_sim = 0.0
         jd_norm = math.hypot(*jd_embedding)
         
         if jd_norm > 0:
             for chunk in chunks:
                 emb = chunk.get("embedding", [])
-                if not emb: continue
+                if emb is None or len(emb) == 0: continue
                 
                 c_norm = math.hypot(*emb)
                 if c_norm > 0:

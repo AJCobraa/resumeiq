@@ -1,11 +1,11 @@
 import { cn } from '../../lib/utils'
 
 const variants = {
-  primary:  'bg-accent-blue hover:bg-accent-blue-hover text-white shadow-lg shadow-accent-blue/20',
-  outline:  'border border-border-default hover:border-accent-blue text-text-primary hover:text-accent-blue',
-  ghost:    'text-text-muted hover:text-text-primary hover:bg-bg-elevated',
-  danger:   'bg-red/10 text-red hover:bg-red/20',
-  success:  'bg-green/10 text-green hover:bg-green/20',
+  primary:  'bg-primary hover:bg-brand-dark text-primary-foreground shadow-glow',
+  outline:  'border border-border hover:border-primary text-foreground hover:text-primary bg-card',
+  ghost:    'text-muted-foreground hover:text-foreground hover:bg-surface-hover',
+  danger:   'bg-destructive/10 text-destructive hover:bg-destructive/20',
+  success:  'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20',
 }
 
 const sizes = {

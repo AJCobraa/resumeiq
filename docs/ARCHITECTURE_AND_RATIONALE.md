@@ -453,7 +453,22 @@ Jobs are linked to the resume used for their analysis. If a resume is deleted, t
 
 ## Section 26 — Personal Usage & ROI Stats
 
-**Problem:** Users wanted to see the value ResumeIQ brings (ROI) and monitor their own AI usage/telemetry without needing access to global admin dashboards.
+**Problem:** Users wanted to see the value ResumeIQ brings (ROI) and monitor their own AI usage/telemetry without needing access to global admin dashboards. Additionally, the coin balance display was inconsistent, sometimes showing only subscription coins instead of the total balance.
+
+**Decision:** Implement a comprehensive Personal Stats dashboard that aggregates usage data directly from PostgreSQL and calculates a "Total ROI" based on job search activity.
+
+**Implementation:**
+- **Backend (`routers/stats.py`):**
+    - Aggregates `totalAiCalls`, `inputTokens`, and `outputTokens` directly from `coin_transactions` using SQL `func.sum()`.
+    - Calculates `coins_balance` as the atomic sum of `subscription_coins` + `topup_coins`.
+    - Implements a "Total ROI" metric calculated as `totalJobs * $2.00`. This provides a tangible value metric for the user based on the average market cost of manual resume tailoring ($2 per job).
+- **Frontend (`PersonalStats.jsx`):**
+    - Created a 6-card grid layout (using `xl:grid-cols-6` for responsiveness).
+    - Visualizes AI performance using token-count badges and model usage strings.
+    - Displays the "Total ROI" as a primary value metric with a currency symbol.
+- **Data Integrity:** All stats are computed live from PostgreSQL tables (`coin_transactions`, `jobs`, `resumes`, `user_credits`), ensuring the stats page is always the source of truth for account state.
+
+**Why live SQL aggregation?** Unlike the legacy Firestore pre-aggregation (Section 32), the PostgreSQL implementation handles aggregation efficiently on-the-fly for personal usage. This eliminates the risk of "dirty" counters and ensures the UI matches the actual transaction history perfectly.
 
 ## Section 27 — Dynamic Resume Template Selection
 
@@ -1022,3 +1037,422 @@ While the system still uses a **Snapshot Architecture** (copying `resumeTitle` i
 - **Persistence (SQLAlchemy JSONB):** Explicitly calls `flag_modified(row, "resume_data")` before `db.commit()`. This is critical because SQLAlchemy does not automatically track mutations inside a JSONB blob.
 
 **Why this works:** It provides "graceful degradation" — exact ID matches are fast and precise, while text-based fallbacks and grammar-aware skills parsing ensure that recommendations remain actionable even if the user has made manual edits to the resume since the last analysis run.
+
+---
+
+## Section 39 — Billing & Subscription System
+
+**Problem:** ResumeIQ needed a monetization layer with subscription plans, coin management, top-up packs, and payment processing while maintaining the existing coin-based budget guard system.
+
+**Decision:** Implement Razorpay Standard Checkout with a dual coin pool model (subscription coins + top-up coins) and server-side order creation/verification.
+
+### Architecture
+
+**Dual Coin Pools:**
+- `coins_balance` — Subscription coins. Reset each billing cycle. Deducted first.
+- `topup_coins_balance` — Top-up coins. Never expire. Deducted after subscription pool is empty.
+- `budget_guard.py` uses `SELECT ... FOR UPDATE` row-level locking with the deduction priority: subscription → top-up → HTTP 402.
+
+**Subscription Plans:** Free (100 coins/mo, 1 resume) → Starter (₹415/mo) → Pro (₹1245/mo) → Growth (₹2490/mo, unlimited resumes).
+
+**Billing Cycles:** Monthly (1×), Quarterly (1.10× bonus), Biannual (1.15× bonus).
+
+**Top-up Packs:** Small (5K), Medium (12K), Large (25K). Only available on paid plans.
+
+### Payment Flow
+1. Frontend calls `POST /api/billing/subscription/order` or `POST /api/billing/topup/order`.
+2. Backend creates a Razorpay order via SDK (`asyncio.to_thread`), stores a `pending` `PaymentTransaction`.
+3. Frontend opens Razorpay Standard Checkout with the returned `orderId`.
+4. On success, frontend sends `razorpay_order_id`, `razorpay_payment_id`, `razorpay_signature` to `POST /api/billing/verify`.
+5. Backend verifies HMAC-SHA256 signature, credits coins to the correct pool, creates/updates `Subscription`, updates `User.plan_type`.
+6. The `process_verified_payment` function is idempotent — re-processing a `success` transaction returns the cached result.
+
+### New Files
+| File | Purpose |
+|---|---|
+| `backend/models/billing_model.py` | Pydantic request/response models for billing endpoints |
+| `backend/models/postgres_schema.py` | Added `SubscriptionPlan`, `Subscription`, `TopUpPack`, `PaymentTransaction` tables; extended `UserCredit` with `topup_coins_balance`, `coins_granted_this_period`, `period_start`, `ai_cost_usd_total` |
+| `backend/services/billing_service.py` | Core billing logic — Razorpay integration, coin calculation, order creation, payment verification, catalog seeding |
+| `backend/routers/billing.py` | 6 API endpoints: `/status`, `/plans/catalog`, `/subscription/order`, `/topup/order`, `/verify`, `/subscription/cancel` |
+| `backend/scripts/migrate_add_billing_columns.py` | One-time migration for new columns on `user_credits` |
+| `backend/core/budget_guard.py` | Updated with dual-pool deduction logic |
+| `frontend/src/pages/Plans.jsx` | Plans & Billing page with plan cards, top-up packs, payment history, Razorpay checkout |
+| `frontend/src/components/billing/CoinBalance.jsx` | Sidebar coin balance widget |
+| `frontend/src/lib/api.js` | Extended with 6 billing API methods |
+
+### Environment Variables
+- Backend: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`
+- Frontend: `VITE_RAZORPAY_KEY_ID`
+
+### Security
+- Razorpay key secret NEVER exposed to frontend.
+- All billing routes use `verify_token` dependency.
+- Signature verification uses `hmac.compare_digest` (timing-safe).
+- `process_verified_payment` is idempotent to protect against webhook/retry duplicates.
+- Top-ups blocked for free-plan users at the API level.
+
+---
+
+## Section 41 — Razorpay Webhooks
+
+**Problem:** The existing billing system relied solely on the frontend `/verify` callback to confirm payments. This is fragile — if the user closes their browser mid-payment, the backend never processes the successful charge. Razorpay webhooks provide server-to-server notification of payment and subscription lifecycle events, ensuring no payment is missed.
+
+**Decision:** Add a `POST /api/billing/webhook/razorpay` endpoint that receives, verifies, and idempotently processes Razorpay webhook events. This complements (does not replace) the existing frontend verify flow — whichever fires first credits the coins.
+
+### Why Webhooks Are Complementary to Checkout Verification
+
+The frontend `/verify` flow and webhooks serve the same purpose (confirm payment, credit coins) but cover different failure modes:
+
+| Scenario | Frontend /verify | Webhook |
+|---|---|---|
+| User completes checkout normally | ✅ Handles | ✅ Also fires |
+| User closes browser after paying | ❌ Missed | ✅ Handles |
+| Network failure on callback | ❌ Missed | ✅ Handles |
+| Subscription renewal (recurring) | ❌ N/A | ✅ Only source |
+| Subscription cancellation (external) | ❌ N/A | ✅ Only source |
+
+Both paths call the same idempotent coin-credit logic — processing the same payment twice never double-credits.
+
+### Webhook Signature Verification
+
+Per Razorpay docs: the raw request body must NOT be parsed or cast before signature verification.
+
+```
+signature = HMAC-SHA256(raw_body, RAZORPAY_WEBHOOK_SECRET)
+compare_digest(computed_signature, X-Razorpay-Signature header)
+```
+
+- The `X-Razorpay-Signature` header contains the expected HMAC.
+- `RAZORPAY_WEBHOOK_SECRET` is set in the Razorpay Dashboard and stored server-side only.
+- Invalid signatures return HTTP 400 immediately.
+
+### Idempotency Strategy
+
+Duplicate webhook deliveries are expected (Razorpay's documented behavior). Prevention uses three layers:
+
+1. **Event ID uniqueness:** `x-razorpay-event-id` header is stored in `payment_transactions.webhook_event_id` (UNIQUE column). A second delivery of the same event is rejected at the DB level.
+2. **Transaction state guards:** Before crediting coins, the processor checks `PaymentTransaction.status`. If already `success`, it returns a duplicate response without modifying state.
+3. **Period-based renewal guards:** For `subscription.charged`, the processor checks whether a renewal `PaymentTransaction` with the same `razorpay_payment_id` already exists before crediting.
+
+### Events Handled
+
+| Event | Action |
+|---|---|
+| `payment.authorized` | Log only — no coin credit (Standard Checkout handles capture) |
+| `payment.captured` | Credit coins if tx still pending; skip if already success |
+| `payment.failed` | Mark tx failed; never downgrade a success to failed |
+| `order.paid` | Reconciliation — credit if tx still pending |
+| `subscription.activated` | Mark subscription active if in weaker state |
+| `subscription.charged` | **Key renewal event** — reset subscription coins, extend period, create renewal tx |
+| `subscription.cancelled` | Mark cancelled; keep access until `period_end` |
+| `subscription.paused` | Update status to paused |
+| `subscription.resumed` | Reactivate to active |
+| `subscription.halted` | Mark halted (payment problem) |
+| `subscription.completed` | Mark completed/expired, prevent future cycles |
+
+### Subscription Renewal Logic (subscription.charged)
+
+This is the most critical webhook event. When fired:
+
+1. Load the subscription by `razorpay_sub_id`.
+2. Load the plan to compute `calculate_coins_for_period(plan, billing_cycle)`.
+3. Check idempotency — does a renewal tx with the same `razorpay_payment_id` exist?
+4. Lock `UserCredit` with `FOR UPDATE`.
+5. Reset `coins_balance` to the new period's allocation.
+6. Update `coins_granted_this_period`, `period_start`, `billing_cycle_end`.
+7. Extend `Subscription.period_start` and `period_end` by the correct duration.
+8. Create an audit `PaymentTransaction` with `transaction_type = 'subscription_renewal'`.
+
+Billing cycle durations: Monthly = 30 days, Quarterly = 90 days, Biannual = 180 days.
+
+### Database Safety
+
+- All state-changing logic runs inside a single DB transaction.
+- `SELECT ... FOR UPDATE` on `UserCredit` and `Subscription` rows prevents concurrent modifications.
+- A single `commit()` at the end ensures atomicity.
+- On error, the transaction is rolled back and the webhook returns 200 (to prevent Razorpay retry storms that would mask the real issue).
+
+### New/Modified Files
+
+| File | Change |
+|---|---|
+| `backend/services/webhook_service.py` | **Created** — signature verification, event dispatch, all handlers |
+| `backend/routers/webhooks.py` | **Created** — `POST /api/billing/webhook/razorpay` (no auth) |
+| `backend/main.py` | **Modified** — mounted `webhooks.router` |
+| `backend/models/postgres_schema.py` | **Modified** — added `webhook_event_id`, `webhook_event_type`, `webhook_status`, `raw_webhook_json`, `razorpay_invoice_id` to `PaymentTransaction` |
+| `backend/scripts/migrate_add_billing_columns.py` | **Modified** — added ALTER TABLE for new webhook columns |
+
+### Security Notes
+
+- The webhook route does NOT use `verify_token` — it uses HMAC signature verification instead.
+- `RAZORPAY_WEBHOOK_SECRET` is never exposed to the frontend.
+- The route returns 200 even on internal errors to prevent Razorpay from retrying infinitely; errors are logged for investigation.
+- `hmac.compare_digest` is used for timing-safe comparison.
+
+---
+
+## Section 42 — Local Webhook Testing (Cloudflare Tunnel)
+
+**Problem:** Razorpay cannot deliver webhooks to `localhost`. During local development, the backend must be reachable through a public HTTPS URL.
+
+**Decision:** Use Cloudflare Quick Tunnel (`cloudflared tunnel --url http://localhost:8000`) to create a temporary public URL that forwards to the local FastAPI server. The tunnel URL is stored in `WEBHOOK_PUBLIC_URL` and printed at startup for easy copy-paste into the Razorpay Dashboard.
+
+### How It Works
+
+1. Developer starts FastAPI locally on port 8000.
+2. Developer runs `cloudflared tunnel --url http://localhost:8000` in a separate terminal.
+3. Cloudflare generates a temporary `https://xxx.trycloudflare.com` URL.
+4. Developer sets `WEBHOOK_PUBLIC_URL` in `backend/.env` and restarts the backend.
+5. On startup, `core/webhook_config.py` prints the full webhook URL: `https://xxx.trycloudflare.com/api/billing/webhook/razorpay`.
+6. Developer pastes this URL into Razorpay Dashboard webhook settings.
+7. Razorpay sends webhook events to the tunnel, which forwards them to `localhost:8000`.
+
+### Why Cloudflare Quick Tunnel
+
+- No account or login required.
+- Immediate public HTTPS URL.
+- Works on Windows, macOS, and Linux.
+- Free for development use.
+- Tunnel URL changes on each restart (acceptable for dev).
+
+### New/Modified Files
+
+| File | Change |
+|---|---|
+| `backend/core/webhook_config.py` | **Created** — reads `WEBHOOK_PUBLIC_URL`, prints full webhook URL at startup |
+| `backend/main.py` | **Modified** — calls `print_webhook_url()` during startup event |
+| `backend/.env` | **Modified** — added `WEBHOOK_PUBLIC_URL` |
+| `backend/.env.example` | **Modified** — added `WEBHOOK_PUBLIC_URL` template |
+| `docs/LOCAL_WEBHOOK_TESTING.md` | **Created** — step-by-step local testing guide |
+
+---
+
+## Section 38 — Webhook Automation & Environment Resolution
+
+### 38.1 dev_start.py Strategy
+
+**Problem:** The `dev_start.py` script (introduced for webhook automation) used `sys.executable` to start the FastAPI backend. In many local development environments, `sys.executable` points to the system-wide Python interpreter rather than the project's virtual environment (`venv`). This led to `ModuleNotFoundError` for packages like `razorpay` that were only installed inside the `venv`.
+
+**Decision:** Implement explicit virtual environment discovery logic within the automation script.
+
+**Implementation (`dev_start.py`):**
+- **Dynamic Resolution:** The `run_backend()` function now actively looks for the `venv` folder within the `backend/` directory.
+- **Cross-Platform Compatibility:** It checks for `Scripts/python.exe` (Windows) and `bin/python` (Linux/macOS).
+- **Fallback:** If a virtual environment is not found, it gracefully falls back to `sys.executable` as a last resort.
+
+**Why this works:** It ensures that the backend always starts using the correct environment where dependencies are installed, regardless of how the parent script was invoked. This significantly improves the reliability of the local development "one-click" startup experience.
+
+
+
+## Section 38 � Global Layout & Scroll Strategy Fix
+
+**Problem:** The initial dashboard layout used a " contained app\ model where AppLayout was fixed to 100vh and forced internal scrolling on child pages (like Dashboard and My Resumes). However, pages with variable-height content (like the Plans page with new top-up sections or the Settings page) lacked their own internal scroll containers, causing content to be cut off and unreachable.
+
+**Decision:** Transition the global AppLayout from a fixed-height container to a minimum-height container with automatic vertical overflow. This shifts the primary scroll responsibility to the parent layout while remaining backward compatible with pages that still use internal scrolling.
+
+**Implementation (AppLayout.jsx):**
+- Changed height: 100vh to min-height: 100vh on the main content area.
+- Replaced overflow: hidden with overflow-y: auto.
+
+**Why this works:** It provides a universal safety net for all pages. If a page implements its own internal scrolling (like Dashboard.jsx), it continues to work as it fills the 100vh parent. If a page does not implement internal scrolling (like Plans.jsx), the AppLayout parent now correctly handles the overflow, ensuring all content is accessible across the entire application without requiring per-page layout logic.
+
+
+## Plans & Billing Page Redesign (May 2026)
+
+**Context:** The plans and billing page was redesigned to provide a more premium, high-conversion experience, moving away from a flat UI to a more dynamic and visually structured layout.
+
+**Key Changes:**
+
+1. **Redesigned Header & Layout:** Added a clear, centered call-to-action section above the pricing table to improve focus.
+2. **Animated Billing Toggle:** Replaced standard buttons with a pill-style toggle using Framer Motion's `layoutId`. This provides a smooth, tactile transition between billing cycles (Monthly, Quarterly, Biannual).
+3. **Plan Hierarchy & Badges:** 
+   - Introduced visual badges for 'Most Popular' (Pro) and 'Best Value' (Growth).
+   - Used scaling and border accents (`lg:scale-105`, high-contrast borders) to guide the user's eye toward higher-value plans.
+4. **Dynamic Coin Bonus Box:** Added a visualization for bonus coins earned through longer-term commitments (+10% for Quarterly, +15% for 6-Months), making the value proposition immediate.
+5. **Premium Coin Top-Ups:** 
+   - Completely overhauled the top-up packs with a high-contrast card design.
+   - Added a 'Popular' badge and a detailed 'Cost per Operation' table to ensure pricing transparency.
+6. **Interactive FAQ Accordion:** Implemented a Framer Motion-powered accordion to address common billing questions directly on the page, reducing friction.
+
+**Rationale:** These changes align the Plans page with modern SaaS aesthetics (e.g., glassmorphism-lite, smooth spring animations) while explicitly highlighting the 'Commit longer, earn more' strategy through visual feedback. No changes were made to existing API logic or state management to ensure stability.
+
+
+**Architectural Refactor (Code Style Compliance):**
+
+- Following the 'Hard Rules' in AGENTS.md regarding component size (under 200 lines), the redesigned Plans page was refactored into a modular architecture.
+- **Sub-components Created:** `PlanCard.jsx`, `TopUpSection.jsx`, `FaqSection.jsx`, and `BillingComponents.jsx`.
+- **Global Integration:** Migrated local toast state to the global `useToast` hook provided by `ToastProvider` to ensure UI consistency.
+- **Benefit:** This structure significantly improves maintainability and allows for granular testing of pricing logic and UI elements without overloading the main Page component.
+
+### Plans Page UI Redesign (Premium Refresh)
+
+**Objective:** Complete UI overhaul of the Plans & Billing experience to match a premium SaaS aesthetic and improve conversion through visual hierarchy.
+
+**Key Changes:**
+- **PlanCard.jsx:** Rewritten with a theme-based system (Free, Starter, Pro, Growth). Implemented light lavender gradients, bold typography (black for prices, purple for Pro accents), and distinct coin bonus pills as per user-provided pixel spec.
+- **Visual Hierarchy:** Centered and elevated the " Most Popular\ (Pro) and \Best Value\ (Growth) badges using absolute positioning and high-contrast pills.
+- **BillingToggle.jsx:** Redesigned with a spring-animated purple pill and integrated bonus labels (e.g., \Save 15%\) directly into the inactive states to nudge users.
+- **Typography:** Shifted to a more aggressive font-weight hierarchy (black weights for key values) and increased spacing for better readability.
+
+**Rationale:** The previous UI was functional but lacked the \wow factor\ required for a premium tool. The new design uses subtle borders, shadow-glow effects, and theme-consistent colors to create a more trustworthy and high-end feel, directly matching the requested Pro card design.
+
+### Privacy Policy Implementation (May 16, 2026)
+
+**New File:** rontend/src/pages/PrivacyPolicy.jsx`n
+**Changes:**
+- Created a high-fidelity Privacy Policy page with a hero section, sticky sidebar navigation, and card-based content layout.
+- Added public route /privacy-policy in App.jsx.
+- Updated the landing page footer to link to the new route.
+
+**Rationale:** Required for Google OAuth and Chrome Web Store compliance. The design uses premium aesthetics (glassmorphism, subtle gradients, and sticky navigation) to maintain brand consistency even for legal pages. The content specifically addresses Chrome Extension data collection as requested.
+
+### Collapsible Sidebar Implementation (May 16, 2026)
+
+**Changes:**
+- Modified `AppLayout.jsx` to manage `isCollapsed` state, persisted in `localStorage`.
+- Updated `Sidebar.jsx` with a smooth transition (300ms) and a floating toggle button.
+- Implemented icon-only mode for navigation links and user profile when collapsed.
+- Created a compact variant of `CoinBalance.jsx` showing only coin count status.
+- Dynamically adjusted `marginLeft` of the main content area to prevent layout shifting.
+
+**Rationale:** Improves the user experience by allowing more screen real estate for core tasks like resume editing and job analysis. The persistence ensures that the user's preference is respected across sessions, providing a customizable dashboard feel.
+
+## Section 39 - Email/Password Authentication & AuthModal Refactor
+
+**Context:** Expanded authentication options to include Email/Password alongside Google OAuth. This reduces friction for users who prefer traditional login methods or don't use Google accounts.
+
+**Key Changes:**
+
+1. **AuthContext & Firebase SDK:**
+   - Updated `firebase.js` to include `signInWithEmailAndPassword`, `createUserWithEmailAndPassword`, `sendPasswordResetEmail`, and `updateProfile`.
+   - Enhanced `AuthContext.jsx` with `signInWithEmail`, `signUpWithEmail`, and `resetPassword` methods.
+   - `signUpWithEmail` includes support for `displayName` updates via `updateProfile`, ensuring new users have immediate identification.
+
+2. **AuthModal.jsx Implementation:**
+   - Introduced a unified, premium modal for all authentication flows.
+   - **Features:**
+     - Tabbed interface (Login/Register).
+     - "Forgot Password" flow with success feedback.
+     - Password visibility toggle.
+     - Integration with Google Sign-In as a secondary action (separated by an "OR" divider).
+     - Context-aware error mapping (e.g., "auth/user-not-found" -> user-friendly message).
+   - **Aesthetics:** Uses `framer-motion` for spring-animated entry, `bg-card` for container, and `shadow-glow` for a premium, floating feel.
+
+3. **Landing Page Refactor:**
+   - Replaced direct `signInWithPopup` calls on "Get Started" buttons with a toggle for `AuthModal`.
+   - This provides a more polished "walled garden" entry point where users can choose their preferred method.
+
+**Rationale:** Moving to a modal-based flow centralizes auth logic and prevents the jarring experience of immediate popup triggers. The support for email/password is handled identically to Google OAuth in the backend: `onAuthChange` intercepts the new Firebase user, retrieves the ID token, and `api.getMe()` automatically handles the PostgreSQL user/credit record creation if it's a first-time login. This ensures parity across all authentication providers.
+
+### Firebase Auth Error Handling & Password Hint (2026-05-16)
+
+**Objective:** Improve UX during authentication by providing specific, actionable error messages and clear password requirements.
+
+**Changes:**
+- **Enhanced handleAuthError:** Expanded the error mapping in AuthModal.jsx to cover specific Firebase codes like auth/invalid-credential, auth/password-does-not-meet-requirements, auth/too-many-requests, and auth/network-request-failed.
+- **Password Requirements Hint:** Added a visual hint under the password field during Sign-Up (isSignUp === true) specifying the required complexity (8+ characters, uppercase, number, special char).
+
+**Rationale:** Generic error messages like 'An unexpected error occurred' lead to user frustration. By mapping internal Firebase codes to human-readable strings, users can immediately identify if they need to check their internet, reset a password due to a lock, or fix a typo. The password hint proactively reduces 'Password does not meet requirements' errors by setting expectations before submission.
+
+### AI Service Overload Error Handling (2026-05-16)
+
+**Objective:** Gracefully handle transient failures from Google AI services (429, 500, 503) to prevent cryptic error messages.
+
+- **Backend:** Implemented GemmaOverloadError and a global FastAPI exception handler to return a structured JSON response with code AI_OVERLOAD.
+- **Retry Logic:** Added a single retry with a 2-second sleep in gemma_service.py for transient AI errors before bubbling up the exception.
+- **Frontend:** Updated pi.js to parse structured error codes and modified Dashboard.jsx and InterviewPrepPanel.jsx to catch AI_OVERLOAD and display friendly toast messages.
+
+**Rationale:** AI services often experience transient high demand. Returning a structured AI_OVERLOAD code allows the frontend to distinguish between a broken backend and a busy AI provider, enabling specific UX (like 'Please try again in a few moments') that reduces user panic and support tickets.
+
+
+### AI Error Handling & Resilience (2026-05-17)
+
+**Objective:** Standardize AI service-level and router-level exception handling for transient errors (overloads and timeouts) to ensure seamless API propagation, consistent HTTP mappings, and comprehensive unit/integration test coverage.
+
+#### 1. Status Code Mapping Decisions
+We distinguish between the two primary failure modes of Google AI (GenAI / Gemini):
+*   **HTTP 503 Service Unavailable (`AI_OVERLOAD`):** Triggered by definitive rate limiting or overload indicators (e.g., HTTP status `429` / `503` or keywords like `overloaded`, `quota`, `rate limit`, `high demand`). This indicates that the AI service is functional but has reached its capacity limit.
+*   **HTTP 504 Gateway Timeout (`AI_TIMEOUT`):** Triggered by backend network timeouts, deadline exceedance (e.g., status `504` or keywords like `deadline exceeded`, `timed out`, `timeout`). This indicates that the AI service failed to respond within a reasonable window.
+
+#### 2. Exception Classification & Propagation Flow
+To avoid catching generic 500 server errors as AI overloads (which would misrepresent local bugs as AI outages), a deterministic classification rule is enforced:
+1.  **Parsing & Detection:** The `is_ai_transient_error` helper extracts error codes (`429`, `503`, `504`) and performs lowercase substring checks against specific transient keywords. High-priority checks for timeouts are evaluated first.
+2.  **Transient Resilience:** When a transient error is caught at the service layer (`gemma_service`, `embedding_service`), the pipeline automatically retries **once** after a `2.0 second` asynchronous delay (`asyncio.sleep`).
+3.  **Custom Exception Raising:** If the second attempt fails, a `GemmaOverloadError` exception is raised with the appropriate HTTP status code (`503` or `504`) and standard user-facing message.
+4.  **Bypassing General Catch blocks:** Every relevant endpoint (e.g., `/analyze`, `/resumes/import-pdf`, `/jobs/{job_id}/interview-prep`) explicitly raises `GemmaOverloadError` via `except (HTTPException, GemmaOverloadError): raise` to ensure it isn't swallowed and mapped to a generic `500 Internal Server Error`.
+5.  **Global Exception Handler:** The global FastAPI handler intercepting `GemmaOverloadError` packages the error into a structured JSON response containing:
+    *   `code`: either `"AI_OVERLOAD"` or `"AI_TIMEOUT"`.
+    *   `message`: A friendly, context-specific description.
+    *   `detail`: A clear warning indicating that Google AI Studio is under high demand or timed out, reducing user friction.
+
+#### 3. Verification & Integration Testing
+We implemented robust test cases under `backend/scratch/test_error_handling.py` executing:
+*   **Service-level Mocks:** Mocking `google-genai` content and embedding methods to raise API errors and asserting that retries occur, sleep is called, and `GemmaOverloadError` is correctly raised with code `503` / `504`.
+*   **FastAPI Router Integration:** Using `FastAPI`'s `TestClient` to mock requests triggering the handler and asserting that HTTP statuses are correctly mapped, payload keys (`code`, `message`, `detail`) are verified, and the API contract is fully satisfied.
+
+
+### Premium Toast & Badge Visual Redesign (2026-05-17)
+
+**Objective:** Redesign the Toast notifications and standard label Badges to look highly premium, modern, and prominent, addressing user feedback regarding visibility, transparent blocks, text contrast, and interactivity.
+
+#### 1. Toast Notification Redesign Decisions
+- **Reposition to Top-Center:** Moved the container from the bottom-right corner to the top-center (`fixed top-6 left-1/2 -translate-x-1/2`). This is the industry-standard for prominent, highly-noticeable system feedback.
+- **Glassmorphism Styling:** Applied a modern `backdrop-blur-xl`, subtle borders (`border-emerald-500/20`, etc.), and custom color scales combined with soft shadow glows (`shadow-[0_8px_30px_...]`). This eliminates the low-contrast transparent blocks with black text.
+- **Micro-animations:** Added smooth slide-down and fade-in animations (`animate-in fade-in slide-in-from-top-4 duration-300`) leveraging utility frameworks.
+- **Dedicated ToastItem Sub-component:**
+  - **Pause-on-Hover:** Moved timer logic to a dedicated `ToastItem` component. Hovering over a toast pauses its auto-dismiss timer, and mouse exit resumes the timer with only the remaining duration.
+  - **Early Dismissal:** Added a micro-animated "x" close button on the right for immediate user dismissal.
+  - **Stacking Limit:** Enforced a maximum of **3 active toasts** in the queue to prevent screen flooding.
+- **Extended Durations:** Standard notifications show for 5 seconds (5000ms), while warnings and errors remain for at least 6 seconds (6000ms) to ensure readability.
+
+#### 2. Premium Badge Redesign Decisions
+- Replaced outdated and uncompilable color names (`orange-dim`, `green-dim`, `red-dim`) with vibrant, premium standard CSS color mappings:
+  - **green:** Emerald scale with light border and high-contrast text.
+  - **orange:** Amber scale with subtle background and crisp contrast.
+  - **red:** Rose scale for noticeability.
+  - **blue:** Sky scale.
+- Unified styling across all templates and screens.
+
+
+## Section 30 — Coin Exhaustion UX & Redirection
+
+### 30.1 Global Coin Exhaustion Detection & Redirection
+To improve the upgrade/top-up funnel, we integrated a global "Top Up Coins" action that triggers whenever a coin exhaustion error is encountered:
+- **FastAPI Backend (budget_guard.py):** Returns an `HTTP 402` status with a descriptive error message (`Not enough coins — top up or upgrade your plan`) when user operation budget is exhausted.
+- **Frontend App Navigation (App.jsx & Plans.jsx):**
+  - Updated React routing so `/pricing` maps to the billing `<Plans />` page.
+  - Detects `?highlight=popular` in URL query parameters, automatically scrolls the viewport smoothly down to the Top-Up pack section, and applies a prominent animated border/glow styling to the medium/most popular pack card.
+- **Surface 1: Toast Integration (Toast.jsx):**
+  - If a toast error containing "insufficient coins" or "not enough coins" is rendered, a prominent "Top Up Coins" button is dynamically appended.
+  - Clicking this button invokes the React Router to navigate directly to `/pricing?highlight=popular` and dismisses the toast.
+- **Surface 2: Extension Popup (popup.js):**
+  - Caught 402/coin error codes in the deep analysis catch block, appending a styled "Top Up Coins" button directly into the error container.
+  - Clicking this button calls `chrome.tabs.create` opening `<frontendUrl>/pricing?highlight=popular`.
+- **Surface 3: Extension Sidebar (sidebar-ui.js):**
+  - The `renderErrorCard` function accepts an `isCoinExhaustion` flag and injects a "Top Up Coins" button when true.
+  - `fetchResumesAndBuild` catches credit/coin load failures, passes the coin exhaustion flag, and binds a listener to proxy tab navigation to the pricing page.
+
+
+## Section 31 — Cross-World Token Sync & Live Sidebar Authentication Updates
+
+### 31.1 Isolated-World Token Sync Solution
+In Chrome Extension Manifest V3, content scripts run in an isolated JavaScript context separate from the host page. Consequently, content scripts cannot read variables or `localStorage` set by the main page. To synchronize authentication state between the web app (`localhost:5173`) and content scripts (like `auth-sync.js`):
+- **Web App Auth Context (`AuthContext.jsx`):** Whenever the user logs in, logs out, or refreshes their authentication token, the web app sets a custom attribute `data-resumeiq-token` directly on the `document.documentElement` element (for logouts, it removes the attribute).
+- **Extension Synchronization (`auth-sync.js`):**
+  - Instead of polling `localStorage` periodically, the content script observes attributes on the shared `document.documentElement` using a `MutationObserver`.
+  - When the `data-resumeiq-token` attribute changes, the observer fires and immediately dispatches `SYNC_TOKEN` or `CLEAR_TOKEN` messages to `background.js` to update `chrome.storage.local`.
+
+### 31.2 Live Tab Refresh-Free Sync
+- **Sidebar Real-time Updates (`sidebar-ui.js`):**
+  - Registered a listener for `chrome.storage.onChanged` inside the content script context.
+  - When the background script updates `resumeIqToken` in `chrome.storage.local` (from a login/logout action on the web app tab), all active sidebars on job search sites (LinkedIn, Indeed, etc.) receive the event.
+  - The sidebars automatically re-evaluate their login status, updating and rendering either the resume list or the login card immediately without requiring the user to refresh the page.
+
+### 31.3 Stale Auth / Expiry Protection
+- If the token stored in extension storage expires or is invalid, the backend API requests to `/api/resumes` return `401 Unauthorized` or `403 Forbidden`.
+- The sidebar catch block intercepts these status codes, triggers a `CLEAR_TOKEN` dispatch to invalidate the stale token in storage, and gracefully replaces the error view with the standard Login card.
+
+### 31.4 Context Invalidation Protection
+- **Stale Content Scripts:** When the user reloads or updates the extension from `chrome://extensions`, any content script running in an already opened tab (like LinkedIn, Indeed, Naukri) is immediately disconnected from the background script.
+- **Graceful Failure Handler (`safeSendMessage`):** To prevent constant console errors like `chrome-extension://invalid/` or uncaught exceptions, we wrap all message dispatches in a wrapper function `safeSendMessage`.
+- **Early Exit Guards:** Added `if (!chrome.runtime?.id)` check at the top of content script initialization, navigation listeners, storage change observers, and fetch routines to immediately disconnect observers and cease operations if the extension is reloaded or disabled.

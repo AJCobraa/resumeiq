@@ -94,7 +94,7 @@ async def get_my_stats(
             select(UserCredit).where(UserCredit.user_id == uid)
         )
         credit = credit_result.scalar_one_or_none()
-        coins_balance = credit.coins_balance if credit else 0
+        coins_balance = (credit.coins_balance + credit.topup_coins_balance) if credit else 0
 
         return UserStatsResponse(
             coinsBalance=coins_balance,

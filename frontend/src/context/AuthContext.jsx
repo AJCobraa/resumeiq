@@ -4,8 +4,18 @@
  * Wraps the entire app so all components can access auth state.
  */
 import { createContext, useContext, useState, useEffect } from 'react'
-import { signInWithPopup, signOut } from 'firebase/auth'
-import { auth, googleProvider, onAuthChange } from '../lib/firebase'
+import { 
+  auth, 
+  googleProvider, 
+  onAuthChange,
+  sendEmailVerification,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile,
+  signInWithPopup,
+  signOut
+} from '../lib/firebase'
 import { api } from '../lib/api'
 import { logger } from '../lib/logger'
 
@@ -17,12 +27,44 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const isMock = localStorage.getItem('useMockAuth') === 'true'
+    if (isMock) {
+      const mockUser = {
+        uid: 'test-user-id',
+        email: 'test@example.com',
+        displayName: 'Test User',
+        providerData: [],
+        getIdToken: async () => 'test-token'
+      }
+      setUser(mockUser)
+      localStorage.setItem('resumeIqExtToken', 'test-token')
+      api.getMe().then(profileData => {
+        setProfile(profileData)
+      }).catch(err => {
+        logger.error('Failed to fetch mock profile:', err)
+      })
+      setLoading(false)
+      return
+    }
+
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
+        // Block unverified email/password users from accessing the app
+        const isEmailPasswordUser = firebaseUser.providerData.some(p => p.providerId === 'password')
+        if (isEmailPasswordUser && !firebaseUser.emailVerified) {
+          logger.warn('Unverified email/password user blocked:', firebaseUser.email)
+          setUser(null)
+          setProfile(null)
+          setLoading(false)
+          return
+        }
+
         setUser(firebaseUser)
-        // Explicitly expose token for Chrome Extension content script
+        // Explicitly expose token + refresh token for Chrome Extension content script
         firebaseUser.getIdToken().then(token => {
           localStorage.setItem('resumeIqExtToken', token)
+          // Also expose refresh token so extension can refresh independently
+          localStorage.setItem('resumeIqExtRefreshToken', firebaseUser.refreshToken || '')
         }).catch(() => {})
 
         try {
@@ -35,6 +77,7 @@ export function AuthProvider({ children }) {
         setUser(null)
         setProfile(null)
         localStorage.removeItem('resumeIqExtToken')
+        localStorage.removeItem('resumeIqExtRefreshToken')
       }
       setLoading(false)
     })
@@ -45,10 +88,49 @@ export function AuthProvider({ children }) {
     try {
       setLoading(true)
       await signInWithPopup(auth, googleProvider)
-      // onAuthChange will handle setting user + profile
     } catch (err) {
       logger.error('Sign-in failed:', err)
       setLoading(false)
+      throw err
+    }
+  }
+
+  const signInWithEmail = async (email, password) => {
+    try {
+      setLoading(true)
+      await signInWithEmailAndPassword(auth, email, password)
+    } catch (err) {
+      setLoading(false)
+      throw err
+    }
+  }
+
+  const signUpWithEmail = async (email, password, displayName) => {
+    try {
+      setLoading(true)
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      
+      if (displayName) {
+        await updateProfile(userCredential.user, { displayName })
+      }
+
+      // Send verification email
+      await sendEmailVerification(userCredential.user)
+      
+      // Sign out immediately so they have to verify before logging in
+      await signOut(auth)
+      
+      setLoading(false)
+    } catch (err) {
+      setLoading(false)
+      throw err
+    }
+  }
+
+  const resetPassword = async (email) => {
+    try {
+      await sendPasswordResetEmail(auth, email)
+    } catch (err) {
       throw err
     }
   }
@@ -62,7 +144,16 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, logOut }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      profile, 
+      loading, 
+      signIn, 
+      signInWithEmail, 
+      signUpWithEmail, 
+      resetPassword, 
+      logOut 
+    }}>
       {children}
     </AuthContext.Provider>
   )

@@ -9,11 +9,21 @@
     "scripting"
   ],
   "host_permissions": [
-    "http://localhost:8001/*",
+    "http://localhost:8000/*",
     "http://localhost:5173/*",
+    "https://resumeiq-stagging.up.railway.app/*",
+    "https://resumeiq-frontend-stagging.up.railway.app/*",
     "https://*.linkedin.com/*",
     "https://*.naukri.com/*",
     "https://*.indeed.com/*",
+    "https://*.glassdoor.com/*",
+    "https://*.glassdoor.co.in/*",
+    "https://*.monster.com/*",
+    "https://*.shine.com/*",
+    "https://*.foundit.in/*",
+    "https://*.simplyhired.com/*",
+    "https://*.ziprecruiter.com/*",
+    "https://*.wellfound.com/*",
     "https://*.internshala.com/*"
   ],
   "background": {
@@ -27,11 +37,17 @@
         "*://*.naukri.com/job-listings-*",
         "*://*.indeed.com/viewjob*",
         "*://internshala.com/job/*",
+        "*://*.glassdoor.com/job-listing/*",
+        "*://*.glassdoor.co.in/job-listing/*",
+        "*://*.wellfound.com/jobs/*",
+        "*://*.monster.com/job-openings/*",
+        "*://*.ziprecruiter.com/jobs/*",
         "*://internshala.com/internship/*"
       ],
       "js": [
         "config.js",
         "keyword-engine.js",
+        "errorUtils.js",
         "content.js",
         "sidebar-ui.js"
       ],
@@ -39,7 +55,7 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["http://localhost:5173/*", "http://127.0.0.1:5173/*"],
+      "matches": ["http://localhost:5173/*", "http://127.0.0.1:5173/*","https://resumeiq-frontend-stagging.up.railway.app/*"],
       "js": ["auth-sync.js"]
     }
   ],

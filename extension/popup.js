@@ -83,7 +83,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   UI.btnLogin.addEventListener('click', () => {
-    chrome.tabs.create({ url: 'http://localhost:5173' });
+    const config = globalThis.CONFIG || {};
+    chrome.tabs.create({ url: config.frontendUrl || 'http://localhost:5173' });
   });
 
   async function initializeApp() {
@@ -127,7 +128,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           return reject(new Error(chrome.runtime.lastError.message));
         }
         if (!response || response.ok === false) {
-          return reject(new Error(response?.error || `Fetch failed (${response?.status || 'unknown'})`));
+          const error = new Error(response?.error || `Fetch failed (${response?.status || 'unknown'})`);
+          error.status = response?.status;
+          error.data = response?.json; // Attach parsed JSON for error code checking
+          return reject(error);
         }
         // Mocked response object compatible with fetch API
         resolve({
@@ -265,13 +269,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       clearInterval(tipInterval);
       showState(UI.stateJob);
-      UI.errorMsg.textContent = `Analysis failed: ${err.message}`;
+      
+      const aiMsg = getFriendlyAiErrorMessage(err, 'dashboard');
+      if (aiMsg) {
+        UI.errorMsg.textContent = aiMsg;
+      } else {
+        UI.errorMsg.textContent = `Analysis failed: ${err.message}`;
+      }
+      
       UI.errorMsg.classList.remove('hidden');
     }
   });
 
   UI.btnDashboard.addEventListener('click', () => {
-    chrome.tabs.create({ url: 'http://localhost:5173/dashboard' });
+    const config = globalThis.CONFIG || {};
+    chrome.tabs.create({ url: (config.frontendUrl || 'http://localhost:5173') + '/dashboard' });
   });
 
   UI.btnReset.addEventListener('click', () => {

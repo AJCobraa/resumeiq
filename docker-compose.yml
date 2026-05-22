@@ -18,6 +18,7 @@ services:
     environment:
       # In dev, we might want to allow CORS for localhost:5173
       - FRONTEND_URL=http://localhost:5173
+      - POSTGRES_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/resumeiq
     depends_on:
       postgres:
         condition: service_healthy   # ← waits for postgres to be ready before starting backend
@@ -35,6 +36,7 @@ services:
         - VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID}
         - VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID}
         - VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET}
+        - VITE_RAZORPAY_KEY_ID=${VITE_RAZORPAY_KEY_ID}
     ports:
       - "5173:80"
     # When developing locally, we typically don't mount React into the Nginx container,

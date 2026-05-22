@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from firebase_admin_init import verify_token
 from core.database import get_db_session
 from core.budget_guard import deduct_coins
+from core.exceptions import GemmaOverloadError
 
 router = APIRouter(prefix="/api", tags=["analysis"])
 
@@ -46,7 +47,7 @@ async def analyze(
             job_id=body.jobId,
         )
         return result
-    except HTTPException:
+    except (HTTPException, GemmaOverloadError):
         raise
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

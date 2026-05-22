@@ -70,7 +70,10 @@ async function riqFetch(url, options = {}) {
         return reject(new Error(chrome.runtime.lastError.message));
       }
       if (!response || response.ok === false) {
-        return reject(new Error(response?.error || `Fetch failed (${response?.status || 'unknown'})`));
+        const error = new Error(response?.error || `Fetch failed (${response?.status || 'unknown'})`);
+        error.status = response?.status;
+        error.data = response?.json; // Attach parsed JSON
+        return reject(error);
       }
       // Mocked response object
       resolve({
@@ -91,7 +94,8 @@ async function fetchResumesAndBuild() {
     });
     riqState.resumes = await res.json();
   } catch (err) {
-    injectCard(renderErrorCard(err.message));
+    const errMsg = getFriendlyAiErrorMessage(err, 'dashboard') || err.message;
+    injectCard(renderErrorCard(errMsg));
     return;
   }
 
@@ -394,7 +398,10 @@ async function checkPreviousAnalysis() {
       riqState.previousAnalysis = data;
       renderPreviousResult(data);
     }
-  } catch {}
+  } catch (err) {
+    const errMsg = getFriendlyAiErrorMessage(err, 'dashboard') || err.message;
+    console.error(`Check previous analysis failed: ${errMsg}`);
+  }
 }
 
 function renderPreviousResult(result) {

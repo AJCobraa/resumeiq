@@ -4,7 +4,18 @@
  * All data operations go through the FastAPI backend via api.js.
  */
 import { initializeApp } from 'firebase/app'
-import { getAuth, GoogleAuthProvider, onIdTokenChanged } from 'firebase/auth'
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  onIdTokenChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  updateProfile,
+  signInWithPopup,
+  signOut
+} from 'firebase/auth'
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -19,6 +30,17 @@ export const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const googleProvider = new GoogleAuthProvider()
 
+export { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  updateProfile,
+  signInWithPopup,
+  signOut
+}
+
 export function onAuthChange(callback) {
   return onIdTokenChanged(auth, callback)
 }
+

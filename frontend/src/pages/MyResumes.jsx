@@ -4,6 +4,7 @@ import { api } from '../lib/api'
 import { useToast } from '../components/ui/Toast'
 import { formatDate, truncate } from '../lib/utils'
 import { motion } from 'framer-motion'
+import { getFriendlyAiErrorMessage } from '../lib/errorUtils'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Spinner from '../components/ui/Spinner'
@@ -375,7 +376,7 @@ export default function MyResumes() {
       if (fileInputRef.current) fileInputRef.current.value = ''
       navigate(`/resumes/${resume.resumeId}`)
     } catch (err) {
-      toast.error('PDF import failed. Make sure the PDF has selectable text.')
+      toast.error(getFriendlyAiErrorMessage(err, 'import resumes') || err.message || 'The Google AI service is currently overloaded. Please try again in a few moments.')
     } finally {
       clearInterval(importStepTimer.current)
       setImporting(false)

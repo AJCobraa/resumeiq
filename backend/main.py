@@ -17,10 +17,13 @@ import sys
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from routers import auth, resumes, jobs, analysis, stats
+from routers import auth, resumes, jobs, analysis, stats, billing, webhooks
 from core.database import engine
+from core.webhook_config import print_webhook_url
+from core.exceptions import GemmaOverloadError
 from models.postgres_schema import Base
 
 app = FastAPI(
@@ -29,6 +32,18 @@ app = FastAPI(
     version="1.0.0",
 )
 
+@app.exception_handler(GemmaOverloadError)
+async def gemma_overload_exception_handler(request: Request, exc: GemmaOverloadError):
+    code = "AI_TIMEOUT" if exc.is_timeout else "AI_OVERLOAD"
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "code": code,
+            "message": exc.message,
+            "detail": "Google AI Studio is under high demand or timed out. This is a temporary transient error."
+        },
+    )
+
 
 # ── Database Startup ─────────────────────────────────
 @app.on_event("startup")
@@ -36,6 +51,11 @@ async def _create_tables():
     """Create all PostgreSQL tables on startup if they don't exist."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    # Seed billing catalog (plans + top-up packs)
+    from services.billing_service import seed_catalog
+    await seed_catalog()
+    # Print webhook URL for local tunnel testing
+    print_webhook_url()
 
 # ── CORS ─────────────────────────────────────────────
 # AGENTS.md rule: allow_origins must be FRONTEND_URL only — never "*"
@@ -63,3 +83,5 @@ app.include_router(resumes.router)
 app.include_router(jobs.router)
 app.include_router(analysis.router)
 app.include_router(stats.router)
+app.include_router(billing.router)
+app.include_router(webhooks.router)
