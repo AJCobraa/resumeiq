@@ -1,0 +1,33 @@
+name: Manual Deep Security Audit
+
+on:
+  workflow_dispatch: # This ensures it ONLY runs when manually triggered via the UI
+
+permissions:
+  contents: read
+
+jobs:
+  full_codebase_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install google-generativeai
+
+      - name: Run Security Investigator Agent
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python .github/scripts/deep_security_review.py
+
+      - name: Upload Security Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: Full-Security-Audit-Report
+          path: security_audit_report.md
