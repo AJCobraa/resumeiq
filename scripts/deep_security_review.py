@@ -5,8 +5,9 @@ from google import genai
 from google.genai import types, errors
 
 # ── Config ───────────────────────────────────────────────────────────────────
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-
+GEMINI_API_KEY = os.environ.get("GOOGLE_AI_STUDIO_API_KEY")
+GITHUB_TOKEN   = os.environ.get("GITHUB_TOKEN")
+REPO           = os.environ.get("REPO")
 # Updated to match the models from your quotas
 MODELS_TO_TRY = [
     "gemini-3.5-flash", # Best quality available; use first
