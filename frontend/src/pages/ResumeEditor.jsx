@@ -11,7 +11,11 @@ import { ProjectsAccordion } from '../components/editor/ProjectsAccordion'
 import { SkillsAccordion } from '../components/editor/SkillsAccordion'
 import { CertificationsAccordion } from '../components/editor/CertificationsAccordion'
 import { AchievementsAccordion } from '../components/editor/AchievementsAccordion'
-
+import { useCustomizationHistory } from '../hooks/useCustomizationHistory'
+import { useDebounce } from '../hooks/useDebounce'
+import { CustomizePanel, DEFAULT_CUSTOMIZATION } from '../components/editor/CustomizePanel'
+import { MultiPagePreview } from '../components/editor/MultiPagePreview'
+import { deepMerge } from '../utils/deepMerge'
 /* ─── Inline SVG Icons ───────────────────────────────────────────── */
 const UserIcon = () => <svg width={16} height={16} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
 const BriefcaseIcon = () => <svg width={16} height={16} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
@@ -80,30 +84,7 @@ function PersonalInfoEditor({ meta, onChange }) {
 }
 
 /* ─── Customize Tab ──────────────────────────────────────────────── */
-function CustomizeTab({ resume, onTemplateChange }) {
-  return (
-    <div style={{ padding: 4 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>Choose Template</div>
-      {TEMPLATE_OPTIONS.map(tpl => {
-        const isActive = tpl.id === resume.templateId
-        return (
-          <button key={tpl.id} onClick={() => onTemplateChange(tpl.id)} style={{
-            width: '100%', padding: '12px 14px', marginBottom: 8,
-            border: isActive ? '2px solid #7c3aed' : '1.5px solid #e5e7eb',
-            borderRadius: 10, background: isActive ? '#faf5ff' : '#ffffff',
-            cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: isActive ? '#7c3aed' : '#111827' }}>{tpl.name}</div>
-              {tpl.description && <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{tpl.description}</div>}
-            </div>
-            {isActive && <span style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', background: '#ede9fe', borderRadius: 999, padding: '3px 10px' }}>Active</span>}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
+// Replaced by CustomizePanel
 
 /* ─── AI Tools Tab ───────────────────────────────────────────────── */
 function AiToolsTab() {
@@ -129,46 +110,7 @@ function AiToolsTab() {
   )
 }
 
-const A4_HEIGHT_PX = 1122  // 297mm at 96dpi
-
-function PageBreakGuides() {
-  const guides = [1, 2, 3, 4, 5]
-  return (
-    <>
-      {guides.map(n => (
-        <div
-          key={n}
-          style={{
-            position: 'absolute',
-            top: A4_HEIGHT_PX * n - 1,
-            left: 0,
-            right: 0,
-            height: 3,
-            background: '#cbd5e1',
-            zIndex: 10,
-            pointerEvents: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <span style={{
-            fontSize: 9,
-            color: '#94a3b8',
-            background: '#f1f5f9',
-            padding: '1px 8px',
-            borderRadius: 3,
-            fontFamily: 'system-ui, sans-serif',
-            letterSpacing: '0.05em',
-            userSelect: 'none',
-          }}>
-            — page {n + 1} —
-          </span>
-        </div>
-      ))}
-    </>
-  )
-}
+// PageBreakGuides replaced by MultiPagePreview CSS slicing
 
 /* ─── Main Component ─────────────────────────────────────────────── */
 export default function ResumeEditor() {
@@ -184,6 +126,15 @@ export default function ResumeEditor() {
   const [exporting, setExporting] = useState(false)
   const [activeTab, setActiveTab] = useState('content')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [highlightIds, setHighlightIds] = useState([])
+
+  const { customization, setCustomization, undo, redo, canUndo, canRedo } = useCustomizationHistory(DEFAULT_CUSTOMIZATION)
+  const debouncedCustomization = useDebounce(customization, 250)
+
+  const handleCustomizationChange = useCallback((updater) => {
+    setCustomization(updater)
+    setHasUnsavedChanges(true)
+  }, [setCustomization])
 
   /* ── Load ─────────────────────────────────────────── */
   const fetchResume = useCallback(async () => {
@@ -191,15 +142,54 @@ export default function ResumeEditor() {
       setLoading(true)
       const data = await api.getResume(resumeId)
       setResume(data)
+      if (data.customization) {
+        setCustomization(data.customization)
+      } else if (data.templateId) {
+        setCustomization(prev => ({ ...prev, templateId: data.templateId }))
+      }
     } catch {
       toastRef.current.error('Failed to load resume')
       navigate('/resumes')
     } finally {
       setLoading(false)
     }
-  }, [resumeId, navigate])
+  }, [resumeId, navigate, setCustomization])
 
-  useEffect(() => { fetchResume() }, [fetchResume])
+  useEffect(() => { 
+    if (resumeId) {
+      fetchResume()
+    }
+  }, [resumeId, fetchResume])
+
+  /* ── Auto-scroll to highlight ── */
+  useEffect(() => {
+    // Read from search params ONCE on mount
+    const params = new URLSearchParams(window.location.search)
+    const highlightsParam = params.get('highlights')
+    
+    if (highlightsParam) {
+      const ids = highlightsParam.split(',').map(s => s.trim()).filter(Boolean)
+      if (ids.length > 0) {
+        setHighlightIds(ids)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    // When resume loads and we have highlights, try scrolling
+    if (!loading && resume && highlightIds.length > 0) {
+      // Small timeout to allow DOM to render
+      setTimeout(() => {
+        for (const id of highlightIds) {
+          const el = document.getElementById(`resume-node-${id}`)
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            break // scroll to first one found
+          }
+        }
+      }, 300)
+    }
+  }, [loading, resume, highlightIds])
 
   /* ── Navigation blocker ───────────────────────────── */
   const blocker = useBlocker(
@@ -216,6 +206,8 @@ export default function ResumeEditor() {
         meta: resume.meta,
         sections: resume.sections,
         title: resume.resumeTitle,
+        customization: customization,
+        templateId: customization.templateId || 'cobra',
       })
       setHasUnsavedChanges(false)
       toast.success('Resume saved!')
@@ -224,7 +216,7 @@ export default function ResumeEditor() {
     } finally {
       setSaving(false)
     }
-  }, [resume, resumeId, saving, toast])
+  }, [resume, resumeId, saving, toast, customization])
 
   useEffect(() => {
     const onKey = e => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); handleSave() } }
@@ -250,27 +242,28 @@ export default function ResumeEditor() {
   }, [])
 
   const handleTemplateChange = useCallback(async (templateId) => {
-    if (!resume || resume.templateId === templateId) return
-    setResume(prev => ({ ...prev, templateId }))
-    try {
-      await api.updateTemplate(resumeId, { templateId })
-      toast.success('Template updated!')
-    } catch {
-      toast.error('Failed to update template')
-    }
-  }, [resume, resumeId, toast])
+    setCustomization(prev => ({ ...prev, templateId }))
+    setHasUnsavedChanges(true)
+  }, [setCustomization])
 
   const handleExportPDF = useCallback(async () => {
     try {
       setExporting(true)
-      await api.exportPDF(resumeId, resume?.templateId || 'cobra')
+      
+      const noPrintEls = document.querySelectorAll('[data-no-print]');
+      noPrintEls.forEach(el => { el._prevDisplay = el.style.display; el.style.display = 'none'; });
+
+      await api.exportPDF(resumeId, customization?.templateId || 'cobra')
       toast.success('PDF downloaded!')
+      
+      noPrintEls.forEach(el => { el.style.display = el._prevDisplay || ''; });
     } catch (err) {
       toast.error(err?.message || 'PDF export failed')
+      document.querySelectorAll('[data-no-print]').forEach(el => { el.style.display = el._prevDisplay || ''; });
     } finally {
       setExporting(false)
     }
-  }, [resumeId, resume?.templateId, toast])
+  }, [resumeId, customization?.templateId, toast])
 
   /* ── Render guards ────────────────────────────────── */
   if (loading) return <LoadingScreen />
@@ -285,7 +278,8 @@ export default function ResumeEditor() {
   const achievementSections = resume.sections.filter(s => s.type === 'achievements')
 
   /* ── Live-preview template ────────────────────────── */
-  const SelectedTemplate = TEMPLATE_REGISTRY[resume.templateId]?.component || TEMPLATE_REGISTRY['cobra']?.component
+  const SelectedTemplate = TEMPLATE_REGISTRY[customization?.templateId]?.component || TEMPLATE_REGISTRY['cobra']?.component
+
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', flexDirection: 'column', background: '#f8f9fa' }}>
@@ -415,13 +409,21 @@ export default function ResumeEditor() {
             </>
           )}
           {activeTab === 'customize' && (
-            <CustomizeTab resume={resume} onTemplateChange={handleTemplateChange} />
+            <CustomizePanel 
+              customization={customization} 
+              setCustomization={handleCustomizationChange} 
+              canUndo={canUndo} 
+              canRedo={canRedo} 
+              onUndo={undo} 
+              onRedo={redo} 
+              onTemplateChange={handleTemplateChange}
+            />
           )}
           {activeTab === 'ai' && <AiToolsTab />}
         </div>
 
         {/* Right panel — live preview */}
-        <div style={{ flex: 1, overflowY: 'auto', background: '#e8e8e8', position: 'relative' }}>
+        <div style={{ flex: 1, height: '100%', overflowY: 'auto', background: '#f3f4f6', position: 'relative' }}>
           {/* Download button */}
           <div style={{ position: 'sticky', top: 0, zIndex: 5, display: 'flex', justifyContent: 'flex-end', padding: '16px 24px 0', pointerEvents: 'none' }}>
             <button
@@ -444,39 +446,9 @@ export default function ResumeEditor() {
             </button>
           </div>
 
-          {/* A4 paper */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            padding: '24px 24px 80px',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 0,
-          }}>
-            {/* Page container — no fixed height, grows naturally */}
-            <div style={{
-              width: 794,
-              background: '#ffffff',
-              boxShadow: '0 4px 40px rgba(0,0,0,0.18)',
-              borderRadius: 4,
-              position: 'relative',
-            }}>
-              <Suspense fallback={
-                <div style={{
-                  display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', height: 400,
-                  color: '#9ca3af', fontSize: 14,
-                }}>
-                  Loading template…
-                </div>
-              }>
-                {SelectedTemplate ? <SelectedTemplate resume={resume} /> : null}
-              </Suspense>
+          {/* Live Preview Container */}
+          <MultiPagePreview resume={resume} customization={debouncedCustomization} SelectedTemplate={SelectedTemplate} highlightIds={highlightIds} />
 
-              {/* A4 page-break guide lines overlay */}
-              <PageBreakGuides />
-            </div>
-          </div>
         </div>
       </div>
 

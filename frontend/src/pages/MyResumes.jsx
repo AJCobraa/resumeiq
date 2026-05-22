@@ -10,6 +10,7 @@ import Button from '../components/ui/Button'
 import Spinner from '../components/ui/Spinner'
 import Modal from '../components/ui/Modal'
 import { TEMPLATE_OPTIONS, TEMPLATE_REGISTRY } from '../lib/templateRegistry'
+import { FileText, Brain, Folder, Palette, CheckCircle2, Lightbulb, FileEdit, Star, ClipboardList } from 'lucide-react'
 
 function ScannerVisual({ file }) {
   const [pdfUrl, setPdfUrl] = useState(null)
@@ -134,28 +135,28 @@ function ScannerVisual({ file }) {
 function ImportLoadingScreen({ step, file }) {
   const STEPS = [
     {
-      icon: '📄',
-      title: '📄Reading your PDF',
+      icon: <FileText className="w-5 h-5 text-indigo-500" />,
+      title: 'Reading your PDF',
       detail: 'We extract every character of text from your PDF — unlike screenshot-based tools, this keeps your content 100% accurate and ATS-readable.',
     },
     {
-      icon: '🧠',
-      title: '🧠AI is understanding your resume',
+      icon: <Brain className="w-5 h-5 text-purple-500" />,
+      title: 'AI is understanding your resume',
       detail: 'Our AI model reads your full resume and maps it to structured fields — name, experience, skills, projects, certifications and more.',
     },
     {
-      icon: '🗂️',
-      title: '🗂️Organising your sections',
+      icon: <Folder className="w-5 h-5 text-blue-500" />,
+      title: 'Organising your sections',
       detail: 'Each section is sorted into the right place: work history by date, skills by category, projects with their tech stacks and bullets.',
     },
     {
-      icon: '🎨',
-      title: '🎨Applying your template',
+      icon: <Palette className="w-5 h-5 text-pink-500" />,
+      title: 'Applying your template',
       detail: 'Your parsed content is being fitted into the template you chose. Every font, spacing, and layout rule is applied for a clean ATS-safe output.',
     },
     {
-      icon: '✅',
-      title: '✅Almost done!',
+      icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />,
+      title: 'Almost done!',
       detail: 'Saving everything to your account and preparing the editor. You\'ll be redirected automatically in a moment.',
     },
   ]
@@ -173,7 +174,9 @@ function ImportLoadingScreen({ step, file }) {
       <h3 style={{
         fontSize: 18, fontWeight: 700, color: '#111827',
         marginTop: 16, marginBottom: 10,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
       }}>
+        {currentStep.icon}
         {currentStep.title}
       </h3>
 
@@ -217,10 +220,13 @@ function ImportLoadingScreen({ step, file }) {
         background: '#f0fdf4', border: '1px solid #bbf7d0',
         borderRadius: 12, maxWidth: 380,
       }}>
-        <p style={{ fontSize: 11, color: '#166534', lineHeight: 1.5 }}>
-          💡 <strong>Why AI parsing?</strong> Most resume tools copy text
-          blindly. We use AI to understand context — so "Led a team of 5"
-          goes into Experience, not Skills, every time.
+        <p style={{ fontSize: 11, color: '#166534', lineHeight: 1.5, display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+          <Lightbulb className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+          <span>
+            <strong>Why AI parsing?</strong> Most resume tools copy text
+            blindly. We use AI to understand context — so "Led a team of 5"
+            goes into Experience, not Skills, every time.
+          </span>
         </p>
       </div>
 
@@ -278,6 +284,7 @@ export default function MyResumes() {
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [pendingImportFile, setPendingImportFile] = useState(null)
   const [selectionSource, setSelectionSource] = useState(null) // 'create' or 'import'
+  const [togglingBase, setTogglingBase] = useState(null) // resumeId currently toggling
 
   const fetchResumes = useCallback(async () => {
     try {
@@ -384,6 +391,25 @@ export default function MyResumes() {
     }
   }
 
+  const handleToggleBase = async (e, resume) => {
+    e.stopPropagation()
+    const newIsBase = !resume.isBase
+    setTogglingBase(resume.resumeId)
+    try {
+      await api.toggleBaseStatus(resume.resumeId, newIsBase)
+      setResumes(prev => prev.map(r => 
+        r.resumeId === resume.resumeId 
+          ? { ...r, isBase: newIsBase }
+          : r
+      ))
+      toast.success(newIsBase ? 'Marked as Base Resume' : 'Marked as Tailored Resume')
+    } catch (err) {
+      toast.error('Failed to update resume status')
+    } finally {
+      setTogglingBase(null)
+    }
+  }
+
   if (loading && resumes.length === 0) {
     return (
       <div className="flex-1 overflow-y-auto p-8 flex items-center justify-center min-h-[60vh]">
@@ -430,7 +456,11 @@ export default function MyResumes() {
 
         {resumes.length === 0 ? (
           <Card className="text-center py-16">
-            <div className="text-5xl mb-4">📝</div>
+            <div className="flex justify-center mb-6">
+              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center shadow-inner border border-slate-100/50">
+                <FileEdit className="w-8 h-8 text-slate-400" />
+              </div>
+            </div>
             <h2 className="text-lg font-semibold mb-2">No resumes yet</h2>
             <p className="text-slate-500 text-sm max-w-md mx-auto mb-6">
               Create your first resume to start analyzing job descriptions
@@ -440,60 +470,150 @@ export default function MyResumes() {
               Create Your First Resume
             </Button>
           </Card>
-        ) : (
-          <div className="gap-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(200px, 100%), 1fr))' }}>
-            <button
-              onClick={() => { setShowCreate(true); setNewTitle('') }}
-              className="relative aspect-[1/1.414] border-2 border-dashed border-slate-200 rounded-2xl p-5 hover:border-blue-500 hover:bg-blue-50/50 transition-all duration-200 flex flex-col items-center justify-center gap-3 cursor-pointer"
-            >
-              <svg className="w-10 h-10 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
-              </svg>
-              <span className="text-sm text-slate-500 font-medium">New Resume</span>
-            </button>
-
-            {resumes.map((r, i) => (
-              <motion.div
-                key={r.resumeId}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
+        ) : (() => {
+          const normalizedResumes = resumes.map(r => ({ ...r, isBase: r.isBase !== undefined ? r.isBase : true }))
+          const baseResumes = normalizedResumes.filter(r => r.isBase)
+          const tailoredResumes = normalizedResumes.filter(r => !r.isBase)
+          return (
+            <div className="gap-6" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(200px, 100%), 1fr))' }}>
+              {/* ── Master Resumes section ── */}
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3" style={{ gridColumn: '1 / -1' }}>
+                <Star className="w-4 h-4 fill-amber-400 text-amber-400" /> Master Resumes
+              </div>
+              <button
+                onClick={() => { setShowCreate(true); setNewTitle('') }}
+                className="relative aspect-[1/1.414] border-2 border-dashed border-slate-200 rounded-2xl p-5 hover:border-blue-500 hover:bg-blue-50/50 transition-all duration-200 flex flex-col items-center justify-center gap-3 cursor-pointer"
               >
-                <div
-                  className="relative aspect-[1/1.414] rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer group"
-                  ref={el => {
-                    if (!el) return
-                    const update = () => el.style.setProperty('--thumb-scale', (el.offsetWidth / 800).toFixed(3))
-                    update()
-                    el._ro?.disconnect()
-                    el._ro = new ResizeObserver(update)
-                    el._ro.observe(el)
-                  }}
-                  onClick={() => navigate(`/resumes/${r.resumeId}`)}
+                <svg className="w-10 h-10 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                </svg>
+                <span className="text-sm text-slate-500 font-medium">New Resume</span>
+              </button>
+              {baseResumes.map((r, i) => (
+                <motion.div
+                  key={r.resumeId}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
                 >
-                  <ResumeThumbnail resume={r} />
-                  <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                    <Button variant="primary" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/resumes/${r.resumeId}`) }}>
-                      Edit
-                    </Button>
+                  <div
+                    className="relative aspect-[1/1.414] rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                    ref={el => {
+                      if (!el) return
+                      const update = () => el.style.setProperty('--thumb-scale', (el.offsetWidth / 800).toFixed(3))
+                      update()
+                      el._ro?.disconnect()
+                      el._ro = new ResizeObserver(update)
+                      el._ro.observe(el)
+                    }}
+                    onClick={() => navigate(`/resumes/${r.resumeId}`)}
+                  >
+                    <ResumeThumbnail resume={r} />
                     <button
-                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(r) }}
-                      className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-rose-500 transition-colors"
+                      onClick={(e) => handleToggleBase(e, r)}
+                      className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/50 transition-colors text-sm"
+                      title={r.isBase ? 'Mark as Tailored' : 'Mark as Base'}
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      {togglingBase === r.resumeId ? (
+                        <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Star className={`w-4 h-4 ${r.isBase ? 'fill-amber-400 text-amber-400' : 'text-white'}`} />
+                      )}
                     </button>
+                    <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                      <Button variant="primary" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/resumes/${r.resumeId}`) }}>
+                        Edit
+                      </Button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeleteTarget(r) }}
+                        className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-rose-500 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-slate-900/70 to-transparent">
+                      <p className="text-white text-xs font-semibold truncate">{r.resumeTitle}</p>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-200 font-semibold">Base</span>
+                        <span className="text-white/70 text-[10px] truncate">{r.meta?.name || 'No name set'}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-slate-900/70 to-transparent">
-                    <p className="text-white text-xs font-semibold truncate">{r.resumeTitle}</p>
-                    <p className="text-white/70 text-[10px] truncate">{r.meta?.name || 'No name set'}</p>
+                </motion.div>
+              ))}
+
+              {/* ── Tailored Resumes section ── */}
+              {tailoredResumes.length > 0 && (
+                <>
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 mt-6" style={{ gridColumn: '1 / -1' }}>
+                    <ClipboardList className="w-4 h-4 text-slate-400" /> Tailored Resumes
                   </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        )}
+                  {tailoredResumes.map((r, i) => {
+                    const sourceResume = normalizedResumes.find(s => s.resumeId === r.sourceResumeId)
+                    return (
+                      <motion.div
+                        key={r.resumeId}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                      >
+                        <div
+                          className="relative aspect-[1/1.414] rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                          ref={el => {
+                            if (!el) return
+                            const update = () => el.style.setProperty('--thumb-scale', (el.offsetWidth / 800).toFixed(3))
+                            update()
+                            el._ro?.disconnect()
+                            el._ro = new ResizeObserver(update)
+                            el._ro.observe(el)
+                          }}
+                          onClick={() => navigate(`/resumes/${r.resumeId}`)}
+                        >
+                          <ResumeThumbnail resume={r} />
+                          <button
+                            onClick={(e) => handleToggleBase(e, r)}
+                            className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/50 transition-colors text-sm"
+                            title={r.isBase ? 'Mark as Tailored' : 'Mark as Base'}
+                          >
+                            {togglingBase === r.resumeId ? (
+                              <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                              <Star className={`w-4 h-4 ${r.isBase ? 'fill-amber-400 text-amber-400' : 'text-white'}`} />
+                            )}
+                          </button>
+                          <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                            <Button variant="primary" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/resumes/${r.resumeId}`) }}>
+                              Edit
+                            </Button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDeleteTarget(r) }}
+                              className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-rose-500 transition-colors"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                          <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-slate-900/70 to-transparent">
+                            <p className="text-white text-xs font-semibold truncate">{r.resumeTitle}</p>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-400/20 text-blue-200 font-semibold">Tailored</span>
+                              <span className="text-white/70 text-[10px] truncate">
+                                {sourceResume ? `Forked from: ${sourceResume.resumeTitle}` : (r.meta?.name || 'No name set')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )
+                  })}
+                </>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {/* Create Step 1 Modal */}

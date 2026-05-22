@@ -188,18 +188,44 @@ async def update_recommendation(
         target["status"] = "approved"
         final_text = body.editedText if body.editedText else target.get("suggestedText", "")
 
-        # Apply to resume using ID-based targeting
-        resume_id = data.get("resumeId")
-        if resume_id and final_text:
-            section_id = target.get("sectionId", "")
-            bullet_id = target.get("bulletId", "")
+        current_resume_id = data.get("resumeId")
+        if current_resume_id and final_text:
+
+            # ── AUTO-BRANCHING LOGIC ──────────────────────────────
+            # Fetch the resume to check if it is a base (master) resume
+            resume = await resume_service.get_resume(db, uid, current_resume_id)
+
+            if resume and resume.get("isBase", False):
+                # It's a base resume → clone it before applying changes
+                company = data.get("company", "Company")
+                base_title = (
+                    resume.get("meta", {}).get("title")
+                    or resume.get("resumeTitle", "Resume")
+                )
+                new_title = f"{company} - {base_title}"
+
+                new_resume = await resume_service.duplicate_resume_for_tailoring(
+                    db, uid, current_resume_id, new_title
+                )
+
+                if new_resume:
+                    # Relink the job to the new clone
+                    current_resume_id = new_resume["resumeId"]
+                    data["resumeId"] = current_resume_id
+                    data["resumeTitle"] = new_title
+                    row.resume_id = current_resume_id  # Update ORM FK column too
+
+            # Apply recommendation to current_resume_id
+            # (clone if branched, original if not a base resume)
+            section_id   = target.get("sectionId", "")
+            bullet_id    = target.get("bulletId", "")
             current_text = target.get("currentText", "")
-            # Apply change in background task
-            # Pass rec_type to help background task pick the right strategy
-            rec_type = target.get("type", "")
+            rec_type     = target.get("type", "")
+
             bg.add_task(
                 _apply_recommendation_to_resume,
-                uid, resume_id, section_id, bullet_id, current_text, final_text, rec_type
+                uid, current_resume_id, section_id, bullet_id,
+                current_text, final_text, rec_type
             )
 
     elif body.action == "dismiss":
@@ -245,8 +271,17 @@ async def _apply_recommendation_to_resume(user_id: str, resume_id: str, section_
             updated = False
             sections = data.get("sections", [])
 
+            print(f"[apply_rec] Starting: type={rec_type}, sid={section_id}, bid={bullet_id}, currentText='{(current_text or '')[:50]}', newText='{(new_text or '')[:50]}'")
+
+            # ── Helper: parse suggestedText for skills ──
+            def _parse_skill_text(text):
+                """Parse skill text into items list, handling 'Label: item1, item2' format."""
+                clean = text
+                if ":" in text and ";" not in text:
+                    _, clean = text.split(":", 1)
+                return [s.strip() for s in clean.split(",") if s.strip()]
+
             # Strategy 1: Professional Summary (meta.summary)
-            # Direct match on type or explicit IDs
             if rec_type in ["summary", "add_section"] or section_id == "meta" or bullet_id == "summary":
                 meta = data.get("meta", {})
                 meta["summary"] = new_text
@@ -254,28 +289,21 @@ async def _apply_recommendation_to_resume(user_id: str, resume_id: str, section_
                 updated = True
                 print(f"[apply_rec] Success: Applied summary update via Strategy 1 (Summary Type/ID)")
 
-            # Strategy 2 & 3: ID-based (Experience, Projects, Skills)
+            # Strategy 2: ID-based (Experience, Projects, Skills)
             if not updated and section_id and bullet_id:
                 for section in sections:
                     if section.get("sectionId") == section_id:
                         stype = section.get("type", "")
                         
-                        # Strategy 2: Skills Categories
+                        # Strategy 2a: Skills Categories by categoryId
                         if stype == "skills" and rec_type in ["skills", "add_skill"]:
                             found_cat = False
                             for cat in section.get("categories", []):
                                 if cat.get("categoryId") == bullet_id:
-                                    # Handle potential "Label: Item1, Item2" format in new_text
-                                    clean_text = new_text
-                                    if ":" in new_text and ";" not in new_text:
-                                        # Only split if there's one colon and no semicolon (simple label: items)
-                                        _, clean_text = new_text.split(":", 1)
-                                    
-                                    # Convert comma-separated string back to list for skills
-                                    cat["items"] = [s.strip() for s in clean_text.split(",") if s.strip()]
+                                    cat["items"] = _parse_skill_text(new_text)
                                     updated = True
                                     found_cat = True
-                                    print(f"[apply_rec] Success: Updated existing skill category via Strategy 2 (ID match)")
+                                    print(f"[apply_rec] Success: Updated existing skill category via Strategy 2a (ID match)")
                                     break
                             
                             # If no ID match but bid is 'new' or it's an add_skill, try parsing suggestedText
@@ -286,7 +314,6 @@ async def _apply_recommendation_to_resume(user_id: str, resume_id: str, section_
                                     if ":" in part:
                                         label, items_str = part.split(":", 1)
                                         items = [i.strip() for i in items_str.split(",") if i.strip()]
-                                        # Check if category already exists by name
                                         existing_cat = next((c for c in section.get("categories", []) if c.get("label", "").lower() == label.strip().lower()), None)
                                         if existing_cat:
                                             existing_cat["items"] = items
@@ -298,31 +325,102 @@ async def _apply_recommendation_to_resume(user_id: str, resume_id: str, section_
                                             })
                                         updated = True
                                 if updated:
-                                    print(f"[apply_rec] Success: Added/Updated skill categories via Strategy 2 (New/Parse)")
+                                    print(f"[apply_rec] Success: Added/Updated skill categories via Strategy 2a (New/Parse)")
                         
-                        # Strategy 2: Experience/Projects bullets
+                        # Strategy 2b: Experience/Projects bullets by bulletId
                         elif stype in ["experience", "projects"]:
-                            # Check bullets directly in section (experience)
                             for bullet in section.get("bullets", []):
                                 if bullet.get("bulletId") == bullet_id:
                                     bullet["text"] = new_text
                                     updated = True
-                                    print(f"[apply_rec] Success: Applied bullet update via Strategy 2")
+                                    print(f"[apply_rec] Success: Applied bullet update via Strategy 2b")
                                     break
                             
-                            # Check bullets inside items (projects)
                             if not updated:
                                 for item in section.get("items", []):
                                     for bullet in item.get("bullets", []):
                                         if bullet.get("bulletId") == bullet_id:
                                             bullet["text"] = new_text
                                             updated = True
-                                            print(f"[apply_rec] Success: Applied project bullet update via Strategy 2")
+                                            print(f"[apply_rec] Success: Applied project bullet update via Strategy 2b")
                                             break
                                     if updated: break
                         if updated: break
 
-            # Strategy 4: Text-based fallback (for robustness)
+            # Strategy 3: Skills-specific — search ALL skills sections by label match
+            # This handles the common case where _find_bullet_ids returned ("", "") 
+            # because Gemma's currentText didn't exactly match a category label
+            if not updated and rec_type in ["skills", "add_skill"] and current_text:
+                normalized_target = current_text.strip().lower()
+                for section in sections:
+                    if section.get("type") != "skills":
+                        continue
+                    for cat in section.get("categories", []):
+                        cat_label = (cat.get("label", "") or "").strip().lower()
+                        # Exact match
+                        if cat_label == normalized_target:
+                            cat["items"] = _parse_skill_text(new_text)
+                            updated = True
+                            print(f"[apply_rec] Success: Applied skills update via Strategy 3 (exact label match)")
+                            break
+                        # Substring match (e.g. "Programming Languages" matches "Languages")
+                        if cat_label and (cat_label in normalized_target or normalized_target in cat_label):
+                            cat["items"] = _parse_skill_text(new_text)
+                            updated = True
+                            print(f"[apply_rec] Success: Applied skills update via Strategy 3 (substring label match: '{cat_label}' ~ '{normalized_target}')")
+                            break
+                    if updated: break
+
+            # Strategy 3b: Skills — if still not matched, try to find a skills section 
+            # and parse suggestedText as "Label: items" or "Label: items; Label2: items"
+            if not updated and rec_type in ["skills", "add_skill"]:
+                skills_section = next((s for s in sections if s.get("type") == "skills"), None)
+                if skills_section:
+                    # Try parsing new_text as "Label: Item1, Item2; Label2: Item3, Item4"
+                    if ":" in new_text:
+                        parts = new_text.split(";") if ";" in new_text else [new_text]
+                        for part in parts:
+                            if ":" in part:
+                                label, items_str = part.split(":", 1)
+                                items = [i.strip() for i in items_str.split(",") if i.strip()]
+                                label_clean = label.strip()
+                                if not label_clean or not items:
+                                    continue
+                                # Find existing category by label
+                                existing_cat = next(
+                                    (c for c in skills_section.get("categories", [])
+                                     if (c.get("label", "") or "").strip().lower() == label_clean.lower()),
+                                    None
+                                )
+                                if existing_cat:
+                                    existing_cat["items"] = items
+                                else:
+                                    skills_section.setdefault("categories", []).append({
+                                        "categoryId": str(uuid.uuid4()),
+                                        "label": label_clean,
+                                        "items": items
+                                    })
+                                updated = True
+                        if updated:
+                            print(f"[apply_rec] Success: Applied skills update via Strategy 3b (parsed suggestedText)")
+                    else:
+                        # Plain comma list — update current_text-matched category or first category
+                        items = [s.strip() for s in new_text.split(",") if s.strip()]
+                        if items and current_text:
+                            target_label = current_text.strip().lower()
+                            matched_cat = next(
+                                (c for c in skills_section.get("categories", [])
+                                 if (c.get("label", "") or "").strip().lower() == target_label
+                                 or target_label in (c.get("label", "") or "").strip().lower()
+                                 or (c.get("label", "") or "").strip().lower() in target_label),
+                                None
+                            )
+                            if matched_cat:
+                                matched_cat["items"] = items
+                                updated = True
+                                print(f"[apply_rec] Success: Applied skills update via Strategy 3b (plain list to matched category)")
+
+            # Strategy 4: Text-based fallback (for robustness — experience/projects bullets)
             if not updated and current_text:
                 normalized_target = current_text.strip().lower()
                 
@@ -338,15 +436,7 @@ async def _apply_recommendation_to_resume(user_id: str, resume_id: str, section_
                     for section in sections:
                         stype = section.get("type", "")
                         
-                        if stype == "skills" and rec_type in ["skills", "add_skill"]:
-                            for cat in section.get("categories", []):
-                                if cat.get("label", "").strip().lower() == normalized_target:
-                                    cat["items"] = [s.strip() for s in new_text.split(",") if s.strip()]
-                                    updated = True
-                                    print(f"[apply_rec] Success: Applied skills update via Strategy 4 (label match)")
-                                    break
-                        
-                        elif stype in ["experience", "projects"]:
+                        if stype in ["experience", "projects"]:
                             for bullet in section.get("bullets", []):
                                 if bullet.get("text", "").strip().lower() == normalized_target:
                                     bullet["text"] = new_text

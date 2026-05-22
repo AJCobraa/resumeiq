@@ -65,6 +65,8 @@ class Resume(Base):
     resume_id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey('users.uid'), nullable=False)
     resume_data = Column(JSONB, nullable=False)
+    is_base = Column(Boolean, default=True, nullable=False)
+    source_resume_id = Column(String, nullable=True)  # Which base resume this was forked from
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc), onupdate=lambda: datetime.datetime.now(datetime.timezone.utc))
 

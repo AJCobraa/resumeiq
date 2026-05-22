@@ -3,6 +3,10 @@ import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import AuthModal from '../components/auth/AuthModal'
+import { api } from '../lib/api'
+import HeroSection from '../components/landing/HeroSection'
+import WorkflowShowcase from '../components/landing/WorkflowShowcase'
+import TopNavBar from '../components/layout/TopNavBar'
 
 /* ─── Spring transition presets ───────────────────────── */
 const spring = { type: 'spring', stiffness: 300, damping: 30 }
@@ -374,7 +378,15 @@ export default function Landing() {
 
   useEffect(() => {
     if (!loading && user) {
-      navigate('/dashboard', { replace: true })
+      api.getResumes().then(resumes => {
+        if (resumes.length === 0) {
+          navigate('/onboarding', { replace: true })
+        } else {
+          navigate('/dashboard', { replace: true })
+        }
+      }).catch(() => {
+        navigate('/dashboard', { replace: true })
+      })
     }
   }, [user, loading, navigate])
 
@@ -390,140 +402,13 @@ export default function Landing() {
     <div className="min-h-screen bg-background font-sans text-foreground selection:bg-primary/10 selection:text-primary">
 
       {/* ═══ Sticky Nav ══════════════════════════════════ */}
-      <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/40">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary to-brand-dark flex items-center justify-center shadow-sm">
-              <span className="text-primary-foreground font-bold text-lg">R</span>
-            </div>
-            <span className="text-xl font-bold tracking-tight text-primary">
-              Resume<span className="text-foreground">IQ</span>
-            </span>
-          </Link>
-
-          <div className="hidden md:flex items-center gap-8">
-            <Link to="/features" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Features</Link>
-            <Link to="/pricing" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Pricing</Link>
-          </div>
-
-          <button
-            onClick={handleGetStarted}
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-primary to-brand-dark text-primary-foreground text-sm font-semibold rounded-xl px-4 py-2 shadow-sm hover:shadow-glow transition-all duration-300"
-          >
-            {user ? 'Open Dashboard' : 'Get Started'}
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
-          </button>
-        </div>
-      </nav>
+      <TopNavBar />
 
       {/* ═══ Hero Section ═══════════════════════════════ */}
-      <section className="relative pt-32 pb-40 px-6 overflow-hidden">
-        <motion.div
-          className="max-w-4xl mx-auto text-center relative z-10"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          {/* Trust Badge */}
-          <motion.div variants={itemVariants} className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-card border border-border/60 shadow-soft mb-8">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            <span className="text-xs font-semibold text-muted-foreground tracking-wide">Trusted by 10,000+ job seekers</span>
-          </motion.div>
+      <HeroSection handleGetStarted={handleGetStarted} />
 
-          {/* H1 */}
-          <motion.h1
-            variants={itemVariants}
-            className="text-5xl sm:text-6xl lg:text-7xl font-bold text-foreground tracking-tighter leading-[1.05] mb-8 text-balance"
-          >
-            Land your dream job with{' '}
-            <span className="bg-gradient-to-r from-primary to-brand-dark bg-clip-text text-transparent">
-              AI-powered resumes
-            </span>
-          </motion.h1>
-
-          {/* Subheading */}
-          <motion.p
-            variants={itemVariants}
-            className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-14"
-          >
-            ResumeIQ uses semantic AI to optimize your resume for any job posting,
-            helping you beat ATS systems and stand out to recruiters.
-          </motion.p>
-
-          {/* CTA Buttons */}
-          <motion.div
-            variants={itemVariants}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
-          >
-            <button
-              onClick={handleGetStarted}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-gradient-to-r from-primary to-brand-dark text-primary-foreground font-bold rounded-2xl px-8 py-4 shadow-glow hover:shadow-[0_12px_40px_hsl(239_84%_67%_/_0.3)] hover:-translate-y-0.5 transition-all duration-300 active:translate-y-0"
-            >
-              Get Started Free
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
-            </button>
-            <button className="w-full sm:w-auto bg-card border border-border/60 text-foreground font-bold rounded-2xl px-8 py-4 hover:bg-surface-hover transition-colors duration-200 shadow-soft">
-              Watch Demo
-            </button>
-          </motion.div>
-        </motion.div>
-
-        {/* Decorative background glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-80 bg-primary/5 blur-3xl -z-10 rounded-full" />
-      </section>
-
-      {/* ═══ Bento Grid Section ═════════════════════════ */}
-      <section id="features" className="py-32 px-6">
-        <div className="max-w-6xl mx-auto">
-          {/* Section Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-80px' }}
-            transition={gentleSpring}
-            className="text-center mb-20"
-          >
-            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-card border border-border/60 shadow-soft mb-6">
-              <motion.div
-                animate={{ opacity: [0.4, 1, 0.4] }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                className="h-1.5 w-1.5 rounded-full bg-primary"
-              />
-              <span className="text-xs font-semibold text-muted-foreground tracking-wide">The ResumeIQ Difference</span>
-            </div>
-
-            <h2 className="text-4xl lg:text-5xl font-bold text-foreground tracking-tighter mb-6 text-balance">
-              Old ATS scanners look for words.<br />
-              <span className="text-muted-foreground font-normal">We look for meaning.</span>
-            </h2>
-
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              Stop keyword stuffing. Our vector-based semantic engine understands your actual experience,
-              rewrites your bullets flawlessly, and preps you for the technical interview.
-            </p>
-          </motion.div>
-
-          {/* Bento Grid */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-60px' }}
-            transition={{ ...gentleSpring, delay: 0.1 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
-          >
-            <SemanticMatchingCard />
-            <AutoApproveCard />
-            <InterviewPredictorCard />
-          </motion.div>
-        </div>
-      </section>
+      {/* ═══ Workflow Showcase Section ═════════════════════════ */}
+      <WorkflowShowcase />
 
       {/* ═══ Footer ══════════════════════════════════════ */}
       <footer className="py-12 px-6 border-t border-border/40">

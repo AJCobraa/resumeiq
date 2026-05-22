@@ -21,3 +21,9 @@ class UserStatsResponse(BaseModel):
     avgLatencyMs: float
     modelsUsed: str
     operationBreakdown: List[OperationStat]
+
+class TransactionRecord(BaseModel):
+    id: str
+    operation: str
+    created_at: datetime
+    amount: int

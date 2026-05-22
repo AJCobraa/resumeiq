@@ -153,6 +153,26 @@ async def update_title(
     return result
 
 
+from pydantic import BaseModel as PydanticBaseModel
+
+class ToggleBaseRequest(PydanticBaseModel):
+    isBase: bool
+
+
+@router.patch("/resumes/{resume_id}/base")
+async def update_base_status(
+    resume_id: str,
+    body: ToggleBaseRequest,
+    uid: str = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """Toggle a resume between Base (master) and Tailored (job-specific) state."""
+    result = await resume_service.toggle_base_status(db, uid, resume_id, body.isBase)
+    if not result:
+        raise HTTPException(status_code=404, detail="Resume not found")
+    return result
+
+
 @router.delete("/resumes/{resume_id}")
 async def delete_resume(
     resume_id: str,

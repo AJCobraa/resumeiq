@@ -5,6 +5,7 @@ import { useToast } from '../components/ui/Toast'
 import { formatDate, getScoreColor, getPortalInfo, truncate } from '../lib/utils'
 import { getFriendlyAiErrorMessage } from '../lib/errorUtils'
 import InterviewPrepPanel from '../components/dashboard/InterviewPrepPanel'
+import { ClipboardList, Target, Users, Sparkles, Rocket } from 'lucide-react'
 
 /* UI Components — Assume these exist in the paths above */
 import Card from '../components/ui/Card'
@@ -34,6 +35,7 @@ export default function Dashboard() {
   const [isReanalyzing, setIsReanalyzing] = useState(false)
   const [showExtensionGuide, setShowExtensionGuide] = useState(false)
   const [resumes, setResumes] = useState([])
+  const [unviewedChanges, setUnviewedChanges] = useState([])
 
   const fetchResumes = useCallback(async () => {
     try {
@@ -97,6 +99,16 @@ export default function Dashboard() {
       if (refreshed) {
         setJobDetail(refreshed)
         setJobs(prev => prev.map(j => j.jobId === jobId ? refreshed : j))
+      }
+      // Queue highlight target for batch viewing
+      if (action === 'approve') {
+        const rec = refreshed?.recommendations?.find(r => r.recommendationId === recId)
+        if (rec) {
+          const targetId = rec.bulletId || rec.sectionId || ''
+          if (targetId) {
+            setUnviewedChanges(prev => [...prev, targetId])
+          }
+        }
       }
       toast.success(action === 'approve' ? 'Applied to resume!' : 'Recommendation updated')
     } catch (e) {
@@ -184,10 +196,10 @@ export default function Dashboard() {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
           {[
-            { label: 'Total Jobs', value: jobs.length, sub: 'Analyzed', icon: '📋' },
-            { label: 'Avg Match', value: `${avgScore}%`, sub: 'Across all', icon: '🎯' },
-            { label: 'Interviews', value: interviewCount, sub: 'Next stage', icon: '🤝' },
-            { label: 'Applied Fixes', value: totalFixes, sub: 'Bullet edits', icon: '✨' },
+            { label: 'Total Jobs', value: jobs.length, sub: 'Analyzed', icon: <ClipboardList className="w-6 h-6 text-slate-700" /> },
+            { label: 'Avg Match', value: `${avgScore}%`, sub: 'Across all', icon: <Target className="w-6 h-6 text-indigo-600" /> },
+            { label: 'Interviews', value: interviewCount, sub: 'Next stage', icon: <Users className="w-6 h-6 text-emerald-600" /> },
+            { label: 'Applied Fixes', value: totalFixes, sub: 'Bullet edits', icon: <Sparkles className="w-6 h-6 text-amber-500" /> },
           ].map((stat, i) => (
             <Card key={i} className="hover:shadow-glow transition-shadow duration-300">
               <div className="flex items-center gap-4">
@@ -302,6 +314,8 @@ export default function Dashboard() {
               onReanalyze={(jobObj) => handleReanalyze(jobObj || jobDetail)}
               onPrepUpdate={setJobDetail}
               isReanalyzing={isReanalyzing}
+              unviewedChanges={unviewedChanges}
+              onFlushChanges={() => setUnviewedChanges([])}
             />
           ) : null}
         </Modal>
@@ -315,7 +329,11 @@ export default function Dashboard() {
 function EmptyState({ onShowGuide }) {
   return (
     <Card className="border-dashed border-2 border-slate-200 py-20 text-center bg-slate-50/30">
-      <div className="text-5xl mb-6">🚀</div>
+      <div className="flex justify-center mb-6">
+        <div className="w-20 h-20 bg-indigo-50 rounded-2xl flex items-center justify-center shadow-inner border border-indigo-100/50">
+          <Rocket className="w-10 h-10 text-indigo-600" />
+        </div>
+      </div>
       <h2 className="text-xl font-bold text-slate-900 mb-2">Ready to land your next role?</h2>
       <p className="text-slate-500 max-w-md mx-auto mb-8 text-balance">
         Install the ResumeIQ extension to analyze job listings directly on LinkedIn, Indeed, and more.
@@ -374,7 +392,7 @@ function ScoreRing({ score, label, color }) {
   )
 }
 
-function JobDetailPanel({ job, resumes, onStatusChange, onRecommendation, onReanalyze, onPrepUpdate, isReanalyzing }) {
+function JobDetailPanel({ job, resumes, onStatusChange, onRecommendation, onReanalyze, onPrepUpdate, isReanalyzing, unviewedChanges = [], onFlushChanges }) {
   const showDebug = import.meta.env.DEV && job?.debug
   const [activeTab, setActiveTab] = useState('score')
 
@@ -620,6 +638,32 @@ function JobDetailPanel({ job, resumes, onStatusChange, onRecommendation, onRean
                   </span>
                 </div>
               )}
+
+              {/* View Resume batch link - FLOATING at bottom of screen */}
+              {unviewedChanges.length > 0 && job.resumeId && job.resumeTitle !== '__deleted__' && (
+                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-8 fade-in duration-300">
+                  <a
+                    href={`/resumes/${job.resumeId}?highlights=${unviewedChanges.join(',')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={onFlushChanges}
+                    className="flex items-center gap-3 py-3.5 px-6 rounded-full bg-emerald-600 text-white shadow-[0_8px_30px_rgb(16,185,129,0.3)] hover:bg-emerald-700 hover:shadow-[0_8px_30px_rgb(16,185,129,0.4)] hover:-translate-y-0.5 transition-all group cursor-pointer no-underline border border-emerald-500/50"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                        {unviewedChanges.length}
+                      </div>
+                      <span className="text-sm font-semibold whitespace-nowrap">
+                        View {unviewedChanges.length} {unviewedChanges.length === 1 ? 'Change' : 'Changes'} on Resume
+                      </span>
+                    </div>
+                    <svg className="w-4 h-4 text-emerald-200 group-hover:translate-x-0.5 group-hover:text-white transition-all ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                </div>
+              )}
+
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                 {job.recommendations.length} Recommendations
               </p>

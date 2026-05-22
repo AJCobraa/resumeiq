@@ -108,6 +108,15 @@
   align-items: center;
   gap: 6px;
 }
+.riq-panel-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+  padding: 8px 8px 4px;
+  margin-top: 4px;
+}
 
 /* Resume ranking */
 .riq-resume-row {

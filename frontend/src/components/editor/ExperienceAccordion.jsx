@@ -56,12 +56,23 @@ export function ExperienceAccordion({ sections, allSections, onChange }) {
     }))
 
   const addEntry = () => {
+    const expSections = allSections.filter(s => s.type === 'experience')
+    let insertOrder = allSections.length
+    if (expSections.length > 0) {
+      insertOrder = Math.max(...expSections.map(s => s.order ?? 0)) + 1
+    }
+    const newSections = allSections.map(s => {
+      if ((s.order ?? 0) >= insertOrder) {
+        return { ...s, order: (s.order ?? 0) + 1 }
+      }
+      return s
+    })
     const newSec = {
-      sectionId: genId(), type: 'experience', order: allSections.length,
+      sectionId: genId(), type: 'experience', order: insertOrder,
       company: '', role: '', location: '', startDate: '', endDate: '', current: false,
       bullets: [{ bulletId: genId(), text: '' }],
     }
-    onChange([...allSections, newSec])
+    onChange([...newSections, newSec].sort((a,b) => (a.order??0) - (b.order??0)))
     setOpenId(newSec.sectionId)
   }
 
