@@ -24,7 +24,7 @@ jobs:
       - name: Run Security Investigator Agent
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python .github/scripts/deep_security_review.py
+        run: python scripts/deep_security_review.py
 
       - name: Upload Security Report
         uses: actions/upload-artifact@v4
