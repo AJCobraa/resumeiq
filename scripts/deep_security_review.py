@@ -338,7 +338,7 @@ def run_analysis():
     final_output = "\n\n".join(full_report)
     final_output += f"\n\n---\n*Processed by `{active_model}`*"
     
-    with open("analysis_report.md", "w", encoding='utf-8') as f:
+    with open("security_audit_report.md", "w", encoding='utf-8') as f:
         f.write(final_output)
         
     print("🎯 Processing complete. Report generated.")
