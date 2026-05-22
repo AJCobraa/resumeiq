@@ -11,6 +11,8 @@ import Settings from './pages/Settings'
 import PersonalStats from './pages/PersonalStats'
 import Plans from './pages/Plans'
 import PrivacyPolicy from './pages/PrivacyPolicy'
+import Features from './pages/Features'
+import Onboarding from './pages/Onboarding'
 
 function AppProviders() {
   return (
@@ -29,8 +31,9 @@ const router = createBrowserRouter([
     element: <AppProviders />,
     children: [
       { path: '/', element: <Landing /> },
-      { path: '/features', element: <Navigate to="/" replace /> },
+      { path: '/features', element: <Features /> },
       { path: '/privacy-policy', element: <PrivacyPolicy /> },
+      { path: '/onboarding', element: <Onboarding /> },
       {
         element: <AppLayout />,
         children: [

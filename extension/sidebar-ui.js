@@ -102,7 +102,15 @@ async function fetchResumesAndBuild() {
   // Run instant keyword matching (uses keyword-engine.js functions in scope)
   if (riqState.resumes.length > 0 && riqState.jobDetails?.jdText) {
     riqState.rankings = rankResumesAgainstJD(riqState.jobDetails.jdText, riqState.resumes);
-    riqState.currentResumeId = riqState.rankings[0]?.resumeId || null;
+    // Augment rankings with isBase from resume data
+    riqState.rankings = riqState.rankings.map(rank => ({
+      ...rank,
+      isBase: riqState.resumes.find(r => r.resumeId === rank.resumeId)?.isBase ?? true
+    }));
+    // Default to top-ranked base resume
+    riqState.currentResumeId = riqState.rankings.find(r => r.isBase)?.resumeId
+                            || riqState.rankings[0]?.resumeId
+                            || null;
   }
 
   // Inject the inline card
@@ -183,6 +191,47 @@ function injectCard(html) {
   wireCardEvents();
 }
 
+// ── Render: grouped resume list ────────────────────────────────
+function renderGroupedResumeList(rankings) {
+  const baseRanks = rankings.filter(r => r.isBase);
+  const tailoredRanks = rankings.filter(r => !r.isBase);
+  let html = '';
+
+  if (baseRanks.length > 0) {
+    html += `<div class="riq-panel-group-label">⭐ MASTER RESUMES</div>`;
+    baseRanks.forEach((rank, i) => {
+      const rc = rank.score >= 75 ? '#0a9d76' : rank.score >= 50 ? '#b35900' : '#c0392b';
+      const isActive = rank.resumeId === riqState.currentResumeId;
+      html += `<div class="riq-resume-row ${isActive ? 'riq-resume-active' : ''}" 
+                   data-resume-id="${rank.resumeId}">
+        <span class="riq-resume-rank-num">${i + 1}</span>
+        <span class="riq-resume-rank-title">${riqEscape(rank.resumeTitle)}</span>
+        <div class="riq-resume-rank-bar-outer">
+          <div class="riq-resume-rank-bar-inner" style="width:${rank.score}%;background:${rc}"></div>
+        </div>
+        <span class="riq-resume-rank-score" style="color:${rc}">${rank.score}%</span>
+      </div>`;
+    });
+  }
+  if (tailoredRanks.length > 0) {
+    html += `<div class="riq-panel-group-label">📋 TAILORED RESUMES</div>`;
+    tailoredRanks.forEach((rank, i) => {
+      const rc = rank.score >= 75 ? '#0a9d76' : rank.score >= 50 ? '#b35900' : '#c0392b';
+      const isActive = rank.resumeId === riqState.currentResumeId;
+      html += `<div class="riq-resume-row ${isActive ? 'riq-resume-active' : ''}" 
+                   data-resume-id="${rank.resumeId}">
+        <span class="riq-resume-rank-num">${i + 1}</span>
+        <span class="riq-resume-rank-title">${riqEscape(rank.resumeTitle)}</span>
+        <div class="riq-resume-rank-bar-outer">
+          <div class="riq-resume-rank-bar-inner" style="width:${rank.score}%;background:${rc}"></div>
+        </div>
+        <span class="riq-resume-rank-score" style="color:${rc}">${rank.score}%</span>
+      </div>`;
+    });
+  }
+  return html;
+}
+
 // ── Render: main card ──────────────────────────────────────────
 function renderMainCard() {
   const best = riqState.rankings[0];
@@ -242,20 +291,7 @@ function renderMainCard() {
         <!-- Resume ranking (if multiple) -->
         ${riqState.rankings.length > 1 ? `
         <div class="riq-panel-section">
-          <div class="riq-panel-label">YOUR RESUMES — RANKED</div>
-          ${riqState.rankings.map((rank, i) => {
-            const rc = rank.score >= 75 ? '#0a9d76' : rank.score >= 50 ? '#b35900' : '#c0392b';
-            const isActive = rank.resumeId === riqState.currentResumeId;
-            return `<div class="riq-resume-row ${isActive ? 'riq-resume-active' : ''}" 
-                         data-resume-id="${rank.resumeId}">
-              <span class="riq-resume-rank-num">${i + 1}</span>
-              <span class="riq-resume-rank-title">${riqEscape(rank.resumeTitle)}</span>
-              <div class="riq-resume-rank-bar-outer">
-                <div class="riq-resume-rank-bar-inner" style="width:${rank.score}%;background:${rc}"></div>
-              </div>
-              <span class="riq-resume-rank-score" style="color:${rc}">${rank.score}%</span>
-            </div>`;
-          }).join('')}
+          ${renderGroupedResumeList(riqState.rankings)}
         </div>
         ` : ''}
 

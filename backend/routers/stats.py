@@ -8,7 +8,7 @@ from sqlalchemy import select, func
 from firebase_admin_init import verify_token
 from core.database import get_db_session
 from models.postgres_schema import CoinTransaction, Job, UserCredit, Resume
-from models.stats_model import UserStatsResponse, OperationStat
+from models.stats_model import UserStatsResponse, OperationStat, TransactionRecord
 
 router = APIRouter(prefix="/api/me", tags=["stats"])
 
@@ -112,3 +112,38 @@ async def get_my_stats(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to fetch user stats: {str(e)}")
+
+@router.get("/transactions", response_model=list[TransactionRecord])
+async def get_transactions(
+    limit: int = 5,
+    offset: int = 0,
+    uid: str = Depends(verify_token),
+    db: AsyncSession = Depends(get_db_session),
+):
+    """
+    Get paginated transaction history for the user from coin_transactions table.
+    """
+    try:
+        query = (
+            select(CoinTransaction)
+            .where(CoinTransaction.user_id == uid)
+            .order_by(CoinTransaction.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await db.execute(query)
+        transactions = result.scalars().all()
+
+        return [
+            TransactionRecord(
+                id=str(tx.id),
+                operation=tx.operation,
+                created_at=tx.created_at,
+                amount=-tx.coins_charged
+            )
+            for tx in transactions
+        ]
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to fetch transactions: {str(e)}")

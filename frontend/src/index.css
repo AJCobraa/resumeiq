@@ -157,3 +157,11 @@
 @utility text-balance {
   text-wrap: balance;
 }
+
+/* Persistent highlight for approved recommendation changes */
+.highlight-persistent {
+  background-color: #dcfce7 !important;
+  border-left: 3px solid #22c55e;
+  padding-left: 4px;
+  border-radius: 2px;
+}

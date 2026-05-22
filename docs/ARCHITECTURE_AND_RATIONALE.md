@@ -1452,7 +1452,17 @@ In Chrome Extension Manifest V3, content scripts run in an isolated JavaScript c
 - If the token stored in extension storage expires or is invalid, the backend API requests to `/api/resumes` return `401 Unauthorized` or `403 Forbidden`.
 - The sidebar catch block intercepts these status codes, triggers a `CLEAR_TOKEN` dispatch to invalidate the stale token in storage, and gracefully replaces the error view with the standard Login card.
 
-### 31.4 Context Invalidation Protection
+- **Context Invalidation Protection**
 - **Stale Content Scripts:** When the user reloads or updates the extension from `chrome://extensions`, any content script running in an already opened tab (like LinkedIn, Indeed, Naukri) is immediately disconnected from the background script.
 - **Graceful Failure Handler (`safeSendMessage`):** To prevent constant console errors like `chrome-extension://invalid/` or uncaught exceptions, we wrap all message dispatches in a wrapper function `safeSendMessage`.
 - **Early Exit Guards:** Added `if (!chrome.runtime?.id)` check at the top of content script initialization, navigation listeners, storage change observers, and fetch routines to immediately disconnect observers and cease operations if the extension is reloaded or disabled.
+
+## Section 43 — Auto-Branching Base Resume System
+
+**Rationale:** To prevent the accidental corruption of a user's master resume when they approve AI recommendations for specific jobs, we introduced the concept of Base vs Tailored resumes.
+
+**Implementation:**
+- **Dual-Storage Flag:** The `is_base` status is tracked both as a boolean column in PostgreSQL (for fast filtering) and within the JSONB `resume_data` (for API delivery). These are kept in sync atomically.
+- **Fork Idempotency:** When `update_recommendation` fires an `approve` action on a base resume, the backend clones it (`duplicate_resume_for_tailoring`), relinks the job's `resumeId` to the new clone, and then applies the bullet edits. Subsequent approves for the same job check the new clone, see `isBase=False`, and apply changes directly.
+- **Lineage Tracking:** `source_resume_id` column points back to the base resume a tailored copy was forked from.
+- **API & UX:** `PATCH /api/resumes/{id}/base` allows toggling the state manually from the dashboard. The extension and dashboard UI group resumes strictly into `⭐ Master` and `📋 Tailored` lists.

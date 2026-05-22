@@ -83,6 +83,7 @@ export const api = {
   // ── Auth ──────────────────────────────────────────
   getMe: () => request('/api/me'),
   getMyStats: () => request('/api/me/stats'),
+  getTransactions: (limit = 5, offset = 0) => request(`/api/me/transactions?limit=${limit}&offset=${offset}`),
 
   // ── Resumes ───────────────────────────────────────
   getResumes:     ()           => request('/api/resumes'),
@@ -93,6 +94,7 @@ export const api = {
   updateBullet:   (id, body)   => request(`/api/resumes/${id}/bullet`, 'PATCH', body),
   updateTemplate: (id, body)   => request(`/api/resumes/${id}/template`, 'PATCH', body),
   updateResumeTitle:(id, body) => request(`/api/resumes/${id}/title`, 'PATCH', body),
+  toggleBaseStatus: (id, isBase) => request(`/api/resumes/${id}/base`, 'PATCH', { isBase }),
   deleteResume:   (id)         => request(`/api/resumes/${id}`, 'DELETE'),
 
   // Batch save — fetches ONE token then fires all 3 requests truly in parallel

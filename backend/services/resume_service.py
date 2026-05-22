@@ -5,6 +5,7 @@ Used by AI services for context generation.
 
 All data stored in `resumes.resume_data` JSONB column.
 """
+import copy
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -87,6 +88,7 @@ def _make_blank_resume(uid: str, title: str, template_id: str = "cobra") -> dict
                 ],
             },
         ],
+        "isBase": True,
         "createdAt": _now(),
         "updatedAt": _now(),
     }
@@ -99,6 +101,7 @@ async def create_resume(db: AsyncSession, uid: str, title: str, template_id: str
         resume_id=resume_id,
         user_id=uid,
         resume_data=data,
+        is_base=True,
     )
     db.add(row)
     await db.commit()
@@ -200,6 +203,7 @@ async def create_resume_from_parsed(db: AsyncSession, uid: str, parsed: dict, ti
         "templateId": template_id,
         "meta": meta,
         "sections": sections,
+        "isBase": True,
         "createdAt": _now(),
         "updatedAt": _now(),
     }
@@ -208,6 +212,7 @@ async def create_resume_from_parsed(db: AsyncSession, uid: str, parsed: dict, ti
         resume_id=resume_id,
         user_id=uid,
         resume_data=data,
+        is_base=True,
     )
     db.add(row)
     await db.commit()
@@ -231,6 +236,8 @@ async def list_resumes(db: AsyncSession, uid: str) -> list[dict]:
             "templateId":  d.get("templateId", "cobra"),
             "meta":        d.get("meta", {}),
             "sections":    d.get("sections", []),
+            "isBase":      row.is_base if row.is_base is not None else True,
+            "sourceResumeId": row.source_resume_id,
             "updatedAt":   d.get("updatedAt"),
             "createdAt":   d.get("createdAt"),
         })
@@ -245,7 +252,15 @@ async def get_resume(db: AsyncSession, uid: str, resume_id: str) -> dict | None:
     row = result.scalar_one_or_none()
     if not row:
         return None
-    return row.resume_data
+    
+    data = dict(row.resume_data)
+    # Backwards compatibility: inject column values if missing from JSONB
+    if "isBase" not in data:
+        data["isBase"] = row.is_base if row.is_base is not None else True
+    if "sourceResumeId" not in data:
+        data["sourceResumeId"] = row.source_resume_id
+        
+    return data
 
 
 async def _get_resume_row(db: AsyncSession, uid: str, resume_id: str) -> Resume | None:
@@ -422,3 +437,63 @@ def summarize_resume(data: dict) -> str:
                 summary.append(f"  * {b.get('text')}")
 
     return "\n".join(summary)
+
+
+async def duplicate_resume_for_tailoring(db: AsyncSession, uid: str, resume_id: str, new_title: str) -> dict:
+    """
+    Clone a base resume for job-specific tailoring.
+
+    CRITICAL CONTRACT:
+    - New top-level resumeId is generated (uuid4)
+    - meta.title and resumeTitle updated to new_title
+    - isBase set to False in both JSONB and ORM column
+    - source_resume_id set to original resume_id (lineage tracking)
+    - ALL internal sectionId and bulletId values PRESERVED EXACTLY
+    - Timestamps (createdAt, updatedAt) reset to now
+    - Embeddings are NOT copied (will be generated fresh by background task)
+    """
+    row = await _get_resume_row(db, uid, resume_id)
+    if not row:
+        return None
+
+    new_resume_id = str(uuid.uuid4())
+    new_data = copy.deepcopy(dict(row.resume_data))
+
+    # Only mutate top-level identity — leave all sectionId/bulletId untouched
+    new_data["resumeId"] = new_resume_id
+    if "meta" in new_data:
+        new_data["meta"]["title"] = new_title
+    new_data["resumeTitle"] = new_title
+    new_data["isBase"] = False
+    new_data["createdAt"] = _now()
+    new_data["updatedAt"] = _now()
+
+    new_row = Resume(
+        resume_id=new_resume_id,
+        user_id=uid,
+        resume_data=new_data,
+        is_base=False,
+        source_resume_id=resume_id,
+    )
+    db.add(new_row)
+    await db.commit()
+    return new_data
+
+
+async def toggle_base_status(db: AsyncSession, uid: str, resume_id: str, is_base: bool) -> dict:
+    """
+    Toggle is_base on both the DB column and inside resume_data JSONB.
+    Both must stay in sync at all times.
+    """
+    row = await _get_resume_row(db, uid, resume_id)
+    if not row:
+        return None
+
+    row.is_base = is_base
+    data = dict(row.resume_data)
+    data["isBase"] = is_base
+    data["updatedAt"] = _now()
+    row.resume_data = data
+    flag_modified(row, "resume_data")
+    await db.commit()
+    return data

@@ -83,6 +83,7 @@ def _find_bullet_ids(resume: dict, current_text: str, rec_type: str = "") -> tup
     """
     Find sectionId and bulletId (or categoryId) for a given text match.
     Now supports category labels for skills and professional summary matching.
+    Uses fuzzy/substring matching for skill category labels.
     """
     normalized_target = _normalize_text(current_text).lower() if current_text else ""
 
@@ -97,10 +98,18 @@ def _find_bullet_ids(resume: dict, current_text: str, rec_type: str = "") -> tup
 
         # 2a. Skills: Match by Category Label or Fallback for 'add_skill'
         if stype == "skills" and rec_type in ["skills", "add_skill"]:
-            # If we have a category match, use it
+            # Pass 1: Exact label match
             for cat in section.get("categories", []):
-                if current_text and normalized_target == _normalize_text(cat.get("label", "")).lower():
+                cat_label = _normalize_text(cat.get("label", "")).lower()
+                if current_text and normalized_target == cat_label:
                     return sid, cat.get("categoryId", "")
+            
+            # Pass 2: Substring/fuzzy label match (handles "Programming Languages" vs "Languages")
+            if current_text:
+                for cat in section.get("categories", []):
+                    cat_label = _normalize_text(cat.get("label", "")).lower()
+                    if cat_label and (cat_label in normalized_target or normalized_target in cat_label):
+                        return sid, cat.get("categoryId", "")
             
             # If it's an add_skill with no specific category yet, return the sectionId
             # and a 'new' sentinel if current_text is empty

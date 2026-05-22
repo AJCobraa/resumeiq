@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ResumeIQ - Workflow Showcase</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-dim": "#cfdaf2",
+                    "outline": "#777584",
+                    "on-secondary-fixed": "#07006c",
+                    "tertiary-fixed-dim": "#c4c7c9",
+                    "surface-container-high": "#dee8ff",
+                    "on-secondary-container": "#fffbff",
+                    "inverse-on-surface": "#ecf1ff",
+                    "background": "#f9f9ff",
+                    "on-surface": "#111c2d",
+                    "inverse-surface": "#263143",
+                    "secondary-fixed-dim": "#c0c1ff",
+                    "secondary-container": "#6063ee",
+                    "tertiary-container": "#404345",
+                    "secondary": "#4648d4",
+                    "on-tertiary-fixed": "#191c1e",
+                    "on-primary-fixed-variant": "#3b35a7",
+                    "on-primary-fixed": "#0f0069",
+                    "on-background": "#111c2d",
+                    "on-secondary": "#ffffff",
+                    "primary-fixed-dim": "#c3c0ff",
+                    "surface-bright": "#f9f9ff",
+                    "on-tertiary-container": "#adb0b2",
+                    "surface-container-low": "#f0f3ff",
+                    "on-tertiary-fixed-variant": "#444749",
+                    "tertiary": "#2a2d2f",
+                    "surface": "#f9f9ff",
+                    "on-primary": "#ffffff",
+                    "inverse-primary": "#c3c0ff",
+                    "error": "#ba1a1a",
+                    "on-tertiary": "#ffffff",
+                    "surface-container-highest": "#d8e3fb",
+                    "surface-container-lowest": "#ffffff",
+                    "primary-fixed": "#e2dfff",
+                    "on-error-container": "#93000a",
+                    "primary-container": "#3730a3",
+                    "on-primary-container": "#a9a7ff",
+                    "on-secondary-fixed-variant": "#2f2ebe",
+                    "on-error": "#ffffff",
+                    "secondary-fixed": "#e1e0ff",
+                    "outline-variant": "#c8c4d5",
+                    "surface-tint": "#544fc0",
+                    "error-container": "#ffdad6",
+                    "surface-variant": "#d8e3fb",
+                    "surface-container": "#e7eeff",
+                    "tertiary-fixed": "#e0e3e5",
+                    "on-surface-variant": "#464553",
+                    "primary": "#1f108e"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "stack-lg": "32px",
+                    "gutter": "32px",
+                    "stack-sm": "8px",
+                    "section-padding": "80px",
+                    "margin-mobile": "20px",
+                    "container-max": "1280px",
+                    "stack-md": "16px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Inter"],
+                    "display-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-lg-mobile": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", {"lineHeight": "1.3", "letterSpacing": "0.01em", "fontWeight": "600"}],
+                    "display-lg": ["56px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "letterSpacing": "0", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "letterSpacing": "0", "fontWeight": "400"}],
+                    "headline-lg-mobile": ["28px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f9f9ff; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid #F1F5F9;
+            box-shadow: 0px 20px 40px rgba(55, 48, 163, 0.08);
+        }
+        .step-active .step-line { background-color: #3730a3; }
+        .step-inactive .step-line { background-color: #c8c4d5; }
+        .step-active .step-dot { border-color: #3730a3; background-color: #3730a3; }
+        .step-inactive .step-dot { border-color: #c8c4d5; background-color: transparent; }
+        
+        .shimmer {
+            background: linear-gradient(90deg, #e2dfff 25%, #c3c0ff 50%, #e2dfff 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+    </style>
+</head>
+<body class="text-on-surface antialiased flex flex-col min-h-screen">
+<!-- TopNavBar (from Shared Components) -->
+<nav class="fixed top-0 w-full z-50 bg-surface/70 dark:bg-surface-container-high/70 backdrop-blur-xl border-b border-outline-variant/20 shadow-sm transition-all duration-300" id="top-nav">
+<div class="flex justify-between items-center max-w-container-max mx-auto px-margin-mobile md:px-gutter h-20">
+<!-- Brand -->
+<div class="flex items-center gap-2">
+<span class="text-headline-md font-headline-md font-bold text-primary tracking-tight">ResumeIQ</span>
+</div>
+<!-- Desktop Nav Links -->
+<div class="hidden md:flex items-center gap-8">
+<a class="text-on-surface-variant font-label-md text-label-md hover:text-primary transition-colors duration-200" href="#">Features</a>
+<a class="text-on-surface-variant font-label-md text-label-md hover:text-primary transition-colors duration-200" href="#">Solutions</a>
+<a class="text-on-surface-variant font-label-md text-label-md hover:text-primary transition-colors duration-200" href="#">Pricing</a>
+<a class="text-on-surface-variant font-label-md text-label-md hover:text-primary transition-colors duration-200" href="#">About</a>
+</div>
+<!-- Actions -->
+<div class="hidden md:flex items-center gap-4">
+<a class="text-primary font-label-md text-label-md hover:text-primary transition-colors duration-200" href="#">Log In</a>
+<a class="bg-primary-container text-on-primary-container font-label-md text-label-md px-6 py-3 rounded-full hover:opacity-90 transition-opacity" href="#">Get Started</a>
+</div>
+<!-- Mobile Menu Toggle -->
+<button class="md:hidden text-on-surface-variant">
+<span class="material-symbols-outlined text-[24px]">menu</span>
+</button>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-grow pt-[120px] pb-section-padding">
+<!-- Workflow Showcase Section -->
+<section class="max-w-container-max mx-auto px-margin-mobile md:px-gutter">
+<div class="mb-12 text-center md:text-left">
+<h2 class="font-display-lg text-headline-lg-mobile md:text-display-lg text-on-surface tracking-tight mb-4">The ResumeIQ Workflow</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl">A seamless, AI-driven process designed to elevate your professional narrative with executive precision.</p>
+</div>
+<div class="flex flex-col md:flex-row gap-gutter relative">
+<!-- Left Column: Steps -->
+<div class="w-full md:w-1/2 flex flex-col relative z-10 space-y-8">
+<!-- Step 1 -->
+<div class="flex gap-6 step-inactive group cursor-pointer" onclick="activateStep(1)">
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full border-2 step-dot flex items-center justify-center transition-colors duration-300"></div>
+<div class="w-[2px] h-full step-line mt-2 transition-colors duration-300"></div>
+</div>
+<div class="pb-8">
+<h3 class="font-headline-md text-headline-md text-on-surface group-hover:text-primary transition-colors">Import Resume</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2">Upload your existing document. We support PDF, DOCX, and direct LinkedIn imports.</p>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="flex gap-6 step-inactive group cursor-pointer" onclick="activateStep(2)">
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full border-2 step-dot flex items-center justify-center transition-colors duration-300"></div>
+<div class="w-[2px] h-full step-line mt-2 transition-colors duration-300"></div>
+</div>
+<div class="pb-8">
+<h3 class="font-headline-md text-headline-md text-on-surface group-hover:text-primary transition-colors">Select Theme</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2">Choose from our curated library of executive-grade templates.</p>
+</div>
+</div>
+<!-- Step 3 -->
+<div class="flex gap-6 step-inactive group cursor-pointer" onclick="activateStep(3)">
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full border-2 step-dot flex items-center justify-center transition-colors duration-300"></div>
+<div class="w-[2px] h-full step-line mt-2 transition-colors duration-300"></div>
+</div>
+<div class="pb-8">
+<h3 class="font-headline-md text-headline-md text-on-surface group-hover:text-primary transition-colors">Visit Job Board</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2">Find your target role. Paste the job description for tailored alignment.</p>
+</div>
+</div>
+<!-- Step 4 -->
+<div class="flex gap-6 step-active group cursor-pointer" id="step-4-nav" onclick="activateStep(4)">
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full border-2 step-dot flex items-center justify-center transition-colors duration-300">
+<div class="w-3 h-3 bg-white rounded-full"></div>
+</div>
+<div class="w-[2px] h-full step-line mt-2 transition-colors duration-300"></div>
+</div>
+<div class="pb-8">
+<h3 class="font-headline-md text-headline-md text-primary font-bold">Deep Analysis</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2">Our intelligence engine cross-references your experience against the role's specific demands.</p>
+</div>
+</div>
+<!-- Step 5 -->
+<div class="flex gap-6 step-inactive group cursor-pointer" id="step-5-nav" onclick="activateStep(5)">
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full border-2 step-dot flex items-center justify-center transition-colors duration-300"></div>
+<div class="w-[2px] h-full step-line mt-2 transition-colors duration-300"></div>
+</div>
+<div class="pb-8">
+<h3 class="font-headline-md text-headline-md text-on-surface group-hover:text-primary transition-colors">Approve Recommendation</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2">Review AI-suggested rewrites, metric enhancements, and structural adjustments.</p>
+</div>
+</div>
+<!-- Step 6 -->
+<div class="flex gap-6 step-inactive group cursor-pointer" onclick="activateStep(6)">
+<div class="flex flex-col items-center">
+<div class="w-8 h-8 rounded-full border-2 step-dot flex items-center justify-center transition-colors duration-300"></div>
+</div>
+<div class="pb-8">
+<h3 class="font-headline-md text-headline-md text-on-surface group-hover:text-primary transition-colors">Interview Preparation</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2">Generate custom interview prep materials based on your newly optimized profile.</p>
+</div>
+</div>
+</div>
+<!-- Right Column: Sticky Visuals -->
+<div class="w-full md:w-1/2 relative h-full min-h-[500px]">
+<div class="sticky top-[120px] w-full">
+<!-- Visual Container -->
+<div class="glass-card rounded-[24px] p-8 h-[500px] relative overflow-hidden flex flex-col">
+<!-- Deep Analysis Visual (Active by default for demo) -->
+<div class="absolute inset-0 p-8 flex flex-col justify-center transition-opacity duration-500 opacity-100 z-10 bg-white/50" id="visual-step-4">
+<div class="flex items-center justify-between mb-8">
+<h4 class="font-label-md text-label-md text-primary uppercase tracking-wider">Analysis Complete</h4>
+<span class="bg-surface-container-high text-primary px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">bolt</span> AI Powered
+                                    </span>
+</div>
+<div class="grid grid-cols-2 gap-6">
+<!-- Score Card -->
+<div class="bg-white rounded-xl p-6 border border-outline-variant/30 shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
+<div class="absolute top-0 left-0 w-full h-1 shimmer"></div>
+<span class="text-on-surface-variant font-label-md text-sm mb-2">ATS Keyword Score</span>
+<div class="relative w-24 h-24 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90" viewbox="0 0 36 36">
+<path class="text-surface-container-high" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3"></path>
+<path class="text-primary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="85, 100" stroke-width="3"></path>
+</svg>
+<span class="absolute text-headline-md font-bold text-on-surface">85</span>
+</div>
+</div>
+<!-- Semantic Match -->
+<div class="bg-white rounded-xl p-6 border border-outline-variant/30 shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
+<div class="absolute top-0 left-0 w-full h-1 shimmer" style="animation-delay: 0.5s"></div>
+<span class="text-on-surface-variant font-label-md text-sm mb-2">Semantic Match</span>
+<div class="relative w-24 h-24 flex items-center justify-center">
+<svg class="w-full h-full transform -rotate-90" viewbox="0 0 36 36">
+<path class="text-surface-container-high" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3"></path>
+<path class="text-secondary" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-dasharray="92, 100" stroke-width="3"></path>
+</svg>
+<span class="absolute text-headline-md font-bold text-on-surface">92<span class="text-sm">%</span></span>
+</div>
+</div>
+</div>
+<div class="mt-6 bg-surface-container-low rounded-lg p-4 border border-outline-variant/20">
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-secondary mt-0.5">check_circle</span>
+<p class="text-sm text-on-surface-variant font-body-md">High probability of progressing past initial screening. Consider strengthening language around "Cross-functional Leadership".</p>
+</div>
+</div>
+</div>
+<!-- Approve Recommendation Visual (Hidden by default) -->
+<div class="absolute inset-0 p-8 flex flex-col transition-opacity duration-500 opacity-0 pointer-events-none z-0 bg-white/50" id="visual-step-5">
+<div class="flex items-center justify-between mb-6">
+<h4 class="font-label-md text-label-md text-primary uppercase tracking-wider">Suggested Revision</h4>
+</div>
+<div class="flex-grow flex flex-col gap-4">
+<!-- Original -->
+<div class="border border-outline-variant/30 rounded-lg p-4 bg-surface-bright relative">
+<span class="absolute -top-3 left-4 bg-surface-bright px-2 text-xs font-label-md text-outline">Original</span>
+<p class="text-sm text-on-surface-variant line-through opacity-70">Managed a team of developers to build a new app feature that improved sales.</p>
+</div>
+<div class="flex justify-center -my-2 z-10">
+<div class="bg-primary text-white rounded-full p-1 shadow-md">
+<span class="material-symbols-outlined text-[16px]">arrow_downward</span>
+</div>
+</div>
+<!-- AI Suggestion -->
+<div class="border border-primary/40 rounded-lg p-4 bg-surface-container-high/30 relative">
+<span class="absolute -top-3 left-4 bg-background px-2 text-xs font-label-md text-primary font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">auto_awesome</span> Enhanced
+                                        </span>
+<p class="text-sm text-on-surface font-medium">Spearheaded a 6-person cross-functional engineering team to architect and launch a core mobile feature, driving a <span class="bg-primary/10 text-primary px-1 rounded font-bold">24% increase</span> in Q3 enterprise sales.</p>
+</div>
+<div class="mt-auto flex gap-3 justify-end">
+<button class="px-4 py-2 text-sm font-label-md text-on-surface-variant border border-outline-variant rounded-md hover:bg-surface-variant transition-colors">Reject</button>
+<button class="px-4 py-2 text-sm font-label-md bg-primary text-white rounded-md hover:opacity-90 transition-opacity shadow-sm">Approve</button>
+</div>
+</div>
+</div>
+<!-- Placeholder for other steps -->
+<div class="absolute inset-0 p-8 flex flex-col items-center justify-center transition-opacity duration-500 opacity-0 pointer-events-none z-0 bg-white/50 backdrop-blur-sm" id="visual-placeholder">
+<span class="material-symbols-outlined text-outline-variant text-[48px] mb-4">manufacturing</span>
+<p class="text-on-surface-variant font-body-md text-center">Interactive preview available for analysis and recommendation steps.</p>
+</div>
+</div>
+<!-- Decorative background elements behind card -->
+<div class="absolute -z-10 top-10 -right-10 w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
+<div class="absolute -z-10 bottom-10 -left-10 w-48 h-48 bg-secondary/5 rounded-full blur-2xl"></div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer (from Shared Components) -->
+<footer class="w-full py-section-padding bg-surface-bright dark:bg-inverse-surface border-t border-outline-variant/30">
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-stack-lg max-w-container-max mx-auto px-margin-mobile md:px-gutter">
+<div class="col-span-2 lg:col-span-2 flex flex-col">
+<span class="text-headline-md font-headline-md font-bold text-primary dark:text-inverse-primary mb-4">ResumeIQ</span>
+<p class="text-label-md font-label-md text-on-surface-variant dark:text-on-tertiary-container mt-auto">© 2024 ResumeIQ. All rights reserved. Precision-engineered for high-achievers.</p>
+</div>
+<div class="flex flex-col gap-4">
+<a class="text-label-md font-label-md text-on-surface-variant dark:text-on-tertiary-container hover:text-primary dark:hover:text-inverse-primary transition-all duration-200" href="#">Product</a>
+<a class="text-label-md font-label-md text-on-surface-variant dark:text-on-tertiary-container hover:text-primary dark:hover:text-inverse-primary transition-all duration-200" href="#">Intelligence</a>
+</div>
+<div class="flex flex-col gap-4">
+<a class="text-label-md font-label-md text-on-surface-variant dark:text-on-tertiary-container hover:text-primary dark:hover:text-inverse-primary transition-all duration-200" href="#">Privacy</a>
+<a class="text-label-md font-label-md text-on-surface-variant dark:text-on-tertiary-container hover:text-primary dark:hover:text-inverse-primary transition-all duration-200" href="#">Terms</a>
+</div>
+<div class="flex flex-col gap-4">
+<a class="text-label-md font-label-md text-on-surface-variant dark:text-on-tertiary-container hover:text-primary dark:hover:text-inverse-primary transition-all duration-200" href="#">Support</a>
+<a class="text-label-md font-label-md text-on-surface-variant dark:text-on-tertiary-container hover:text-primary dark:hover:text-inverse-primary transition-all duration-200" href="#">Careers</a>
+</div>
+</div>
+</footer>
+<script>
+        // Simple JS to toggle active states for the demo
+        function activateStep(stepNum) {
+            // Very basic visual toggle for demo purposes
+            const vis4 = document.getElementById('visual-step-4');
+            const vis5 = document.getElementById('visual-step-5');
+            const visPlaceholder = document.getElementById('visual-placeholder');
+            
+            // Reset all opacity
+            vis4.style.opacity = '0'; vis4.style.pointerEvents = 'none'; vis4.style.zIndex = '0';
+            vis5.style.opacity = '0'; vis5.style.pointerEvents = 'none'; vis5.style.zIndex = '0';
+            visPlaceholder.style.opacity = '0'; visPlaceholder.style.pointerEvents = 'none'; visPlaceholder.style.zIndex = '0';
+            
+            if(stepNum === 4) {
+                vis4.style.opacity = '1'; vis4.style.pointerEvents = 'auto'; vis4.style.zIndex = '10';
+            } else if (stepNum === 5) {
+                vis5.style.opacity = '1'; vis5.style.pointerEvents = 'auto'; vis5.style.zIndex = '10';
+            } else {
+                visPlaceholder.style.opacity = '1'; visPlaceholder.style.zIndex = '10';
+            }
+        }
+    </script>
+</body></html>

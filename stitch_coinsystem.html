@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ResumeIQ - Credit System</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-bright": "#f9f9ff",
+                        "inverse-on-surface": "#ecf1ff",
+                        "secondary-fixed-dim": "#c0c1ff",
+                        "on-secondary-container": "#fffbff",
+                        "error": "#ba1a1a",
+                        "surface-dim": "#cfdaf2",
+                        "secondary": "#4648d4",
+                        "inverse-surface": "#263143",
+                        "on-primary-fixed-variant": "#3b35a7",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed": "#191c1e",
+                        "surface-variant": "#d8e3fb",
+                        "on-secondary-fixed": "#07006c",
+                        "tertiary-container": "#404345",
+                        "primary-fixed-dim": "#c3c0ff",
+                        "on-surface": "#111c2d",
+                        "primary": "#1f108e",
+                        "surface-container-highest": "#d8e3fb",
+                        "error-container": "#ffdad6",
+                        "primary-container": "#3730a3",
+                        "on-secondary-fixed-variant": "#2f2ebe",
+                        "on-error": "#ffffff",
+                        "primary-fixed": "#e2dfff",
+                        "surface-container-low": "#f0f3ff",
+                        "on-tertiary-container": "#adb0b2",
+                        "surface-tint": "#544fc0",
+                        "outline-variant": "#c8c4d5",
+                        "on-surface-variant": "#464553",
+                        "secondary-fixed": "#e1e0ff",
+                        "on-background": "#111c2d",
+                        "tertiary": "#2a2d2f",
+                        "on-primary-fixed": "#0f0069",
+                        "surface": "#f9f9ff",
+                        "surface-container-high": "#dee8ff",
+                        "on-primary-container": "#a9a7ff",
+                        "outline": "#777584",
+                        "inverse-primary": "#c3c0ff",
+                        "tertiary-fixed": "#e0e3e5",
+                        "surface-container": "#e7eeff",
+                        "on-secondary": "#ffffff",
+                        "background": "#f9f9ff",
+                        "on-tertiary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#6063ee",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#c4c7c9",
+                        "on-tertiary-fixed-variant": "#444749"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "section-padding": "80px",
+                        "gutter": "32px",
+                        "stack-md": "16px",
+                        "stack-lg": "32px",
+                        "stack-sm": "8px",
+                        "margin-mobile": "20px",
+                        "container-max": "1280px"
+                    },
+                    fontFamily: {
+                        "headline-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "body-lg": ["Inter"]
+                    },
+                    fontSize: {
+                        "headline-md": ["24px", { lineHeight: "1.3", letterSpacing: "0.01em", fontWeight: "600" }],
+                        "headline-lg": ["32px", { lineHeight: "1.2", letterSpacing: "-0.01em", fontWeight: "600" }],
+                        "headline-lg-mobile": ["28px", { lineHeight: "1.2", letterSpacing: "-0.01em", fontWeight: "600" }],
+                        "label-md": ["14px", { lineHeight: "1", letterSpacing: "0.05em", fontWeight: "500" }],
+                        "display-lg": ["56px", { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "700" }],
+                        "body-md": ["16px", { lineHeight: "1.5", letterSpacing: "0", fontWeight: "400" }],
+                        "body-lg": ["18px", { lineHeight: "1.6", letterSpacing: "0", fontWeight: "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(241, 245, 249, 0.8);
+            box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.03);
+            border-radius: 24px;
+            transition: all 0.3s ease;
+        }
+        .glass-card:hover {
+            border-color: rgba(195, 192, 255, 0.5); /* secondary-fixed-dim approx */
+            box-shadow: 0px 8px 30px rgba(55, 48, 163, 0.05);
+        }
+        .ai-glow {
+            box-shadow: inset 0 0 0 1px transparent, 0px 20px 40px rgba(55, 48, 163, 0.08);
+            border: 1px solid transparent;
+            background-clip: padding-box;
+            position: relative;
+        }
+        .ai-glow::before {
+            content: '';
+            position: absolute;
+            top: 0; right: 0; bottom: 0; left: 0;
+            z-index: -1;
+            margin: -1px;
+            border-radius: inherit;
+            background: linear-gradient(135deg, #4648d4 0%, transparent 100%);
+            opacity: 0.2;
+        }
+        .shimmer-progress {
+            background: linear-gradient(90deg, #3730a3 0%, #1f108e 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .shimmer-progress::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer {
+            100% { left: 100%; }
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md antialiased min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-surface/70 dark:bg-surface-container-high/70 backdrop-blur-xl border-b border-outline-variant/20 shadow-sm transition-opacity duration-200" id="main-nav">
+<div class="flex justify-between items-center max-w-container-max mx-auto px-margin-mobile md:px-gutter h-20">
+<!-- Brand -->
+<a class="text-headline-md font-headline-md font-bold text-primary tracking-tight" href="#">
+                ResumeIQ
+            </a>
+<!-- Desktop Nav Links -->
+<div class="hidden md:flex items-center space-x-8">
+<a class="text-on-surface-variant font-label-md text-label-md hover:text-primary transition-colors duration-200" href="#">Features</a>
+<a class="text-on-surface-variant font-label-md text-label-md hover:text-primary transition-colors duration-200" href="#">Solutions</a>
+<a aria-current="page" class="text-primary font-label-md text-label-md font-bold border-b-2 border-primary pb-1 active" href="#">Pricing</a>
+<a class="text-on-surface-variant font-label-md text-label-md hover:text-primary transition-colors duration-200" href="#">About</a>
+</div>
+<!-- Actions -->
+<div class="hidden md:flex items-center space-x-4">
+<button class="px-4 py-2 font-label-md text-label-md text-primary border border-primary rounded-full hover:bg-primary/5 transition-colors">
+                    Log In
+                </button>
+<button class="px-6 py-2 font-label-md text-label-md text-white bg-primary rounded-full hover:bg-primary-container transition-colors shadow-sm">
+                    Get Started
+                </button>
+</div>
+<!-- Mobile Menu Toggle (Decorative) -->
+<button class="md:hidden text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">menu</span>
+</button>
+</div>
+</nav>
+<!-- Main Content -->
+<main class="flex-grow pt-[100px] pb-section-padding">
+<!-- Hero / Section Header -->
+<section class="max-w-container-max mx-auto px-margin-mobile md:px-gutter pt-12 pb-16 text-center">
+<span class="inline-block px-3 py-1 rounded-full bg-surface-container-low text-primary text-label-md font-label-md mb-4 border border-outline-variant/30">Tokens &amp; Usage</span>
+<h1 class="text-display-lg font-display-lg text-primary mb-6 tracking-tight">Precision Powered by IQ Credits</h1>
+<p class="text-body-lg font-body-lg text-on-surface-variant max-w-2xl mx-auto">
+                Access enterprise-grade AI analysis, tailored rewrites, and competitive intelligence without a rigid subscription. Pay only for the computational power you need to advance your career.
+            </p>
+</section>
+<!-- Bento Grid System -->
+<section class="max-w-container-max mx-auto px-margin-mobile md:px-gutter">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- Left Column: The Token -->
+<div class="lg:col-span-5 flex justify-center items-center relative">
+<!-- Atmospheric glow behind the coin -->
+<div class="absolute inset-0 bg-primary/5 rounded-full blur-[80px] w-3/4 h-3/4 mx-auto my-auto -z-10"></div>
+<div class="w-full max-w-[400px] aspect-square relative rounded-full ai-glow p-8 bg-surface-bright/50 backdrop-blur-sm flex items-center justify-center">
+<img alt="ResumeIQ Credit Token" class="w-full h-full object-contain drop-shadow-[0_20px_40px_rgba(31,16,142,0.2)]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAK17HZR_JiM9Gf9qUfQDpUYfzmlyo0_uoOaOIEE0TmVgOnsnbjsVRvZUWBJRkI2MoMcmVz7Hoyo6vD_hwT8RvD1vwuoelUSBjwUvZnD6l5lec_K7Vomia8Rmto6RNx5d_UV0zvzHf_f5t7ubMm-DyK2W-acS4nNMVWQ3oI9tiDqHbXqJ2GGYBkNS2vuTcaeW7840GlMKclCkeBlblojBGSpudmqvX6UGLaB05in_In6i1EwoaG-syg13gj0uAVsF6sspczJYYZEWwL"/>
+</div>
+</div>
+<!-- Right Column: Dashboard & Usage -->
+<div class="lg:col-span-7 grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Balance Card (Full Width in this col) -->
+<div class="md:col-span-2 glass-card p-8">
+<div class="flex justify-between items-end mb-6">
+<div>
+<h3 class="text-headline-md font-headline-md text-on-surface mb-1">Available Balance</h3>
+<p class="text-body-md font-body-md text-on-surface-variant">Your current IQ Credit reservoir.</p>
+</div>
+<div class="text-right">
+<span class="text-display-lg font-display-lg text-primary leading-none">85</span>
+<span class="text-body-lg font-body-lg text-on-surface-variant">/100</span>
+</div>
+</div>
+<!-- Progress Bar -->
+<div class="w-full bg-surface-container-high rounded-full h-2 mb-3 overflow-hidden">
+<div class="shimmer-progress h-2 rounded-full" style="width: 85%;"></div>
+</div>
+<div class="flex justify-between text-label-md font-label-md text-on-surface-variant">
+<span>Auto-refill enabled</span>
+<a class="text-secondary hover:underline" href="#">Manage Settings</a>
+</div>
+</div>
+<!-- Usage Breakdown (Left Half) -->
+<div class="glass-card p-6 flex flex-col">
+<h4 class="text-headline-md font-headline-md text-on-surface mb-4">Transaction Log</h4>
+<div class="space-y-4 flex-grow">
+<!-- Log Item 1 -->
+<div class="flex justify-between items-center pb-3 border-b border-outline-variant/20">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">psychology</span>
+</div>
+<div>
+<p class="text-label-md font-label-md text-on-surface">Deep AI Analysis</p>
+<p class="text-[12px] text-on-surface-variant">Today, 10:42 AM</p>
+</div>
+</div>
+<span class="text-label-md font-label-md text-error">-2</span>
+</div>
+<!-- Log Item 2 -->
+<div class="flex justify-between items-center pb-3 border-b border-outline-variant/20">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">edit_document</span>
+</div>
+<div>
+<p class="text-label-md font-label-md text-on-surface">Tailored Rewrite</p>
+<p class="text-[12px] text-on-surface-variant">Yesterday</p>
+</div>
+</div>
+<span class="text-label-md font-label-md text-error">-1</span>
+</div>
+<!-- Log Item 3 -->
+<div class="flex justify-between items-center pb-3 border-b border-outline-variant/20">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+</div>
+<div>
+<p class="text-label-md font-label-md text-on-surface">Monthly Refill</p>
+<p class="text-[12px] text-on-surface-variant">Oct 1st</p>
+</div>
+</div>
+<span class="text-label-md font-label-md text-primary">+100</span>
+</div>
+</div>
+<button class="mt-4 w-full py-2 text-center text-label-md font-label-md text-secondary hover:bg-surface-container-low rounded-lg transition-colors">
+                            View All History
+                        </button>
+</div>
+<!-- Top Up Actions (Right Half) -->
+<div class="glass-card p-6 bg-surface-bright flex flex-col justify-between">
+<div>
+<div class="flex items-center space-x-2 mb-2">
+<span class="material-symbols-outlined text-primary">bolt</span>
+<h4 class="text-headline-md font-headline-md text-on-surface">Need more power?</h4>
+</div>
+<p class="text-body-md font-body-md text-on-surface-variant mb-6">
+                                Instantly add IQ Credits to your account to unlock advanced rewrite strategies and deeper market comparisons.
+                            </p>
+<div class="space-y-3">
+<label class="flex items-center justify-between p-3 border border-outline-variant/30 rounded-xl cursor-pointer hover:border-primary hover:bg-surface-container-low transition-colors">
+<div class="flex items-center space-x-3">
+<input class="form-radio text-primary focus:ring-primary border-outline-variant" name="topup" type="radio"/>
+<span class="text-label-md font-label-md text-on-surface">+25 Credits</span>
+</div>
+<span class="text-label-md font-label-md text-on-surface-variant">$19</span>
+</label>
+<label class="flex items-center justify-between p-3 border border-primary rounded-xl bg-surface-container-low cursor-pointer">
+<div class="flex items-center space-x-3">
+<input checked="" class="form-radio text-primary focus:ring-primary border-outline-variant" name="topup" type="radio"/>
+<span class="text-label-md font-label-md text-primary font-bold">+50 Credits</span>
+</div>
+<span class="text-label-md font-label-md text-primary font-bold">$35</span>
+</label>
+</div>
+</div>
+<button class="mt-6 w-full py-3 bg-primary text-white text-label-md font-label-md rounded-xl hover:bg-primary-container transition-colors shadow-sm">
+                            Purchase Credits
+                        </button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full py-section-padding border-t border-outline-variant/30 bg-surface-bright dark:bg-inverse-surface mt-auto">
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-stack-lg max-w-container-max mx-auto px-margin-mobile md:px-gutter">
+<div class="col-span-2 md:col-span-4 lg:col-span-2 flex flex-col space-y-4">
+<span class="text-headline-md font-headline-md font-bold text-primary">ResumeIQ</span>
+<p class="text-label-md font-label-md text-on-surface-variant">© 2024 ResumeIQ. All rights reserved. Precision-engineered for high-achievers.</p>
+</div>
+<div class="flex flex-col space-y-3">
+<span class="text-label-md font-label-md font-bold text-on-surface mb-2">Product</span>
+<a class="text-label-md font-label-md text-on-surface-variant hover:text-primary transition-all duration-200" href="#">Features</a>
+<a class="text-label-md font-label-md text-on-surface-variant hover:text-primary transition-all duration-200" href="#">Pricing</a>
+</div>
+<div class="flex flex-col space-y-3">
+<span class="text-label-md font-label-md font-bold text-on-surface mb-2">Intelligence</span>
+<a class="text-label-md font-label-md text-on-surface-variant hover:text-primary transition-all duration-200" href="#">Blog</a>
+<a class="text-label-md font-label-md text-on-surface-variant hover:text-primary transition-all duration-200" href="#">Guides</a>
+</div>
+<div class="flex flex-col space-y-3">
+<span class="text-label-md font-label-md font-bold text-on-surface mb-2">Company</span>
+<a class="text-label-md font-label-md text-on-surface-variant hover:text-primary transition-all duration-200" href="#">About</a>
+<a class="text-label-md font-label-md text-on-surface-variant hover:text-primary transition-all duration-200" href="#">Careers</a>
+</div>
+<div class="flex flex-col space-y-3">
+<span class="text-label-md font-label-md font-bold text-on-surface mb-2">Legal</span>
+<a class="text-label-md font-label-md text-on-surface-variant hover:text-primary transition-all duration-200" href="#">Privacy Policy</a>
+<a class="text-label-md font-label-md text-on-surface-variant hover:text-primary transition-all duration-200" href="#">Terms of Service</a>
+</div>
+</div>
+</footer>
+<script>
+        // Simple scroll interaction for Nav
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('main-nav');
+            if (window.scrollY > 20) {
+                nav.classList.add('shadow-md');
+                nav.classList.remove('shadow-sm');
+            } else {
+                nav.classList.remove('shadow-md');
+                nav.classList.add('shadow-sm');
+            }
+        });
+    </script>
+</body></html>
