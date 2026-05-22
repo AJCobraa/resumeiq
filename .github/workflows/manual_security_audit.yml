@@ -3,6 +3,9 @@ name: Manual Deep Security Audit
 on:
   workflow_dispatch: # This ensures it ONLY runs when manually triggered via the UI
 
+permissions:
+  contents: read
+
 jobs:
   full_codebase_scan:
     runs-on: ubuntu-latest
