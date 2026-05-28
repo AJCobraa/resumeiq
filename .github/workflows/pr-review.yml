@@ -9,10 +9,23 @@ on:
 # The three review jobs then run in PARALLEL, cutting total wall-clock time by ~66%.
 
 jobs:
+  # ── Step 0: Gatekeeper Check ────────────────────────────────────────────────
+  branch-guard:
+    name: Enforce Staging to Main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Source Branch
+        run: |
+          if [[ "${{ github.base_ref }}" == "main" && "${{ github.head_ref }}" != "staging" ]]; then
+            echo "❌ ERROR: Direct merges to 'main' are restricted."
+            exit 1 
+          fi
+          echo "✅ Branch flow verified."
 
   # ── Step 1: Generate diff once, upload as artifact ──────────────────────────
   generate-diff:
     name: Generate PR Diff
+    needs: branch-guard
     if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
