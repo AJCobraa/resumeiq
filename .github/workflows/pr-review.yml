@@ -49,7 +49,7 @@ jobs:
         id: check
 
       - name: Upload diff artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pr-diff
           path: /tmp/pr_diff.txt

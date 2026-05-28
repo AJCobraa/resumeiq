@@ -29,7 +29,7 @@ jobs:
         run: python scripts/deep_security_review.py
 
       - name: Upload Security Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Full-Security-Audit-Report
           path: security_audit_report.md
