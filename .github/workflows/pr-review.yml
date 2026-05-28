@@ -70,7 +70,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5    # v5 is current stable; v6 does not exist
+        uses: actions/setup-python@v6    # v5 is current stable; v6 does not exist
         with:
           python-version: "3.11"
 
@@ -116,7 +116,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -162,7 +162,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
