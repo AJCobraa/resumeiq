@@ -75,7 +75,7 @@ jobs:
           python-version: "3.11"
 
       - name: Cache pip packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-ai-reviewer-${{ hashFiles('**/requirements*.txt') }}
@@ -121,7 +121,7 @@ jobs:
           python-version: "3.11"
 
       - name: Cache pip packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-ai-reviewer-${{ hashFiles('**/requirements*.txt') }}
@@ -167,7 +167,7 @@ jobs:
           python-version: "3.11"
 
       - name: Cache pip packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-ai-reviewer-${{ hashFiles('**/requirements*.txt') }}
