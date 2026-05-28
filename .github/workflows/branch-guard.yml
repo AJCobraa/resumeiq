@@ -1,0 +1,23 @@
+name: Branch Flow Guard
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  enforce-staging-only:
+    name: Enforce Staging to Main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Source Branch
+        run: |
+          if [[ "${{ github.head_ref }}" != "staging" ]]; then
+            echo "❌ ERROR: Direct merges to 'main' are restricted."
+            echo "Only the 'staging' branch is allowed to merge into 'main'."
+            echo "This PR is attempting to merge from '${{ github.head_ref }}'."
+            
+            # Fails the GitHub Action
+            exit 1 
+          fi
+          echo "✅ Branch flow verified: ${{ github.head_ref }} -> main"
