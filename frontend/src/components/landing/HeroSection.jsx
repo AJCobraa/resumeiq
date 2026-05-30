@@ -84,7 +84,7 @@ export default function HeroSection({ handleGetStarted }) {
         >
           <button
             onClick={handleGetStarted}
-            className="w-full sm:w-auto inline-flex items-center justify-center bg-gradient-to-r from-primary to-brand-dark text-primary-foreground rounded-2xl px-8 py-4 text-base font-bold hover:shadow-glow hover:-translate-y-0.5 transition-all duration-300"
+            className="cursor-pointer w-full sm:w-auto inline-flex items-center justify-center bg-gradient-to-r from-primary to-brand-dark text-primary-foreground rounded-2xl px-8 py-4 text-base font-bold hover:shadow-glow hover:-translate-y-0.5 transition-all duration-300"
           >
             Get Started Free
             <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -13,7 +13,7 @@ export function AchievementsAccordion({ sections, allSections, onChange }) {
   }
 
   if (!section) {
-    return <AddEntryButton label="Add Achievements Section" onClick={addNewSection} />
+    return <AddEntryButton className="cursor-pointer" label="Add Achievements Section" onClick={addNewSection} />
   }
 
   const updateBullet = (bi, text) =>
@@ -51,7 +51,7 @@ export function AchievementsAccordion({ sections, allSections, onChange }) {
               fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
             }}
           />
-          <button
+          <button className="cursor-pointer"
             onClick={() => removeBullet(bi)}
             style={{ marginTop: 6, padding: 4, border: 'none', background: 'none', cursor: 'pointer', color: '#d1d5db', borderRadius: 4, display: 'flex', flexShrink: 0 }}
             onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
@@ -61,7 +61,7 @@ export function AchievementsAccordion({ sections, allSections, onChange }) {
           </button>
         </div>
       ))}
-      <AddEntryButton label="Add Achievement" onClick={addBullet} />
+      <AddEntryButton className="cursor-pointer" label="Add Achievement" onClick={addBullet} />
     </div>
   )
 }

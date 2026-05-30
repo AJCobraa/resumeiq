@@ -25,6 +25,7 @@ from core.database import engine
 from core.webhook_config import print_webhook_url
 from core.exceptions import GemmaOverloadError
 from models.postgres_schema import Base
+import modules.study_center.models  # noqa: F401 — register tables for create_all
 
 app = FastAPI(
     title="ResumeIQ API",
@@ -85,3 +86,7 @@ app.include_router(analysis.router)
 app.include_router(stats.router)
 app.include_router(billing.router)
 app.include_router(webhooks.router)
+
+# ── Study Center Module ──────────────────────────────
+from modules.study_center.router import router as study_center_router
+app.include_router(study_center_router)

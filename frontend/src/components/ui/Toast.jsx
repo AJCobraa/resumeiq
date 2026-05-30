@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '../../lib/utils'
 
@@ -97,7 +97,7 @@ function ToastItem({ toast, onClose }) {
           {message}
         </p>
         {isCoinError && (
-          <button
+          <button className="cursor-pointer"
             onClick={() => {
               navigate('/pricing?highlight=popular')
               onClose(id)
@@ -108,7 +108,7 @@ function ToastItem({ toast, onClose }) {
           </button>
         )}
       </div>
-      <button
+      <button className="cursor-pointer"
         onClick={() => onClose(id)}
         className="ml-auto text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300 transition-colors p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800/80 shrink-0"
       >
@@ -142,12 +142,12 @@ export function ToastProvider({ children }) {
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
 
-  const toast = {
+  const toast = useMemo(() => ({
     success: (msg) => addToast(msg, 'success'),
     error:   (msg) => addToast(msg, 'error'),
     info:    (msg) => addToast(msg, 'info'),
     warning: (msg) => addToast(msg, 'warning'),
-  }
+  }), [addToast])
 
   return (
     <ToastContext.Provider value={toast}>

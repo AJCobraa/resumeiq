@@ -87,7 +87,7 @@ export default function InterviewPrepPanel({ job, onUpdate }) {
             size="sm"
             onClick={handleGenerate}
             disabled={loading}
-            className="bg-foreground text-background hover:bg-foreground/90 rounded-full px-6"
+            className="cursor-pointer bg-foreground text-background hover:bg-foreground/90 rounded-full px-6"
           >
             {loading ? <Spinner size="sm" /> : 'Analyze & Generate Prep'}
           </Button>
@@ -179,7 +179,7 @@ export default function InterviewPrepPanel({ job, onUpdate }) {
             <button
               onClick={handleGenerate}
               disabled={loading}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              className="cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
             >
               {loading ? <Spinner size="sm" /> : 'Regenerate Questions'}
             </button>

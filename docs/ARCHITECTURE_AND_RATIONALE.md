@@ -1466,3 +1466,26 @@ In Chrome Extension Manifest V3, content scripts run in an isolated JavaScript c
 - **Fork Idempotency:** When `update_recommendation` fires an `approve` action on a base resume, the backend clones it (`duplicate_resume_for_tailoring`), relinks the job's `resumeId` to the new clone, and then applies the bullet edits. Subsequent approves for the same job check the new clone, see `isBase=False`, and apply changes directly.
 - **Lineage Tracking:** `source_resume_id` column points back to the base resume a tailored copy was forked from.
 - **API & UX:** `PATCH /api/resumes/{id}/base` allows toggling the state manually from the dashboard. The extension and dashboard UI group resumes strictly into `⭐ Master` and `📋 Tailored` lists.
+
+---
+
+## Section 44 — Study Center Feature
+
+**Problem:** Users requested gated educational content for system design and OOD interviews to complement the resume builder.
+**Decision:** Implemented a new `study_center` module following hard-isolation rules, interacting only with `core/` and the shared Base models.
+
+**Backend Implementation:**
+- **Models:** Created `Course`, `Chapter`, `Enrollment`, and `ChapterProgress` extending `postgres_schema.Base`. This ensures they are auto-created by `Base.metadata.create_all` during startup.
+- **Service Layer:**
+  - In-memory content cache (`_content_cache`) for markdown files to avoid repeated disk reads.
+  - Manual coin deduction for enrollments using `FOR UPDATE` lock, as course costs are variable (unlike `FIXED_COST` operations).
+- **Seed Script:** A script to upsert courses and chapters into the database, setting free chapters and processing course metadata.
+- **Content:** Generated markdown stubs for 45 chapters (System Design and OOD) using a Python script (due to LLM quota exhaustion on subagents).
+
+**Frontend Implementation:**
+- **Pages:**
+  - `StudyCenter.jsx`: Landing page listing courses with enroll/continue buttons.
+  - `CourseOverview.jsx`: Details page showing chapter list, progress ring, and enrollment status.
+  - `ChapterReader.jsx`: Content reader using `react-markdown` and `remark-gfm` with custom `DiagramBlock` for Mermaid and ReactFlow diagram placeholders.
+- **Design System:** Designed with Stitch. Implemented using standard Tailwind classes (indigo/purple gradient aesthetics, clean layout) following ByteByteGo inspiration.
+- **API Helper:** Added 5 methods for fetching courses, chapters, and marking progress.

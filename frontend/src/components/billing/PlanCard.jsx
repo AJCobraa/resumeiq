@@ -202,7 +202,7 @@ export default function PlanCard({
       <div className="mt-auto">
         {isCurrent ? (
           isOnPaid && billing?.status === 'active' ? (
-            <button
+            <button className="cursor-pointer"
               onClick={() => setCancelModal(true)}
               className="w-full py-3.5 rounded-2xl text-sm font-bold border-2 border-slate-200
                 text-slate-400 hover:text-red-500 hover:border-red-200 transition-all duration-300 cursor-pointer bg-white/50 hover:bg-red-50"
@@ -215,7 +215,7 @@ export default function PlanCard({
             </div>
           )
         ) : isFree ? null : (
-          <button
+          <button className="cursor-pointer"
             disabled={!!processing}
             onClick={() => handleSubscribe(plan.plan_id)}
             className={`group relative w-full py-4 rounded-2xl text-sm font-black transition-all duration-300 cursor-pointer overflow-hidden

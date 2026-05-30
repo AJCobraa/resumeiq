@@ -194,4 +194,11 @@ export const api = {
   verifyPayment:          (body) => request('/api/billing/verify', 'POST', body),
   cancelSubscription:     (reason) =>
     request('/api/billing/subscription/cancel', 'POST', { reason }),
+
+  // ── Study Center ──────────────────────────────────
+  getCourses:       () => request('/api/courses'),
+  getCourseDetail:  (courseId) => request(`/api/courses/${courseId}`),
+  enrollCourse:     (courseId, durationDays) => request(`/api/courses/${courseId}/enroll`, 'POST', { duration_days: durationDays }),
+  getChapter:       (courseId, chapterId) => request(`/api/courses/${courseId}/chapters/${chapterId}`),
+  toggleChapter:  (courseId, chapterId) => request(`/api/courses/${courseId}/chapters/${chapterId}/toggle`, 'POST'),
 }

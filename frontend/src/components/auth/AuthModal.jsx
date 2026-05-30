@@ -172,7 +172,7 @@ export default function AuthModal({ isOpen, onClose }) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+        className="cursor-pointer absolute inset-0 bg-background/80 backdrop-blur-sm"
       />
 
       {/* Modal */}
@@ -184,7 +184,7 @@ export default function AuthModal({ isOpen, onClose }) {
       >
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-foreground transition-colors"
+          className="cursor-pointer absolute top-4 right-4 p-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -225,7 +225,7 @@ export default function AuthModal({ isOpen, onClose }) {
             </div>
             <button
               onClick={onClose}
-              className="w-full bg-secondary text-foreground font-bold rounded-xl py-3 hover:bg-secondary/80 transition-all"
+              className="cursor-pointer w-full bg-secondary text-foreground font-bold rounded-xl py-3 hover:bg-secondary/80 transition-all"
             >
               Close Window
             </button>
@@ -265,7 +265,7 @@ export default function AuthModal({ isOpen, onClose }) {
                 <button
                   type="button"
                   onClick={handleResetPassword}
-                  className="text-[10px] font-bold text-primary hover:underline uppercase tracking-wider"
+                  className="cursor-pointer text-[10px] font-bold text-primary hover:underline uppercase tracking-wider"
                 >
                   Forgot password?
                 </button>
@@ -280,7 +280,7 @@ export default function AuthModal({ isOpen, onClose }) {
                 required
                 className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               />
-              <button
+              <button className="cursor-pointer"
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
@@ -371,7 +371,7 @@ export default function AuthModal({ isOpen, onClose }) {
         <button
           onClick={handleGoogleSignIn}
           disabled={loading}
-          className="w-full bg-card border border-border text-foreground font-semibold rounded-xl py-3 hover:bg-secondary transition-colors flex items-center justify-center gap-3 shadow-soft"
+          className="cursor-pointer w-full bg-card border border-border text-foreground font-semibold rounded-xl py-3 hover:bg-secondary transition-colors flex items-center justify-center gap-3 shadow-soft"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path
@@ -396,7 +396,7 @@ export default function AuthModal({ isOpen, onClose }) {
 
         <p className="text-center text-sm text-muted-foreground mt-8">
           {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-          <button
+          <button className="cursor-pointer"
             onClick={() => {
               setIsSignUp(!isSignUp)
               setError('')

@@ -37,7 +37,7 @@ export default function TopNavBar() {
 
           <button
             onClick={handleGetStarted}
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-primary to-brand-dark text-primary-foreground text-sm font-semibold rounded-xl px-4 py-2 shadow-sm hover:shadow-glow transition-all duration-300"
+            className="cursor-pointer inline-flex items-center gap-2 bg-gradient-to-r from-primary to-brand-dark text-primary-foreground text-sm font-semibold rounded-xl px-4 py-2 shadow-sm hover:shadow-glow transition-all duration-300"
           >
             {user ? 'Open Dashboard' : 'Get Started'}
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

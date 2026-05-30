@@ -205,7 +205,7 @@ export function ProjectsAccordion({ sections, allSections, onChange }) {
                 }}>
                   Bullets
                 </label>
-                <button
+                <button className="cursor-pointer"
                   onClick={() =>
                     addBullet(item._sectionId, item.projectId)
                   }
@@ -233,7 +233,7 @@ export function ProjectsAccordion({ sections, allSections, onChange }) {
           </EntryCard>
         )
       })}
-      <AddEntryButton label="Add Project" onClick={addEntry} />
+      <AddEntryButton className="cursor-pointer" label="Add Project" onClick={addEntry} />
     </div>
   )
 }

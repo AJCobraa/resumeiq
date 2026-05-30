@@ -152,6 +152,17 @@
     @apply antialiased;
     font-feature-settings: "cv11", "ss01";
   }
+  button:not(:disabled),
+  [role="button"]:not(:disabled),
+  a[href],
+  input[type="submit"]:not(:disabled),
+  input[type="button"]:not(:disabled),
+  input[type="reset"]:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  label {
+    cursor: pointer;
+  }
 }
 
 @utility text-balance {

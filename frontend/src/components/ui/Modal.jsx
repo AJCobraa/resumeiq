@@ -36,7 +36,7 @@ export default function Modal({ isOpen, onClose, title, size = 'md', children })
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            className="cursor-pointer absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
             onClick={onClose}
           />
           

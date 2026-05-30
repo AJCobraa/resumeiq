@@ -13,7 +13,7 @@ export function SkillsAccordion({ sections, allSections, onChange }) {
   }
 
   if (!section) {
-    return <AddEntryButton label="Add Skills Section" onClick={addNewSection} />
+    return <AddEntryButton className="cursor-pointer" label="Add Skills Section" onClick={addNewSection} />
   }
 
   const updateCategory = (catIdx, field, value) => {
@@ -59,7 +59,7 @@ export function SkillsAccordion({ sections, allSections, onChange }) {
               fontSize: 12, outline: 'none', fontFamily: 'inherit',
             }}
           />
-          <button
+          <button className="cursor-pointer"
             onClick={() => removeCategory(i)}
             style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: '#d1d5db', marginTop: 2 }}
             onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
@@ -69,7 +69,7 @@ export function SkillsAccordion({ sections, allSections, onChange }) {
           </button>
         </div>
       ))}
-      <AddEntryButton label="Add Category" onClick={addCategory} />
+      <AddEntryButton className="cursor-pointer" label="Add Category" onClick={addCategory} />
     </div>
   )
 }

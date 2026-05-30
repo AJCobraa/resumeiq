@@ -65,7 +65,7 @@ export default function Onboarding() {
         </div>
         <button
           onClick={handleSkip}
-          className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
         >
           Skip for now &rarr;
         </button>
@@ -94,7 +94,7 @@ export default function Onboarding() {
         {/* Progress Dots */}
         <div className="flex gap-2">
           {steps.map((step) => (
-            <button
+            <button className="cursor-pointer"
               key={step.id}
               onClick={() => setCurrentStep(step.id)}
               className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
@@ -110,7 +110,7 @@ export default function Onboarding() {
           {currentStep > 1 && (
             <button
               onClick={handleBack}
-              className="px-4 py-2 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-secondary transition-colors"
+              className="cursor-pointer px-4 py-2 rounded-xl text-sm font-semibold text-muted-foreground hover:bg-secondary transition-colors"
             >
               Back
             </button>
@@ -118,7 +118,7 @@ export default function Onboarding() {
           {currentStep < steps.length && (
             <button
               onClick={handleNext}
-              className="px-6 py-2 rounded-xl bg-foreground text-background text-sm font-semibold shadow-sm hover:bg-foreground/90 transition-colors"
+              className="cursor-pointer px-6 py-2 rounded-xl bg-foreground text-background text-sm font-semibold shadow-sm hover:bg-foreground/90 transition-colors"
             >
               Next
             </button>

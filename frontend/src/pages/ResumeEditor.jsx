@@ -292,7 +292,7 @@ export default function ResumeEditor() {
       }}>
         {/* Left: back + logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button
+          <button className="cursor-pointer"
             onClick={() => navigate('/resumes')}
             title="Back to resumes"
             style={{ padding: 6, borderRadius: 8, border: 'none', background: 'none', cursor: 'pointer', color: '#6b7280', display: 'flex' }}
@@ -317,7 +317,7 @@ export default function ResumeEditor() {
         {/* Center: tab pills */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f3f4f6', borderRadius: 999, padding: '4px' }}>
           {['content', 'customize', 'ai'].map(tab => (
-            <button
+            <button className="cursor-pointer"
               key={tab}
               onClick={() => setActiveTab(tab)}
               style={{
@@ -461,13 +461,13 @@ export default function ResumeEditor() {
               You have unsaved changes. Are you sure you want to leave? Your changes will be lost.
             </p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button
+              <button className="cursor-pointer"
                 onClick={() => blocker.reset()}
                 style={{ padding: '9px 20px', borderRadius: 8, border: '1.5px solid #e5e7eb', background: '#ffffff', fontSize: 14, fontWeight: 500, cursor: 'pointer', color: '#374151' }}
               >
                 Stay
               </button>
-              <button
+              <button className="cursor-pointer"
                 onClick={() => blocker.proceed()}
                 style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: '#ef4444', color: '#ffffff', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
               >

@@ -14,6 +14,11 @@ import PrivacyPolicy from './pages/PrivacyPolicy'
 import Features from './pages/Features'
 import Onboarding from './pages/Onboarding'
 
+// Study Center Pages
+import StudyCenter from './pages/StudyCenter'
+import CourseOverview from './pages/CourseOverview'
+import ChapterReader from './pages/ChapterReader'
+
 function AppProviders() {
   return (
     <AuthProvider>
@@ -44,6 +49,10 @@ const router = createBrowserRouter([
           { path: '/stats', element: <PersonalStats /> },
           { path: '/plans', element: <Plans /> },
           { path: '/pricing', element: <Plans /> },
+          
+          { path: '/study-center', element: <StudyCenter /> },
+          { path: '/study-center/:courseId', element: <CourseOverview /> },
+          { path: '/study-center/:courseId/chapters/:chapterId', element: <ChapterReader /> },
         ],
       },
     ],

@@ -76,7 +76,7 @@ function ExperienceEditor({ section, onUpdate, onRemoveSection }) {
     <div className="p-4 bg-bg-elevated border border-border-default rounded-[8px] space-y-3">
       <div className="flex items-start justify-between">
         <span className="text-xs font-medium text-accent-blue uppercase">Experience</span>
-        <RemoveButton onClick={onRemoveSection} />
+        <RemoveButton className="cursor-pointer" onClick={onRemoveSection} />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <FieldInput label="Company" value={section.company} onChange={v => updateField('company', v)} placeholder="Google" />
@@ -102,7 +102,7 @@ function ExperienceEditor({ section, onUpdate, onRemoveSection }) {
               rows={2}
               className="flex-1 px-3 py-2 bg-bg-primary border border-border-default rounded-[6px] text-sm text-text-primary placeholder-text-muted focus:border-accent-blue focus:outline-none resize-none"
             />
-            <button onClick={() => removeBullet(i)} className="mt-2 text-text-muted hover:text-red cursor-pointer">
+            <button className="cursor-pointer" onClick={() => removeBullet(i)} className="mt-2 text-text-muted hover:text-red cursor-pointer">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -141,11 +141,11 @@ function EducationEditor({ section, onUpdate, onRemoveSection }) {
     <div className="p-4 bg-bg-elevated border border-border-default rounded-[8px] space-y-3">
       <div className="flex items-start justify-between">
         <span className="text-xs font-medium text-accent-green uppercase">Education</span>
-        <RemoveButton onClick={onRemoveSection} />
+        <RemoveButton className="cursor-pointer" onClick={onRemoveSection} />
       </div>
       {(section.items || []).map((item, i) => (
         <div key={item.eduId} className="space-y-2 pb-3 border-b border-border-default last:border-0 last:pb-0">
-          <div className="flex justify-end"><RemoveButton onClick={() => removeItem(i)} /></div>
+          <div className="flex justify-end"><RemoveButton className="cursor-pointer" onClick={() => removeItem(i)} /></div>
           <div className="grid grid-cols-2 gap-3">
             <FieldInput label="Degree" value={item.degree} onChange={v => updateItem(i, 'degree', v)} placeholder="B.S. Computer Science" />
             <FieldInput label="Institution" value={item.institution} onChange={v => updateItem(i, 'institution', v)} placeholder="MIT" />
@@ -192,7 +192,7 @@ function SkillsEditor({ section, onUpdate, onRemoveSection }) {
     <div className="p-4 bg-bg-elevated border border-border-default rounded-[8px] space-y-3">
       <div className="flex items-start justify-between">
         <span className="text-xs font-medium text-accent-purple uppercase">Skills</span>
-        <RemoveButton onClick={onRemoveSection} />
+        <RemoveButton className="cursor-pointer" onClick={onRemoveSection} />
       </div>
       {(section.categories || []).map((cat, i) => (
         <div key={cat.categoryId} className="flex items-start gap-3">
@@ -212,7 +212,7 @@ function SkillsEditor({ section, onUpdate, onRemoveSection }) {
               className="px-2 py-1.5 bg-bg-primary border border-border-default rounded text-xs text-text-primary"
             />
           </div>
-          <RemoveButton onClick={() => removeCategory(i)} />
+          <RemoveButton className="cursor-pointer" onClick={() => removeCategory(i)} />
         </div>
       ))}
       <button onClick={addCategory} className="text-xs text-accent-purple hover:text-accent-purple/80 font-medium cursor-pointer">+ Add Category</button>
@@ -274,11 +274,11 @@ function ProjectsEditor({ section, onUpdate, onRemoveSection }) {
     <div className="p-4 bg-bg-elevated border border-border-default rounded-[8px] space-y-3">
       <div className="flex items-start justify-between">
         <span className="text-xs font-medium text-accent-orange uppercase">Projects</span>
-        <RemoveButton onClick={onRemoveSection} />
+        <RemoveButton className="cursor-pointer" onClick={onRemoveSection} />
       </div>
       {(section.items || []).map((item, i) => (
         <div key={item.projectId} className="space-y-2 pb-3 border-b border-border-default last:border-0 last:pb-0">
-          <div className="flex justify-end"><RemoveButton onClick={() => removeItem(i)} /></div>
+          <div className="flex justify-end"><RemoveButton className="cursor-pointer" onClick={() => removeItem(i)} /></div>
           <div className="grid grid-cols-2 gap-3">
             <FieldInput label="Project Name" value={item.name} onChange={v => updateItem(i, 'name', v)} placeholder="ResumeIQ" />
             <FieldInput label="Organization" value={item.institution} onChange={v => updateItem(i, 'institution', v)} placeholder="Personal" />
@@ -291,14 +291,14 @@ function ProjectsEditor({ section, onUpdate, onRemoveSection }) {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-medium text-text-muted">Bullets</label>
-              <button onClick={() => addBullet(i)} className="text-xs text-accent-orange hover:text-accent-orange/80 cursor-pointer">+ Bullet</button>
+              <button className="cursor-pointer" onClick={() => addBullet(i)} className="text-xs text-accent-orange hover:text-accent-orange/80 cursor-pointer">+ Bullet</button>
             </div>
             {(item.bullets || []).map((b, bi) => (
               <div key={b.bulletId} className="flex items-start gap-2 mb-2">
                 <span className="text-text-muted text-xs mt-2.5">•</span>
                 <textarea value={b.text} onChange={(e) => updateBullet(i, bi, e.target.value)} placeholder="Achievement..." rows={2}
                   className="flex-1 px-3 py-2 bg-bg-primary border border-border-default rounded-[6px] text-sm text-text-primary placeholder-text-muted focus:border-accent-blue focus:outline-none resize-none" />
-                <button onClick={() => removeBullet(i, bi)} className="mt-2 text-text-muted hover:text-red cursor-pointer">
+                <button className="cursor-pointer" onClick={() => removeBullet(i, bi)} className="mt-2 text-text-muted hover:text-red cursor-pointer">
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -338,11 +338,11 @@ function CertificationsEditor({ section, onUpdate, onRemoveSection }) {
     <div className="p-4 bg-bg-elevated border border-border-default rounded-[8px] space-y-3">
       <div className="flex items-start justify-between">
         <span className="text-xs font-medium text-accent-blue uppercase">Certifications</span>
-        <RemoveButton onClick={onRemoveSection} />
+        <RemoveButton className="cursor-pointer" onClick={onRemoveSection} />
       </div>
       {(section.items || []).map((item, i) => (
         <div key={item.certId} className="space-y-2 pb-3 border-b border-border-default last:border-0 last:pb-0">
-          <div className="flex justify-end"><RemoveButton onClick={() => removeItem(i)} /></div>
+          <div className="flex justify-end"><RemoveButton className="cursor-pointer" onClick={() => removeItem(i)} /></div>
           <div className="grid grid-cols-2 gap-3">
             <FieldInput label="Certification Name" value={item.name} onChange={v => updateItem(i, 'name', v)} placeholder="AWS Solutions Architect" />
             <FieldInput label="Issuing Organization" value={item.issuer} onChange={v => updateItem(i, 'issuer', v)} placeholder="Amazon Web Services" />
@@ -381,7 +381,7 @@ function AchievementsEditor({ section, onUpdate, onRemoveSection }) {
     <div className="p-4 bg-bg-elevated border border-border-default rounded-[8px] space-y-3">
       <div className="flex items-start justify-between">
         <span className="text-xs font-medium text-accent-orange uppercase">Achievements</span>
-        <RemoveButton onClick={onRemoveSection} />
+        <RemoveButton className="cursor-pointer" onClick={onRemoveSection} />
       </div>
       <div>
         <div className="flex items-center justify-between mb-1">
@@ -398,7 +398,7 @@ function AchievementsEditor({ section, onUpdate, onRemoveSection }) {
               rows={2}
               className="flex-1 px-3 py-2 bg-bg-primary border border-border-default rounded-[6px] text-sm text-text-primary placeholder-text-muted focus:border-accent-blue focus:outline-none resize-none"
             />
-            <button onClick={() => removeBullet(i)} className="mt-2 text-text-muted hover:text-red cursor-pointer">
+            <button className="cursor-pointer" onClick={() => removeBullet(i)} className="mt-2 text-text-muted hover:text-red cursor-pointer">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -489,7 +489,7 @@ export default function SectionEditor({ sections, onChange }) {
             { type: 'certifications', label: '🏅 Certifications', color: 'accent-blue' },
             { type: 'achievements', label: '🏆 Achievements', color: 'accent-orange' },
           ].map(({ type, label }) => (
-            <button
+            <button className="cursor-pointer"
               key={type}
               onClick={() => addSection(type)}
               className="px-3 py-1.5 text-xs font-medium bg-bg-elevated border border-border-default rounded-[6px] hover:border-accent-blue hover:bg-accent-blue/5 transition-colors cursor-pointer"

@@ -66,7 +66,7 @@ export function EducationAccordion({ sections, allSections, onChange }) {
           </div>
         </EntryCard>
       ))}
-      <AddEntryButton label="Add Education" onClick={addEntry} />
+      <AddEntryButton className="cursor-pointer" label="Add Education" onClick={addEntry} />
     </div>
   )
 }

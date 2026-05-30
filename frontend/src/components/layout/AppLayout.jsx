@@ -1,4 +1,4 @@
-import { Outlet, Navigate } from 'react-router-dom'
+import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { motion } from 'framer-motion'
 import Sidebar from './Sidebar'
@@ -10,6 +10,9 @@ const COLLAPSED_WIDTH = 80
 
 export default function AppLayout() {
   const { user, loading } = useAuth()
+  const location = useLocation()
+  
+  const isStudyCenter = location.pathname.startsWith('/study-center')
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar-collapsed')
@@ -34,14 +37,14 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen bg-bg-primary">
-      <Sidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />
+      {!isStudyCenter && <Sidebar isCollapsed={isCollapsed} onToggle={() => setIsCollapsed(!isCollapsed)} />}
       {/* Inline style for margin-left ensures it always applies regardless of Tailwind purge */}
       <motion.main
         initial={{ opacity: 0, y: 5 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
         style={{ 
-          marginLeft: isCollapsed ? COLLAPSED_WIDTH : SIDEBAR_WIDTH, 
+          marginLeft: isStudyCenter ? 0 : (isCollapsed ? COLLAPSED_WIDTH : SIDEBAR_WIDTH), 
           minHeight: '100vh',
           transition: 'margin-left 0.3s ease-in-out'
         }}

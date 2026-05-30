@@ -112,7 +112,7 @@ function TransactionLog() {
         <button 
           onClick={handleViewMore}
           disabled={loading}
-          className="mt-6 pt-4 border-t border-slate-100 text-sm font-semibold text-indigo-500 hover:text-indigo-600 transition-colors w-full text-center disabled:opacity-50"
+          className="cursor-pointer mt-6 pt-4 border-t border-slate-100 text-sm font-semibold text-indigo-500 hover:text-indigo-600 transition-colors w-full text-center disabled:opacity-50"
         >
           {loading ? 'Loading...' : 'View All History'}
         </button>
@@ -238,7 +238,9 @@ export default function PersonalStats() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {stats.operationBreakdown.map((op, i) => (
+                  {stats.operationBreakdown
+                    .filter(op => !op.operation.startsWith('course_enrollment'))
+                    .map((op, i) => (
                     <tr key={i} className="hover:bg-slate-50/50 transition-colors group cursor-default">
                       <td className="px-6 py-4">
                         <div className="flex flex-col">

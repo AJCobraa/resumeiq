@@ -187,7 +187,7 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Applications</h1>
             <p className="text-slate-500 mt-1.5">Manage job matches and optimize your resume.</p>
           </div>
-          <Button onClick={() => setShowExtensionGuide(true)} variant="outline" size="sm" className="gap-2">
+          <Button className="cursor-pointer" onClick={() => setShowExtensionGuide(true)} variant="outline" size="sm" className="gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             Extension Active
           </Button>
@@ -235,7 +235,7 @@ export default function Dashboard() {
                     const portal = getPortalInfo(job.portal)
                     const statusInfo = STATUS_OPTIONS.find(s => s.value === job.status) || STATUS_OPTIONS[0]
                     return (
-                      <tr 
+                      <tr className="cursor-pointer" 
                         key={job.jobId} 
                         onClick={() => openJobDetail(job.jobId)}
                         className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
@@ -279,7 +279,7 @@ export default function Dashboard() {
                           {formatDate(job.createdAt)}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <button 
+                          <button className="cursor-pointer" 
                             onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.jobId) }}
                             className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
                           >
@@ -338,7 +338,7 @@ function EmptyState({ onShowGuide }) {
       <p className="text-slate-500 max-w-md mx-auto mb-8 text-balance">
         Install the ResumeIQ extension to analyze job listings directly on LinkedIn, Indeed, and more.
       </p>
-      <Button onClick={onShowGuide} className="bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-600/20">
+      <Button onClick={onShowGuide} className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-600/20">
         Get Started
       </Button>
     </Card>
@@ -437,7 +437,7 @@ function JobDetailPanel({ job, resumes, onStatusChange, onRecommendation, onRean
           {job.resumeTitle === '__deleted__' ? (
             <ResumePickerReanalyze job={job} onReanalyze={onReanalyze} isReanalyzing={isReanalyzing} />
           ) : (
-            <Button
+            <Button className="cursor-pointer"
               onClick={() => onReanalyze(job)}
               disabled={isReanalyzing}
               variant="outline"
@@ -493,7 +493,7 @@ function JobDetailPanel({ job, resumes, onStatusChange, onRecommendation, onRean
             { id: 'recs', label: `AI Recommendations${pendingRecs > 0 ? ` (${pendingRecs})` : ''}` },
             { id: 'interview', label: 'Interview Coach' },
           ].map(tab => (
-            <button
+            <button className="cursor-pointer"
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
@@ -770,14 +770,14 @@ function RecommendationCard({ rec, onAction, resumeDeleted = false }) {
         {/* Approve / Dismiss buttons */}
         {rec.status === 'pending' && !resumeDeleted && (
           <div className="flex items-center gap-3 pt-3 border-t border-border/30">
-            <Button
+            <Button className="cursor-pointer"
               size="sm"
               onClick={() => onAction('approve')}
               className="bg-foreground text-background hover:bg-foreground/90 rounded-full px-5 text-xs"
             >
               Approve
             </Button>
-            <Button
+            <Button className="cursor-pointer"
               size="sm"
               variant="ghost"
               onClick={() => onAction('dismiss')}
@@ -843,7 +843,7 @@ function ResumePickerReanalyze({ job, onReanalyze, isReanalyzing }) {
         disabled={isReanalyzing || !selectedResumeId}
         variant="outline"
         size="sm"
-        className="flex items-center gap-1.5 rounded-full border-orange-300 text-orange-500 text-xs px-3 hover:bg-orange-50"
+        className="cursor-pointer flex items-center gap-1.5 rounded-full border-orange-300 text-orange-500 text-xs px-3 hover:bg-orange-50"
       >
         {isReanalyzing ? (
           <Spinner size="sm" />
@@ -879,7 +879,7 @@ function ExtensionGuide({ isOpen, onClose }) {
             </div>
           ))}
         </div>
-        <Button onClick={onClose} className="w-full mt-2">I have installed it</Button>
+        <Button onClick={onClose} className="cursor-pointer w-full mt-2">I have installed it</Button>
       </div>
     </Modal>
   )

@@ -48,7 +48,7 @@ const PillGroup = ({ options, value, onChange }) => (
       const optLabel = typeof opt === 'string' ? opt : opt.label;
       const isActive = value === optVal;
       return (
-        <button
+        <button className="cursor-pointer"
           key={i}
           onClick={() => onChange && onChange(optVal)}
           style={{
@@ -116,7 +116,7 @@ const DiscreteSlider = ({ label, value, min, max, step, unit, onChange, customSt
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <div style={{ flex: 1, display: 'flex', background: '#f3f4f6', borderRadius: 4, padding: 0, position: 'relative', height: 22 }}>
           {steps.map((s, i) => (
-            <div key={i} onClick={() => onChange(s)} style={{ 
+            <div className="cursor-pointer" key={i} onClick={() => onChange(s)} style={{ 
               flex: 1, height: '100%', cursor: 'pointer', position: 'relative',
               borderRight: i < steps.length - 1 ? '1px solid #e5e7eb' : 'none'
             }}>
@@ -169,7 +169,7 @@ export function CustomizePanel({ customization, setCustomization, canUndo, canRe
     { id: 'template', title: 'Template', render: () => (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         {TEMPLATE_OPTIONS.map(tpl => (
-          <div key={tpl.id} onClick={() => onTemplateChange(tpl.id)} style={{
+          <div className="cursor-pointer" key={tpl.id} onClick={() => onTemplateChange(tpl.id)} style={{
             height: 100, borderRadius: 8, border: c.templateId === tpl.id ? '2px solid #7c3aed' : '1px solid #e5e7eb',
             boxShadow: c.templateId === tpl.id ? '0 0 0 3px #ede9fe' : 'none',
             display: 'flex', flexDirection: 'column', overflow: 'hidden', cursor: 'pointer', background: '#fff'
@@ -198,7 +198,7 @@ export function CustomizePanel({ customization, setCustomization, canUndo, canRe
         <>
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
             {typeOptions.map(opt => (
-              <button key={opt.value} onClick={() => set('font.type', opt.value)} style={{
+              <button className="cursor-pointer" key={opt.value} onClick={() => set('font.type', opt.value)} style={{
                 flex: 1, padding: '12px 0', border: c.font.type === opt.value ? '2px solid #7c3aed' : '1px solid #e5e7eb',
                 borderRadius: 8, background: c.font.type === opt.value ? '#f5f3ff' : '#fff', color: c.font.type === opt.value ? '#7c3aed' : '#374151',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', transition: 'all 0.1s'
@@ -210,7 +210,7 @@ export function CustomizePanel({ customization, setCustomization, canUndo, canRe
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
             {FONTS[c.font.type].map(f => (
-              <div key={f} onClick={() => set('font.family', f)} style={{
+              <div className="cursor-pointer" key={f} onClick={() => set('font.family', f)} style={{
                 border: c.font.family === f ? '1.5px solid #7c3aed' : '1px solid #e5e7eb',
                 background: c.font.family === f ? '#f5f3ff' : '#fff', color: c.font.family === f ? '#7c3aed' : '#4b5563',
                 borderRadius: 6, padding: '8px 4px', fontSize: 11, textAlign: 'center', cursor: 'pointer', fontFamily: `"${f}", sans-serif`
@@ -229,7 +229,7 @@ export function CustomizePanel({ customization, setCustomization, canUndo, canRe
           <SectionLabel>Accent Color</SectionLabel>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8, 1fr)', gap: 6 }}>
             {swatches.map(hex => (
-              <div key={hex} onClick={() => set('colors.accent', hex)} style={{
+              <div className="cursor-pointer" key={hex} onClick={() => set('colors.accent', hex)} style={{
                 width: 26, height: 26, borderRadius: '50%', background: hex, cursor: 'pointer', position: 'relative',
                 boxShadow: c.colors.accent === hex ? `0 0 0 2px #fff, 0 0 0 4px ${hex}` : 'none'
               }}>
@@ -278,13 +278,13 @@ export function CustomizePanel({ customization, setCustomization, canUndo, canRe
         <Checkbox label="Name bold" value={c.name.bold} onChange={v=>set('name.bold', v)} />
         <SectionLabel>Font</SectionLabel>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <button onClick={() => set('name.fontType', 'body')} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: c.name.fontType === 'body' ? '1.5px solid #7c3aed' : '1px solid #e5e7eb', background: c.name.fontType === 'body' ? '#f5f3ff' : '#fff', color: c.name.fontType === 'body' ? '#7c3aed' : '#374151', fontSize: 12, cursor: 'pointer' }}>Body Font</button>
-          <button onClick={() => set('name.fontType', 'creative')} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: c.name.fontType === 'creative' ? '1.5px solid #7c3aed' : '1px solid #e5e7eb', background: c.name.fontType === 'creative' ? '#f5f3ff' : '#fff', color: c.name.fontType === 'creative' ? '#7c3aed' : '#374151', fontSize: 12, cursor: 'pointer' }}>Creative</button>
+          <button className="cursor-pointer" onClick={() => set('name.fontType', 'body')} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: c.name.fontType === 'body' ? '1.5px solid #7c3aed' : '1px solid #e5e7eb', background: c.name.fontType === 'body' ? '#f5f3ff' : '#fff', color: c.name.fontType === 'body' ? '#7c3aed' : '#374151', fontSize: 12, cursor: 'pointer' }}>Body Font</button>
+          <button className="cursor-pointer" onClick={() => set('name.fontType', 'creative')} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: c.name.fontType === 'creative' ? '1.5px solid #7c3aed' : '1px solid #e5e7eb', background: c.name.fontType === 'creative' ? '#f5f3ff' : '#fff', color: c.name.fontType === 'creative' ? '#7c3aed' : '#374151', fontSize: 12, cursor: 'pointer' }}>Creative</button>
         </div>
         {c.name.fontType === 'creative' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
             {FONTS.creative.map(f => (
-              <div key={f} onClick={() => set('name.creativeFont', f)} style={{
+              <div className="cursor-pointer" key={f} onClick={() => set('name.creativeFont', f)} style={{
                 border: c.name.creativeFont === f ? '1.5px solid #7c3aed' : '1px solid #e5e7eb',
                 background: c.name.creativeFont === f ? '#f5f3ff' : '#fff', color: c.name.creativeFont === f ? '#7c3aed' : '#4b5563',
                 borderRadius: 6, padding: '10px 4px', fontSize: 14, textAlign: 'center', cursor: 'pointer', fontFamily: `"${f}", cursive`
@@ -390,7 +390,7 @@ export function CustomizePanel({ customization, setCustomization, canUndo, canRe
         <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 12 }}>Update your entire resume design with one click 💡</div>
         <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 8 }}>
           {PRESETS.map(p => (
-            <div key={p.id} onClick={() => setPreset(p.conf)} style={{
+            <div className="cursor-pointer" key={p.id} onClick={() => setPreset(p.conf)} style={{
               minWidth: 80, height: 100, borderRadius: 8, border: '1.5px solid #e5e7eb', overflow: 'hidden', cursor: 'pointer',
               background: p.color, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', transition: 'all 0.18s ease'
             }} onMouseOver={e => e.currentTarget.style.transform = 'scale(1.04)'} onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}>
@@ -405,7 +405,7 @@ export function CustomizePanel({ customization, setCustomization, canUndo, canRe
         const isOpen = openSection === sec.id;
         return (
           <div key={sec.id} style={{ borderTop: i === 0 ? '1px solid #f0f0f0' : 'none', borderBottom: '1px solid #f0f0f0' }}>
-            <button onClick={() => setOpenSection(isOpen ? null : sec.id)} style={{
+            <button className="cursor-pointer" onClick={() => setOpenSection(isOpen ? null : sec.id)} style={{
               width: '100%', padding: '14px 4px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between',
               alignItems: 'center', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#111827'
             }}>

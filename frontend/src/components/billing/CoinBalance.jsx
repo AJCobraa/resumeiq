@@ -43,7 +43,7 @@ export default function CoinBalance({ isCollapsed }) {
 
   if (isCollapsed) {
     return (
-      <button
+      <button className="cursor-pointer"
         onClick={() => navigate('/plans')}
         className="w-full flex justify-center py-4 group cursor-pointer"
         title={`${total.toLocaleString()} Coins - ${balance.plan_name} plan`}
@@ -64,7 +64,7 @@ export default function CoinBalance({ isCollapsed }) {
   }
 
   return (
-    <button
+    <button className="cursor-pointer"
       onClick={() => navigate('/plans')}
       className="w-full px-3 py-2 mb-1 group cursor-pointer"
       id="sidebar-coin-balance"

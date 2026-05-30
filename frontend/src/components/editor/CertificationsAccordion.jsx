@@ -84,7 +84,7 @@ export function CertificationsAccordion({ sections, allSections, onChange }) {
           <FormField label="Description (optional)" value={item.description} onChange={v => updateItem(item._sectionId, item.certId, 'description', v)} placeholder="Brief note about this certification…" multiline rows={2} />
         </EntryCard>
       ))}
-      <AddEntryButton label="Add Certification" onClick={addEntry} />
+      <AddEntryButton className="cursor-pointer" label="Add Certification" onClick={addEntry} />
     </div>
   )
 }
