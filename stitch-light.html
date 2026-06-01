@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Study Center - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Hanken+Grotesk:wght@600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "secondary-container": "#8a4cfc",
+                    "on-tertiary": "#ffffff",
+                    "on-tertiary-fixed-variant": "#7a3003",
+                    "on-background": "#1a1c1d",
+                    "surface-container": "#eeeeef",
+                    "on-primary-fixed-variant": "#3b35a7",
+                    "outline": "#777584",
+                    "secondary-fixed": "#eaddff",
+                    "surface-container-low": "#f3f3f4",
+                    "secondary": "#712ae2",
+                    "on-tertiary-container": "#fe9562",
+                    "outline-variant": "#c8c4d5",
+                    "tertiary-fixed-dim": "#ffb694",
+                    "tertiary-fixed": "#ffdbcc",
+                    "on-secondary-container": "#fffbff",
+                    "on-error-container": "#93000a",
+                    "on-primary-container": "#a9a7ff",
+                    "primary-fixed": "#e2dfff",
+                    "surface": "#f9f9fa",
+                    "on-secondary-fixed-variant": "#5a00c6",
+                    "background": "#f9f9fa",
+                    "on-surface-variant": "#464553",
+                    "inverse-primary": "#c3c0ff",
+                    "on-secondary-fixed": "#25005a",
+                    "error": "#ba1a1a",
+                    "surface-bright": "#f9f9fa",
+                    "on-error": "#ffffff",
+                    "surface-variant": "#e2e2e3",
+                    "on-primary-fixed": "#0f0069",
+                    "primary-container": "#3730a3",
+                    "secondary-fixed-dim": "#d2bbff",
+                    "inverse-surface": "#2f3132",
+                    "tertiary-container": "#752c00",
+                    "error-container": "#ffdad6",
+                    "primary-fixed-dim": "#c3c0ff",
+                    "on-surface": "#1a1c1d",
+                    "tertiary": "#511c00",
+                    "surface-tint": "#544fc0",
+                    "on-tertiary-fixed": "#351000",
+                    "surface-container-high": "#e8e8e9",
+                    "surface-dim": "#d9dadb",
+                    "primary": "#1f108e",
+                    "on-secondary": "#ffffff",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary": "#ffffff",
+                    "surface-container-highest": "#e2e2e3",
+                    "inverse-on-surface": "#f0f1f2"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "gutter": "24px",
+                    "container-max": "1280px",
+                    "margin-mobile": "20px",
+                    "margin-desktop": "64px",
+                    "base": "8px"
+            },
+            "fontFamily": {
+                    "label-sm": ["Inter"],
+                    "headline-sm": ["Hanken Grotesk"],
+                    "display-lg": ["Hanken Grotesk"],
+                    "body-lg": ["Inter"],
+                    "display-lg-mobile": ["Hanken Grotesk"],
+                    "label-md": ["Inter"],
+                    "headline-md": ["Hanken Grotesk"],
+                    "body-md": ["Inter"]
+            },
+            "fontSize": {
+                    "label-sm": ["12px", {"lineHeight": "1.2", "fontWeight": "600"}],
+                    "headline-sm": ["24px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                    "display-lg": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                    "display-lg-mobile": ["36px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "1.2", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                    "headline-md": ["30px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #f9f9fa;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(138, 76, 252, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(31, 16, 142, 0.03) 0px, transparent 50%);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+        .mesh-gradient-bg {
+            background: radial-gradient(circle at 20% 30%, rgba(226, 223, 255, 0.4) 0%, transparent 70%),
+                        radial-gradient(circle at 80% 70%, rgba(210, 187, 255, 0.3) 0%, transparent 70%);
+        }
+        .card-shadow {
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card-shadow:active {
+            transform: scale(0.98);
+            box-shadow: 0 10px 15px -3px rgba(55, 48, 163, 0.08), 0 4px 6px -2px rgba(55, 48, 163, 0.03);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body-md text-on-background overflow-x-hidden">
+<!-- TopAppBar -->
+<header class="bg-surface docked full-width top-0 z-50 border-b border-outline-variant">
+<nav class="flex justify-between items-center w-full px-5 md:px-margin-desktop max-w-container-max mx-auto h-20">
+<div class="flex items-center gap-4">
+<span class="font-display-lg text-headline-sm font-bold text-primary">Study Center</span>
+</div>
+<!-- Mobile Menu Placeholder / Simplified for context -->
+<div class="flex items-center gap-3">
+<button class="material-symbols-outlined text-primary p-2">search</button>
+<button class="material-symbols-outlined text-primary p-2">menu</button>
+</div>
+</nav>
+</header>
+<main class="relative min-h-screen pt-4 pb-20 px-5 max-w-xl mx-auto">
+<!-- Navigation Breadcrumb / Top Section -->
+<section class="mt-4 mb-8">
+<button class="flex items-center gap-2 text-primary font-label-md mb-4 group active:opacity-70 transition-all">
+<span class="material-symbols-outlined text-[20px]">arrow_back</span>
+<span>Back to Dashboard</span>
+</button>
+<h1 class="font-display-lg-mobile text-display-lg-mobile text-on-background tracking-tight">Study &amp; Prep Center</h1>
+<p class="text-on-surface-variant font-body-md mt-2 opacity-80">Elevate your academic and professional trajectory.</p>
+</section>
+<!-- Main Content Hubs -->
+<div class="flex flex-col gap-6">
+<!-- Hub 1: Interview Prep Center -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant card-shadow overflow-hidden group">
+<div class="h-32 w-full bg-primary-container relative">
+<img alt="Professional Interview Environment" class="w-full h-full object-cover opacity-60 mix-blend-overlay" data-alt="A professional, modern corporate meeting room with clean lines and soft daylight filtering through large windows. The atmosphere is calm and focused, reflecting a high-end academic and professional setting. The lighting is bright and airy, with a soft indigo and lavender color cast consistent with a premium light-mode UI design. Deep shadows are absent, emphasizing clarity and intellectual rigor." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHPetVc3erf6EsKFEvPXblQb7-Kb4v2h3YzX1RZ9lECBt7KkqmzQxqqFQ7OdmEqnkfarHCzn1OkNaN5CXmlVQB0VYYLTk09F4i8T9ZVTCveYimhjpvz9JB15mrbZtbFVmtucsUBRolklc32QSKYGw0F0z2_23OrDbQGzwIX1eJrEBh1alGA5J1rNDLd6jdgCDCp_nSkrs1GyETiGFg-Y8OnmMzIlafgq-82wg-JtYsG9dX3V3uIQ8cGP_5Cr4cj15sg0_KfEVoIEk"/>
+<div class="absolute inset-0 p-6 flex items-end">
+<span class="material-symbols-outlined text-on-primary text-4xl" data-weight="fill" style="font-variation-settings: 'FILL' 1;">video_chat</span>
+</div>
+</div>
+<div class="p-6">
+<h2 class="font-headline-sm text-headline-sm text-on-background mb-2">Interview Prep Center</h2>
+<p class="text-on-surface-variant font-body-md mb-6 leading-relaxed">Master the art of professional dialogue with our AI-driven mock simulators and peer review networks.</p>
+<button class="w-full bg-primary text-on-primary py-4 rounded-lg font-label-md flex items-center justify-center gap-2 hover:bg-primary-container transition-colors active:scale-[0.99]">
+<span>Enter Simulator</span>
+<span class="material-symbols-outlined text-[18px]">play_circle</span>
+</button>
+</div>
+</div>
+<!-- Hub 2: Skill Roadmaps -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant card-shadow p-6 group">
+<div class="flex items-center gap-4 mb-6">
+<div class="w-12 h-12 rounded-lg bg-secondary-container/10 flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">alt_route</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-background">Skill Roadmaps</h2>
+<span class="inline-block px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[10px] font-bold uppercase tracking-wider">Strategic Learning</span>
+</div>
+</div>
+<div class="flex flex-col border-t border-outline-variant/30">
+<a class="flex items-center justify-between py-4 border-b border-outline-variant/30 hover:bg-surface-variant/20 transition-colors" href="#">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline">map</span>
+<span class="font-label-md text-on-surface">My Roadmaps</span>
+</div>
+<span class="material-symbols-outlined text-outline">chevron_right</span>
+</a>
+<a class="flex items-center justify-between py-4 hover:bg-surface-variant/20 transition-colors" href="#">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline">analytics</span>
+<span class="font-label-md text-on-surface">Analyze Skill Gaps</span>
+</div>
+<span class="material-symbols-outlined text-outline">chevron_right</span>
+</a>
+</div>
+</div>
+<!-- Hub 3: Course Catalog -->
+<div class="bg-surface-container-lowest rounded-xl border border-outline-variant card-shadow p-6 flex items-center justify-between group">
+<div class="flex flex-col gap-1">
+<h2 class="font-headline-sm text-headline-sm text-on-background">Course Catalog</h2>
+<div class="flex items-center gap-2">
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-primary-fixed-dim"></div>
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-secondary-fixed-dim"></div>
+<div class="w-6 h-6 rounded-full border-2 border-surface bg-tertiary-fixed-dim"></div>
+</div>
+<p class="text-primary font-label-md font-bold">420+ Certified Courses</p>
+</div>
+</div>
+<div class="bg-primary-container p-4 rounded-full text-on-primary active:bg-primary transition-all shadow-md">
+<span class="material-symbols-outlined block">manage_search</span>
+</div>
+</div>
+<!-- Progress Snapshot (Extra Component for academic clarity vibe) -->
+<div class="mt-4 p-5 bg-primary-fixed rounded-xl border border-primary/10">
+<div class="flex justify-between items-center mb-3">
+<span class="font-label-md text-on-primary-fixed-variant">Overall Progress</span>
+<span class="font-label-md text-on-primary-fixed-variant font-bold">68%</span>
+</div>
+<div class="w-full h-1.5 bg-on-primary/30 rounded-full overflow-hidden">
+<div class="h-full bg-primary-container w-[68%] transition-all duration-1000 ease-out"></div>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-low border-t border-outline-variant">
+<div class="w-full py-12 px-5 max-w-container-max mx-auto flex flex-col items-center gap-8">
+<div class="flex flex-col items-center gap-4">
+<span class="font-headline-sm text-headline-sm font-bold text-primary">Study Center</span>
+<div class="flex flex-wrap justify-center gap-x-6 gap-y-3">
+<a class="font-label-md text-on-surface-variant hover:text-primary transition-all" href="#">Privacy Policy</a>
+<a class="font-label-md text-on-surface-variant hover:text-primary transition-all" href="#">Terms of Service</a>
+<a class="font-label-md text-on-surface-variant hover:text-primary transition-all" href="#">Help Center</a>
+<a class="font-label-md text-on-surface-variant hover:text-primary transition-all" href="#">Contact Us</a>
+</div>
+</div>
+<p class="font-label-md text-on-surface-variant opacity-60 text-center">© 2024 Academic Clarity Course Platform. All rights reserved.</p>
+</div>
+</footer>
+<!-- Simple Tab Interaction Script -->
+<script>
+        // Micro-interaction for list items
+        document.querySelectorAll('a').forEach(link => {
+            link.addEventListener('touchstart', () => {
+                link.classList.add('bg-primary/5');
+            });
+            link.addEventListener('touchend', () => {
+                link.classList.remove('bg-primary/5');
+            });
+        });
+    </script>
+</body></html>

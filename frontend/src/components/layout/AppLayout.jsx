@@ -12,7 +12,7 @@ export default function AppLayout() {
   const { user, loading } = useAuth()
   const location = useLocation()
   
-  const isStudyCenter = location.pathname.startsWith('/study-center')
+  const isStudyCenter = location.pathname.startsWith('/study-prep-center')
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar-collapsed')

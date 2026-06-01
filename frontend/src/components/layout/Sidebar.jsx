@@ -15,8 +15,8 @@ const navItems = [
     ),
   },
   {
-    label: 'Study Center',
-    path: '/study-center',
+    label: 'Study & Prep Center',
+    path: '/study-prep-center',
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}

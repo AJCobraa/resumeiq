@@ -16,8 +16,18 @@ import Onboarding from './pages/Onboarding'
 
 // Study Center Pages
 import StudyCenter from './pages/StudyCenter'
+import CourseCatalog from './pages/CourseCatalog'
 import CourseOverview from './pages/CourseOverview'
 import ChapterReader from './pages/ChapterReader'
+import SkillGapPage from './pages/SkillGapPage'
+import CustomRoadmapPage from './pages/CustomRoadmapPage'
+import MyRoadmapsPage from './pages/MyRoadmapsPage'
+import RoadmapCanvas from './pages/RoadmapCanvas'
+import InterviewSessionsListPage from './pages/InterviewSessionsListPage'
+import JobSessionsPage from './pages/JobSessionsPage'
+import InterviewPrepPage from './pages/InterviewPrepPage'
+import InterviewSessionPage from './pages/InterviewSessionPage'
+import InterviewRoundPage from './pages/InterviewRoundPage'
 
 function AppProviders() {
   return (
@@ -50,9 +60,20 @@ const router = createBrowserRouter([
           { path: '/plans', element: <Plans /> },
           { path: '/pricing', element: <Plans /> },
           
-          { path: '/study-center', element: <StudyCenter /> },
-          { path: '/study-center/:courseId', element: <CourseOverview /> },
-          { path: '/study-center/:courseId/chapters/:chapterId', element: <ChapterReader /> },
+          { path: '/study-prep-center', element: <StudyCenter /> },
+          { path: '/study-prep-center/catalog', element: <CourseCatalog /> },
+          { path: '/study-prep-center/:courseId', element: <CourseOverview /> },
+          { path: '/study-prep-center/:courseId/chapters/:chapterId', element: <ChapterReader /> },
+          
+          { path: '/study-prep-center/skill-gap', element: <SkillGapPage /> },
+          { path: '/study-prep-center/interview-prep', element: <InterviewPrepPage /> },
+          { path: '/study-prep-center/interview-prep/:sessionId', element: <InterviewSessionPage /> },
+          { path: '/study-prep-center/interview-prep/:sessionId/round/:roundId', element: <InterviewRoundPage /> },
+          { path: '/study-prep-center/learn-skill', element: <CustomRoadmapPage /> },
+          { path: '/study-prep-center/roadmaps', element: <MyRoadmapsPage /> },
+          { path: '/study-prep-center/roadmaps/:roadmapId', element: <RoadmapCanvas /> },
+          { path: '/study-prep-center/interviews', element: <InterviewSessionsListPage /> },
+          { path: '/study-prep-center/interviews/:jobId', element: <JobSessionsPage /> },
         ],
       },
     ],

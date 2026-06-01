@@ -87,6 +87,10 @@ app.include_router(stats.router)
 app.include_router(billing.router)
 app.include_router(webhooks.router)
 
-# ── Study Center Module ──────────────────────────────
+# ── Study & Prep Center Module ──────────────────────────────
 from modules.study_center.router import router as study_center_router
+from modules.study_center.roadmap_router import router as roadmap_router
+from modules.study_center.interview_router import router as interview_router
 app.include_router(study_center_router)
+app.include_router(roadmap_router)
+app.include_router(interview_router)

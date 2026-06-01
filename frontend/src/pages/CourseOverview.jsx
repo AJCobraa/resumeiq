@@ -23,7 +23,7 @@ export default function CourseOverview() {
       setCourse(data)
     } catch (err) {
       error(err.message || 'Failed to load course details')
-      navigate('/study-center')
+      navigate('/study-prep-center')
     } finally {
       setLoading(false)
     }
@@ -77,7 +77,7 @@ export default function CourseOverview() {
         </div>
 
         <div className="max-w-5xl mx-auto relative z-10">
-          <Link to="/study-center" className="inline-flex items-center gap-2 text-sm text-indigo-200 hover:text-white mb-10 font-medium transition-colors">
+          <Link to="/study-prep-center" className="inline-flex items-center gap-2 text-sm text-indigo-200 hover:text-white mb-10 font-medium transition-colors">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
@@ -210,7 +210,7 @@ export default function CourseOverview() {
             {course.chapters?.map((ch, idx) => (
               <Link
                 key={ch.chapter_id}
-                to={ch.is_locked ? '#' : `/study-center/${course.course_id}/chapters/${ch.chapter_id}`}
+                to={ch.is_locked ? '#' : `/study-prep-center/${course.course_id}/chapters/${ch.chapter_id}`}
                 className={cn(
                   "group relative overflow-hidden flex items-center p-5 rounded-2xl transition-all duration-300",
                   ch.is_locked 

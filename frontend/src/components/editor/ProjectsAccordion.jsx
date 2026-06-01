@@ -205,7 +205,7 @@ export function ProjectsAccordion({ sections, allSections, onChange }) {
                 }}>
                   Bullets
                 </label>
-                <button className="cursor-pointer"
+                <button
                   onClick={() =>
                     addBullet(item._sectionId, item.projectId)
                   }

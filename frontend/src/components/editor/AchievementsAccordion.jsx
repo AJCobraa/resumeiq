@@ -51,7 +51,7 @@ export function AchievementsAccordion({ sections, allSections, onChange }) {
               fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
             }}
           />
-          <button className="cursor-pointer"
+          <button
             onClick={() => removeBullet(bi)}
             style={{ marginTop: 6, padding: 4, border: 'none', background: 'none', cursor: 'pointer', color: '#d1d5db', borderRadius: 4, display: 'flex', flexShrink: 0 }}
             onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}

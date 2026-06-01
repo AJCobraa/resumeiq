@@ -94,7 +94,7 @@ export default function Onboarding() {
         {/* Progress Dots */}
         <div className="flex gap-2">
           {steps.map((step) => (
-            <button className="cursor-pointer"
+            <button
               key={step.id}
               onClick={() => setCurrentStep(step.id)}
               className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${

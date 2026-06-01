@@ -280,7 +280,7 @@ export default function AuthModal({ isOpen, onClose }) {
                 required
                 className="w-full bg-secondary border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
               />
-              <button className="cursor-pointer"
+              <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors"
@@ -396,7 +396,7 @@ export default function AuthModal({ isOpen, onClose }) {
 
         <p className="text-center text-sm text-muted-foreground mt-8">
           {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-          <button className="cursor-pointer"
+          <button
             onClick={() => {
               setIsSignUp(!isSignUp)
               setError('')

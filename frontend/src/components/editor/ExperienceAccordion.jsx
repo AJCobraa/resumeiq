@@ -105,7 +105,7 @@ export function ExperienceAccordion({ sections, allSections, onChange }) {
           <div style={{ marginTop: 4 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
               <label style={{ fontSize: 11, fontWeight: 500, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.03em' }}>Bullets</label>
-              <button className="cursor-pointer" onClick={() => addBullet(sec.sectionId)} style={{ fontSize: 11, color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+              <button onClick={() => addBullet(sec.sectionId)} style={{ fontSize: 11, color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
                 + Add Bullet
               </button>
             </div>

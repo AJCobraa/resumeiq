@@ -15,8 +15,13 @@ from fastapi import HTTPException
 from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from modules.study_center.models import Course, Chapter, Enrollment, ChapterProgress
-from models.postgres_schema import UserCredit, CoinTransaction
+from modules.study_center.models import Course, Chapter, Enrollment, ChapterProgress, SkillGapSnapshot, Roadmap, RoadmapNodeProgress
+from models.postgres_schema import UserCredit, CoinTransaction, Job
+from core.model_registry import get_model, get_operation_name
+from core.budget_guard import deduct_coins
+from services.gemma_service import call_model_json
+from services.roadmap_prompts import build_skill_gap_prompt, build_roadmap_prompt, build_interview_prep_v2_prompt
+from services import resume_service
 
 # ── In-memory content cache ─────────────────────────
 # Keyed by "{course_id}/{filename}" → markdown string
@@ -397,3 +402,199 @@ async def _get_active_enrollment(db: AsyncSession, uid: str, course_id: str):
             return None
 
     return enrollment
+
+
+# ── Study Center V2 Services ────────────────────────────────────────
+
+async def _refund_coins(db: AsyncSession, uid: str, amount: int, operation: str):
+    """Helper to refund coins if an AI generation fails after deduction."""
+    if amount <= 0:
+        return
+    query = select(UserCredit).where(UserCredit.user_id == uid).with_for_update()
+    result = await db.execute(query)
+    credit = result.scalar_one_or_none()
+    if credit:
+        credit.coins_balance += amount
+        db.add(CoinTransaction(
+            user_id=uid,
+            operation=f"refund:{operation}",
+            coins_charged=-amount,
+        ))
+        await db.commit()
+
+
+async def generate_roadmap_questions(skill_name: str, role_context: str = None, experience_level: str = "intermediate"):
+    """
+    Generates tailored questions to ask the user before building their custom roadmap.
+    This is a free AI call to encourage engagement.
+    """
+    prompt = f"""
+    You are an expert technical interviewer and curriculum designer.
+    A user wants to learn the skill: "{skill_name}".
+    Their current experience level with this skill is: {experience_level}.
+    {"They are learning this for the specific role/context: " + role_context if role_context else ""}
+
+    Generate exactly 3 multiple-choice questions to ask the user to tailor their learning roadmap.
+    The questions should uncover their specific knowledge gaps, learning preferences, or project requirements.
+
+    Return the result strictly as a JSON object with this format:
+    {{
+      "questions": [
+        {{
+          "id": "q1",
+          "text": "The question text",
+          "options": ["Option A", "Option B", "Option C"]
+        }},
+        ...
+      ]
+    }}
+    Do not include any markdown formatting, only the JSON.
+    """
+    try:
+        # Free call, we use base Gemma model
+        ai_response = await call_model_json(prompt, user_id="system", operation="generate_roadmap_questions")
+        
+        if not isinstance(ai_response, dict) or "questions" not in ai_response:
+            raise ValueError("Invalid AI response format")
+            
+        return ai_response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate questions: {str(e)}")
+
+
+async def generate_roadmap(db: AsyncSession, uid: str, skill_name: str, model_key: str, roadmap_type: str, experience_level: str, source_job_id: str = None, source_gap_id: str = None, role_context: str = None, gap_status: str = None, answers: dict = None):
+    """Generates or retrieves a cached learning roadmap."""
+    # 1. Check cache (same user, skill, job context, experience)
+    query = select(Roadmap).where(
+        Roadmap.user_id == uid,
+        Roadmap.skill_name == skill_name,
+        Roadmap.experience_level == experience_level
+    )
+    if source_job_id:
+        query = query.where(Roadmap.source_job_id == source_job_id)
+        
+    cached_result = await db.execute(query)
+    cached_roadmap = cached_result.scalar_one_or_none()
+    
+    if cached_roadmap:
+        cached_roadmap.last_accessed_at = datetime.now(timezone.utc)
+        await db.commit()
+        return {"id": str(cached_roadmap.id), "cached": True}
+
+    # 2. Verify source_gap_id ownership if provided
+    if source_gap_id:
+        gap_result = await db.execute(select(SkillGapSnapshot).where(SkillGapSnapshot.id == source_gap_id, SkillGapSnapshot.user_id == uid))
+        if not gap_result.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="Source gap analysis not found")
+
+    # 3. Model & Pricing
+    try:
+        model_info = get_model(model_key)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    op_name = get_operation_name("generate_roadmap", model_key)
+    
+    try:
+        from core.constants import FIXED_COST
+        cost = FIXED_COST.get(op_name, 0)
+        await deduct_coins(db, uid, op_name)
+    except ValueError as e:
+        raise HTTPException(status_code=402, detail=str(e))
+
+    # 4. Call AI
+    prompt = build_roadmap_prompt(skill_name, role_context, experience_level, gap_status, answers)
+    
+    try:
+        model_override = model_info["api_model_id"] if model_key != "gemma-4-31b" else None
+        # intentional: internal method, approved for cross-module use
+        ai_response = await call_model_json(prompt, user_id=uid, operation=op_name, model_override=model_override)
+        
+        if not isinstance(ai_response, dict) or "nodes" not in ai_response:
+            raise ValueError("Invalid AI roadmap response format")
+
+        import uuid
+        roadmap = Roadmap(
+            id=uuid.uuid4(),
+            user_id=uid,
+            skill_name=skill_name,
+            roadmap_type=roadmap_type,
+            experience_level=experience_level,
+            source_job_id=source_job_id,
+            source_gap_id=source_gap_id,
+            model_key=model_key,
+            coins_spent=cost,
+            roadmap_data=ai_response,
+            last_accessed_at=datetime.now(timezone.utc)
+        )
+        db.add(roadmap)
+        await db.commit()
+        
+        return {"id": str(roadmap.id), "cached": False}
+
+    except Exception as e:
+        await _refund_coins(db, uid, cost, op_name)
+        raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
+
+
+async def get_roadmap_with_progress(db: AsyncSession, uid: str, roadmap_id: str):
+    """Fetch roadmap and overlay user progress on nodes."""
+    result = await db.execute(select(Roadmap).where(Roadmap.id == roadmap_id, Roadmap.user_id == uid))
+    roadmap = result.scalar_one_or_none()
+    if not roadmap:
+        raise HTTPException(status_code=404, detail="Roadmap not found")
+        
+    roadmap.last_accessed_at = datetime.now(timezone.utc)
+    
+    prog_result = await db.execute(select(RoadmapNodeProgress).where(RoadmapNodeProgress.roadmap_id == roadmap_id, RoadmapNodeProgress.user_id == uid))
+    progress_rows = prog_result.scalars().all()
+    progress_map = {p.node_id: p.status for p in progress_rows}
+    
+    data = dict(roadmap.roadmap_data) if roadmap.roadmap_data else {}
+    nodes = data.get("nodes", {})
+    
+    for node_id, node_data in nodes.items():
+        node_data["user_status"] = progress_map.get(node_id, "NOT_STARTED")
+        
+    data["nodes"] = nodes
+    
+    await db.commit()
+    return {
+        "id": str(roadmap.id),
+        "skill_name": roadmap.skill_name,
+        "roadmap_type": roadmap.roadmap_type,
+        "roadmap_data": data,
+    }
+
+
+async def upsert_node_progress(db: AsyncSession, uid: str, roadmap_id: str, node_id: str, status: str):
+    """Update user progress for a specific node."""
+    # Verify roadmap ownership
+    result = await db.execute(select(Roadmap).where(Roadmap.id == roadmap_id, Roadmap.user_id == uid))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Roadmap not found")
+        
+    prog_result = await db.execute(
+        select(RoadmapNodeProgress).where(
+            RoadmapNodeProgress.roadmap_id == roadmap_id,
+            RoadmapNodeProgress.user_id == uid,
+            RoadmapNodeProgress.node_id == node_id
+        )
+    )
+    progress = prog_result.scalar_one_or_none()
+    
+    if progress:
+        progress.status = status
+    else:
+        import uuid
+        progress = RoadmapNodeProgress(
+            id=uuid.uuid4(),
+            user_id=uid,
+            roadmap_id=roadmap_id,
+            node_id=node_id,
+            status=status
+        )
+        db.add(progress)
+        
+    await db.commit()
+    return {"status": "success"}

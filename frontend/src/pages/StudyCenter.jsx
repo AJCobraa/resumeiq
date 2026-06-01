@@ -1,164 +1,220 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { api } from '../lib/api'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useToast } from '../components/ui/Toast'
-import { cn } from '../lib/utils'
+import { ArrowLeft, Rocket, Map, BookOpen, Sparkles, Target, Zap, Play, Layers, Code, GitBranch, Brain, Users, LayoutGrid, FileText } from 'lucide-react'
+import Modal from '../components/ui/Modal'
+import '../study-center.css'
 
 export default function StudyCenter() {
-  const [courses, setCourses] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('All')
-  const { user } = useAuth()
-  const { error } = useToast()
+  const { profile } = useAuth()
+  const navigate = useNavigate()
+  const [isTypesModalOpen, setIsTypesModalOpen] = useState(false)
 
-  useEffect(() => {
-    async function fetchCourses() {
-      try {
-        const data = await api.getCourses()
-        setCourses(data)
-      } catch (err) {
-        error('Failed to load courses')
-      } finally {
-        setLoading(false)
-      }
-    }
-    if (user) fetchCourses()
-  }, [user, error])
-
-  const filteredCourses = filter === 'All' 
-    ? courses 
-    : courses.filter(c => c.tags?.includes(filter.toLowerCase()))
+  const ROUND_TYPES = [
+    { id: 'tech', label: 'Technical Questions', icon: <Code className="w-5 h-5" />, color: 'text-blue-500', bg: 'bg-blue-50 border-blue-100', desc: 'Probes JD keywords and missing skills with company-specific depth' },
+    { id: 'system', label: 'System Design', icon: <GitBranch className="w-5 h-5" />, color: 'text-emerald-500', bg: 'bg-emerald-50 border-emerald-100', desc: 'Architecture and scale challenges calibrated to company tier' },
+    { id: 'dsa', label: 'DSA Patterns', icon: <Brain className="w-5 h-5" />, color: 'text-indigo-500', bg: 'bg-indigo-50 border-indigo-100', desc: "Algorithm questions weighted to this company's interview style, with LeetCode links" },
+    { id: 'behavioral', label: 'Behavioral', icon: <Users className="w-5 h-5" />, color: 'text-amber-500', bg: 'bg-amber-50 border-amber-100', desc: "Culture fit, leadership stories calibrated to this specific company's values" },
+    { id: 'lld', label: 'Low-Level Design', icon: <LayoutGrid className="w-5 h-5" />, color: 'text-purple-500', bg: 'bg-purple-50 border-purple-100', desc: 'Class design, OOP patterns and SOLID principles' },
+    { id: 'resume', label: 'Resume Deep Dive', icon: <FileText className="w-5 h-5" />, color: 'text-rose-500', bg: 'bg-rose-50 border-rose-100', desc: 'Questions derived directly from your actual projects and experience bullets' }
+  ]
 
   return (
-    <div className="flex-1 bg-[#fcfcfd] min-h-screen pb-20">
-      {/* Header Area */}
-      <div className="pt-12 pb-12 px-8 bg-gradient-to-br from-indigo-50/50 to-white border-b border-border-default">
-        <div className="max-w-5xl mx-auto flex flex-col">
-          <Link to="/dashboard" className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 mb-8 font-medium transition-colors bg-white/50 px-4 py-2 rounded-full border border-indigo-100 w-fit hover:shadow-sm">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-            Back to Dashboard
-          </Link>
-          <h1 className="text-4xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 mb-4">
-            Study Center
-          </h1>
-          <p className="text-lg text-text-muted max-w-2xl">
-            Master system design and OOD interviews with step-by-step visual guides. Complete courses to earn certificates and level up your skills.
-          </p>
-          
-          {/* Tag Filters */}
-          <div className="flex flex-wrap gap-2 mt-8">
-            {['All', 'System-Design', 'OOD', 'Interviews'].map((tag) => (
-              <button className="cursor-pointer"
-                key={tag}
-                onClick={() => setFilter(tag)}
-                className={cn(
-                  "px-4 py-1.5 rounded-full text-sm font-medium transition-colors",
-                  filter === tag
-                    ? "bg-indigo-100 text-indigo-700"
-                    : "bg-bg-elevated text-text-muted hover:bg-bg-card hover:text-text-primary border border-border-default"
-                )}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+    <div className="min-h-[calc(100vh-64px)] text-[#1a1c1d] bg-[#fcfcfd] font-sans premium-bg flex flex-col justify-center py-10">
+      <main className="relative z-10 px-6 max-w-[1200px] w-full mx-auto">
+        
+        {/* Back Button */}
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="mb-8 text-sm font-semibold text-slate-500 hover:text-indigo-600 transition-colors flex items-center gap-1.5 w-fit group"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Dashboard
+        </button>
 
-      {/* Main Grid */}
-      <div className="max-w-5xl mx-auto px-8 py-12">
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {[1, 2].map((i) => (
-              <div key={i} className="animate-pulse bg-white border border-border-default rounded-2xl h-80"></div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {filteredCourses.map((course) => (
-              <div key={course.course_id} className="group bg-white border border-border-default rounded-2xl overflow-hidden hover:shadow-lg hover:border-indigo-200 transition-all duration-300 flex flex-col">
-                {/* Card Graphic */}
-                <div className="h-40 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center p-6 border-b border-border-default">
-                   <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center">
-                     {course.course_id === 'system-design' ? (
-                       <svg className="w-8 h-8 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                       </svg>
-                     ) : (
-                       <svg className="w-8 h-8 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2-1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
-                       </svg>
-                     )}
-                   </div>
+        {/* Sleek Header Section */}
+        <section className="mb-12 text-center animate-spring-up flex flex-col items-center">
+          <h1 className="text-4xl md:text-5xl font-extrabold text-[#0f0f14] tracking-tight mb-3">
+            Training & Command Center
+          </h1>
+          <p className="text-base md:text-lg text-[#464553] max-w-2xl mx-auto">
+            Your strategic hub for career acceleration. Run highly realistic mock interviews, analyze skill gaps, and execute personalized roadmaps.
+          </p>
+        </section>
+
+        <div className="flex flex-col gap-6">
+          
+          {/* Featured Top Product: Interview Simulator */}
+          <div className="relative group/hero cursor-pointer animate-spring-up" style={{ animationDelay: '100ms' }}>
+            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500 rounded-[2.2rem] opacity-30 blur-lg group-hover/hero:opacity-100 group-hover/hero:blur-xl transition-all duration-700 bg-[length:200%_auto] animate-[pulse_3s_ease-in-out_infinite]"></div>
+            
+            <div className="relative bg-[#0f0f14] rounded-[2rem] p-8 md:p-14 overflow-hidden flex flex-col lg:flex-row items-center justify-between gap-10 shadow-2xl transition-transform duration-500 group-hover/hero:scale-[1.01]">
+              <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none group-hover/hero:bg-indigo-500/20 transition-colors duration-700"></div>
+              <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-600/10 rounded-full blur-[80px] pointer-events-none group-hover/hero:bg-purple-500/20 transition-colors duration-700"></div>
+              
+              <div className="flex-1 relative z-10 max-w-2xl">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold rounded-full uppercase tracking-widest mb-6 shadow-inner">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                  Flagship Product
                 </div>
                 
-                {/* Content */}
-                <div className="p-6 flex-1 flex flex-col">
-                  <div className="flex items-start justify-between mb-2">
-                    <h2 className="text-xl font-bold text-text-primary group-hover:text-indigo-600 transition-colors">
-                      {course.title}
-                    </h2>
-                    {course.coin_cost > 0 && !course.is_enrolled && (
-                      <span className="flex items-center gap-1 bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-1 rounded-full whitespace-nowrap">
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                        </svg>
-                        Premium
-                      </span>
-                    )}
+                <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-white mb-5 tracking-tight leading-tight">
+                  AI Interview Simulator
+                </h2>
+                
+                <p className="text-indigo-100/70 text-lg leading-relaxed mb-6">
+                  Run high-stress, company-specific mock rounds. We dynamically tailor <strong>6 distinct interview types</strong> to your target role's exact Job Description, your actual resume experience, and the company's specific interview culture and difficulty tier.
+                </p>
+                
+                <div className="flex flex-wrap items-center gap-4 mb-6">
+                  <button onClick={() => navigate('/study-prep-center/interviews')} className="bg-white hover:bg-indigo-50 text-indigo-950 px-8 py-4 rounded-xl font-bold text-lg flex items-center gap-3 transition-all transform active:scale-95 shadow-[0_0_40px_rgba(255,255,255,0.2)] hover:shadow-[0_0_60px_rgba(255,255,255,0.4)]">
+                    <Play className="w-5 h-5 fill-indigo-950" />
+                    Launch Simulation
+                  </button>
+                  <button onClick={() => setIsTypesModalOpen(true)} className="px-6 py-4 rounded-xl border border-white/20 text-white font-bold hover:bg-white/10 transition-colors flex items-center gap-2">
+                    <Layers className="w-5 h-5" /> Explore Round Types
+                  </button>
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/60 text-xs font-semibold w-fit">
+                    <Target className="w-3.5 h-3.5" /> Evaluated on FAANG Rubrics
                   </div>
-                  
-                  <p className="text-sm text-text-muted mb-4 line-clamp-2">
-                    {course.description}
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/60 text-xs font-semibold w-fit">
+                    <Zap className="w-3.5 h-3.5" /> Real-time Voice Interaction
+                  </div>
+                </div>
+              </div>
+              
+              {/* Interactive Graphic showing all 6 types */}
+              <div className="hidden lg:flex w-96 h-96 relative items-center justify-center shrink-0">
+                <div className="absolute inset-0 border-[2px] border-indigo-500/20 rounded-full animate-[spin_20s_linear_infinite]"></div>
+                <div className="absolute inset-10 border-[2px] border-dashed border-purple-500/30 rounded-full animate-[spin_15s_linear_infinite_reverse]"></div>
+                <div className="absolute inset-20 border-[2px] border-indigo-400/20 rounded-full animate-[spin_10s_linear_infinite]"></div>
+                
+                <div className="w-28 h-28 bg-gradient-to-br from-indigo-400 to-purple-600 rounded-full flex items-center justify-center shadow-[0_0_100px_rgba(99,102,241,0.6)] animate-pulse relative z-10">
+                  <Rocket className="w-12 h-12 text-white" />
+                </div>
+                
+                {/* 6 Floating Badges */}
+                <div className="absolute top-2 right-12 bg-[#1a1c1d] border border-white/10 px-3 py-1.5 rounded-lg shadow-2xl animate-float-icon" style={{ animationDelay: '0ms' }}>
+                  <span className="text-emerald-400 text-xs font-bold font-mono tracking-wider text-shadow-glow">System Design</span>
+                </div>
+                <div className="absolute bottom-6 left-12 bg-[#1a1c1d] border border-white/10 px-3 py-1.5 rounded-lg shadow-2xl animate-float-icon" style={{ animationDelay: '500ms' }}>
+                  <span className="text-amber-400 text-xs font-bold font-mono tracking-wider text-shadow-glow">Behavioral</span>
+                </div>
+                <div className="absolute top-16 left-6 bg-[#1a1c1d] border border-white/10 px-3 py-1.5 rounded-lg shadow-2xl animate-float-icon" style={{ animationDelay: '1200ms' }}>
+                  <span className="text-indigo-400 text-xs font-bold font-mono tracking-wider text-shadow-glow">DSA Patterns</span>
+                </div>
+                <div className="absolute bottom-16 right-6 bg-[#1a1c1d] border border-white/10 px-3 py-1.5 rounded-lg shadow-2xl animate-float-icon" style={{ animationDelay: '800ms' }}>
+                  <span className="text-rose-400 text-xs font-bold font-mono tracking-wider text-shadow-glow">Resume Deep Dive</span>
+                </div>
+                <div className="absolute top-1/2 -left-6 -translate-y-1/2 bg-[#1a1c1d] border border-white/10 px-3 py-1.5 rounded-lg shadow-2xl animate-float-icon" style={{ animationDelay: '300ms' }}>
+                  <span className="text-blue-400 text-xs font-bold font-mono tracking-wider text-shadow-glow">Technical Q's</span>
+                </div>
+                <div className="absolute top-1/2 -right-6 -translate-y-1/2 bg-[#1a1c1d] border border-white/10 px-3 py-1.5 rounded-lg shadow-2xl animate-float-icon" style={{ animationDelay: '1600ms' }}>
+                  <span className="text-purple-400 text-xs font-bold font-mono tracking-wider text-shadow-glow">LLD & OOP</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Secondary Products Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
+            <div className="glass-card rounded-[2rem] p-8 flex flex-col justify-between animate-spring-up group/card border border-slate-200/60 hover:shadow-xl hover:-translate-y-1 hover:border-blue-300/50 transition-all duration-300" style={{ animationDelay: '200ms' }}>
+              <div className="ambient-glow top-1/2 right-0 bg-gradient-to-l from-blue-500/10 to-transparent blur-3xl w-64 h-64 opacity-0 group-hover/card:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+              <div>
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-50 to-slate-100 border border-blue-100/50 flex items-center justify-center text-blue-600 shadow-sm group-hover/card:scale-110 group-hover/card:rotate-3 transition-transform duration-500">
+                    <Map className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-[#1a1c1d]">Skill Roadmaps</h2>
+                    <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Gap Analysis</span>
+                  </div>
+                </div>
+                <p className="text-[#464553] text-base leading-relaxed mb-8">
+                  Algorithms analyze your profile against job descriptions to pinpoint structural gaps and generate highly personalized learning paths.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3">
+                <button onClick={() => navigate('/study-prep-center/roadmaps')} className="w-full flex items-center justify-between p-4 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-100 hover:border-blue-200 font-bold text-sm transition-all group/btn shadow-sm">
+                  View Active Roadmaps
+                  <ArrowLeft className="w-4 h-4 rotate-180 group-hover/btn:translate-x-1 transition-transform" />
+                </button>
+                <button onClick={() => navigate('/study-prep-center/skill-gap')} className="w-full flex items-center justify-between p-4 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-100 hover:border-blue-200 font-bold text-sm transition-all group/btn shadow-sm">
+                  Run New Gap Analysis
+                  <ArrowLeft className="w-4 h-4 rotate-180 group-hover/btn:translate-x-1 transition-transform" />
+                </button>
+              </div>
+            </div>
+
+            <div className="glass-card rounded-[2rem] p-8 flex flex-col justify-between animate-spring-up group/card border border-slate-200/60 hover:shadow-xl hover:-translate-y-1 hover:border-purple-300/50 transition-all duration-300" style={{ animationDelay: '300ms' }}>
+              <div className="ambient-glow bottom-0 left-1/4 bg-gradient-to-r from-purple-500/10 to-transparent blur-3xl w-64 h-64 opacity-0 group-hover/card:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+              <div>
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-50 to-slate-100 border border-purple-100/50 flex items-center justify-center text-purple-600 shadow-sm group-hover/card:scale-110 group-hover/card:-rotate-3 transition-transform duration-500">
+                    <BookOpen className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-[#1a1c1d]">Course Catalog</h2>
+                    <span className="text-xs font-bold text-emerald-600 flex items-center gap-1.5 uppercase tracking-wider">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      420+ Curated Modules
+                    </span>
+                  </div>
+                </div>
+                <p className="text-[#464553] text-base leading-relaxed mb-8">
+                  Access a high-signal repository focusing exclusively on industry-standard technologies and architectures for senior-level engineering and product roles.
+                </p>
+              </div>
+              <button 
+                onClick={() => navigate('/study-prep-center/catalog')}
+                className="w-full mt-auto flex justify-center items-center gap-2 bg-[#0f0f14] hover:bg-purple-900 text-white py-4 rounded-xl font-bold transition-all shadow-md active:scale-95 group/btn"
+              >
+                <span>Explore Catalog</span>
+                <ArrowLeft className="w-4 h-4 rotate-180 group-hover/btn:translate-x-1 transition-transform" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      {/* Round Types Modal */}
+      <Modal isOpen={isTypesModalOpen} onClose={() => setIsTypesModalOpen(false)} title="Tailored Interview Rounds" size="lg">
+        <div className="p-2">
+          <p className="text-slate-500 text-sm mb-6">
+            Our AI engine dynamically generates fully contextualized rounds tailored to your target company. Here are the 6 distinct interview modules available in the simulator:
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {ROUND_TYPES.map(round => (
+              <div key={round.id} className="flex gap-4 p-5 rounded-2xl border border-slate-200 bg-white shadow-sm hover:border-slate-300 transition-colors">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border shadow-sm ${round.bg} ${round.color}`}>
+                  {round.icon}
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 mb-1">{round.label}</h3>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    {round.desc}
                   </p>
-                  
-                  <div className="flex flex-wrap gap-2 mb-6 mt-auto">
-                    {course.tags?.map(t => (
-                      <span key={t} className="px-2 py-0.5 bg-bg-elevated text-text-muted rounded text-xs">
-                        #{t}
-                      </span>
-                    ))}
-                  </div>
-                  
-                  <div className="flex items-center justify-between mt-4 pt-4 border-t border-border-default">
-                    <div className="flex items-center gap-2 text-sm text-text-muted font-medium">
-                      <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                      </svg>
-                      {course.chapter_count} Chapters
-                    </div>
-                    
-                    <Link 
-                      to={`/study-center/${course.course_id}`}
-                      className="px-5 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
-                    >
-                      {course.is_enrolled ? 'Continue Learning' : 'View Course'}
-                    </Link>
-                  </div>
-                  
-                  {course.is_enrolled && (
-                    <div className="mt-4 pt-2">
-                      <div className="flex justify-between text-xs text-text-muted mb-1 font-medium">
-                        <span>Progress</span>
-                        <span>{course.completed_count} / {course.chapter_count}</span>
-                      </div>
-                      <div className="w-full bg-bg-elevated rounded-full h-1.5 overflow-hidden">
-                        <div 
-                          className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500" 
-                          style={{ width: `${Math.max(2, (course.completed_count / course.chapter_count) * 100)}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             ))}
           </div>
-        )}
-      </div>
+          
+          <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end">
+            <button 
+              onClick={() => {
+                setIsTypesModalOpen(false)
+                navigate('/study-prep-center/interview-prep')
+              }}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-md transition-colors"
+            >
+              Start Generating Simulation
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

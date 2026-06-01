@@ -273,16 +273,25 @@ Rules:
     return await _call_model_json(prompt, user_id=user_id, operation="parse_resume_pdf")
 
 
-async def _call_model_json(prompt: str, user_id: str = "", operation: str = "") -> dict | list:
+async def call_model_json(prompt: str, user_id: str = "", operation: str = "", model_override: str = None) -> dict | list:
+    """
+    Public wrapper for JSON model calls.
+    Allows specifying a model_override (e.g. for Gemini Flash).
+    """
+    return await _call_model_json(prompt, user_id=user_id, operation=operation, model_override=model_override)
+
+
+async def _call_model_json(prompt: str, user_id: str = "", operation: str = "", model_override: str = None) -> dict | list:
     """Call Gemma model expecting JSON output. Retries once with 2s sleep. Logs token usage."""
     client = _get_client()
+    target_model = model_override if model_override else MODEL
 
     for attempt in range(2):
         try:
             t0 = time.monotonic()
             response = await asyncio.to_thread(
                 client.models.generate_content,
-                model=MODEL,
+                model=target_model,
                 contents=prompt,
                 config={
                     "response_mime_type": "application/json",

@@ -439,7 +439,7 @@ export default function MyResumes() {
               className="hidden"
               onChange={handleImportPDF}
             />
-            <Button className="cursor-pointer"
+            <Button
               variant="outline"
               loading={importing}
               onClick={() => fileInputRef.current?.click()}
@@ -466,7 +466,7 @@ export default function MyResumes() {
               Create your first resume to start analyzing job descriptions
               and tracking your ATS scores.
             </p>
-            <Button className="cursor-pointer" onClick={() => { setShowCreate(true); setNewTitle('') }}>
+            <Button onClick={() => { setShowCreate(true); setNewTitle('') }}>
               Create Your First Resume
             </Button>
           </Card>
@@ -480,7 +480,7 @@ export default function MyResumes() {
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3" style={{ gridColumn: '1 / -1' }}>
                 <Star className="w-4 h-4 fill-amber-400 text-amber-400" /> Master Resumes
               </div>
-              <button className="cursor-pointer"
+              <button
                 onClick={() => { setShowCreate(true); setNewTitle('') }}
                 className="relative aspect-[1/1.414] border-2 border-dashed border-slate-200 rounded-2xl p-5 hover:border-blue-500 hover:bg-blue-50/50 transition-all duration-200 flex flex-col items-center justify-center gap-3 cursor-pointer"
               >
@@ -509,7 +509,7 @@ export default function MyResumes() {
                     onClick={() => navigate(`/resumes/${r.resumeId}`)}
                   >
                     <ResumeThumbnail resume={r} />
-                    <button className="cursor-pointer"
+                    <button
                       onClick={(e) => handleToggleBase(e, r)}
                       className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/50 transition-colors text-sm"
                       title={r.isBase ? 'Mark as Tailored' : 'Mark as Base'}
@@ -521,10 +521,10 @@ export default function MyResumes() {
                       )}
                     </button>
                     <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                      <Button className="cursor-pointer" variant="primary" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/resumes/${r.resumeId}`) }}>
+                      <Button variant="primary" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/resumes/${r.resumeId}`) }}>
                         Edit
                       </Button>
-                      <button className="cursor-pointer"
+                      <button
                         onClick={(e) => { e.stopPropagation(); setDeleteTarget(r) }}
                         className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-rose-500 transition-colors"
                       >
@@ -572,7 +572,7 @@ export default function MyResumes() {
                           onClick={() => navigate(`/resumes/${r.resumeId}`)}
                         >
                           <ResumeThumbnail resume={r} />
-                          <button className="cursor-pointer"
+                          <button
                             onClick={(e) => handleToggleBase(e, r)}
                             className="absolute top-2 right-2 z-20 w-7 h-7 rounded-full bg-black/30 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/50 transition-colors text-sm"
                             title={r.isBase ? 'Mark as Tailored' : 'Mark as Base'}
@@ -584,10 +584,10 @@ export default function MyResumes() {
                             )}
                           </button>
                           <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                            <Button className="cursor-pointer" variant="primary" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/resumes/${r.resumeId}`) }}>
+                            <Button variant="primary" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/resumes/${r.resumeId}`) }}>
                               Edit
                             </Button>
-                            <button className="cursor-pointer"
+                            <button
                               onClick={(e) => { e.stopPropagation(); setDeleteTarget(r) }}
                               className="w-8 h-8 rounded-full bg-white/20 text-white flex items-center justify-center hover:bg-rose-500 transition-colors"
                             >
@@ -632,8 +632,8 @@ export default function MyResumes() {
             />
           </div>
           <div className="flex justify-end gap-3">
-            <Button className="cursor-pointer" variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button className="cursor-pointer" onClick={handleCreatePrompt} disabled={!newTitle.trim()}>
+            <Button variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button onClick={handleCreatePrompt} disabled={!newTitle.trim()}>
               Next: Choose Template
             </Button>
           </div>
@@ -659,7 +659,7 @@ export default function MyResumes() {
           <>
             <div className="grid grid-cols-2 gap-6 py-4">
               {TEMPLATE_OPTIONS.map(template => (
-                <div className="cursor-pointer"
+                <div 
                   key={template.id}
                   onClick={() =>
                     selectionSource === 'create'
@@ -716,7 +716,7 @@ export default function MyResumes() {
              </p>
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <Button className="cursor-pointer" variant="ghost" onClick={() => setDeleteTarget(null)} className="flex-1">Cancel</Button>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)} className="flex-1">Cancel</Button>
             <Button variant="outline" onClick={handleDelete} loading={deleting} className="cursor-pointer flex-1 bg-rose-500 text-white border-rose-600 hover:bg-rose-600">
               Delete
             </Button>

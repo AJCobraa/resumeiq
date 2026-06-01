@@ -97,7 +97,7 @@ function ToastItem({ toast, onClose }) {
           {message}
         </p>
         {isCoinError && (
-          <button className="cursor-pointer"
+          <button
             onClick={() => {
               navigate('/pricing?highlight=popular')
               onClose(id)
@@ -108,7 +108,7 @@ function ToastItem({ toast, onClose }) {
           </button>
         )}
       </div>
-      <button className="cursor-pointer"
+      <button
         onClick={() => onClose(id)}
         className="ml-auto text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300 transition-colors p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800/80 shrink-0"
       >

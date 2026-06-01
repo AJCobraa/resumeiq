@@ -48,7 +48,7 @@ const PillGroup = ({ options, value, onChange }) => (
       const optLabel = typeof opt === 'string' ? opt : opt.label;
       const isActive = value === optVal;
       return (
-        <button className="cursor-pointer"
+        <button
           key={i}
           onClick={() => onChange && onChange(optVal)}
           style={{
@@ -198,7 +198,7 @@ export function CustomizePanel({ customization, setCustomization, canUndo, canRe
         <>
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
             {typeOptions.map(opt => (
-              <button className="cursor-pointer" key={opt.value} onClick={() => set('font.type', opt.value)} style={{
+              <button key={opt.value} onClick={() => set('font.type', opt.value)} style={{
                 flex: 1, padding: '12px 0', border: c.font.type === opt.value ? '2px solid #7c3aed' : '1px solid #e5e7eb',
                 borderRadius: 8, background: c.font.type === opt.value ? '#f5f3ff' : '#fff', color: c.font.type === opt.value ? '#7c3aed' : '#374151',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', transition: 'all 0.1s'
@@ -278,8 +278,8 @@ export function CustomizePanel({ customization, setCustomization, canUndo, canRe
         <Checkbox label="Name bold" value={c.name.bold} onChange={v=>set('name.bold', v)} />
         <SectionLabel>Font</SectionLabel>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <button className="cursor-pointer" onClick={() => set('name.fontType', 'body')} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: c.name.fontType === 'body' ? '1.5px solid #7c3aed' : '1px solid #e5e7eb', background: c.name.fontType === 'body' ? '#f5f3ff' : '#fff', color: c.name.fontType === 'body' ? '#7c3aed' : '#374151', fontSize: 12, cursor: 'pointer' }}>Body Font</button>
-          <button className="cursor-pointer" onClick={() => set('name.fontType', 'creative')} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: c.name.fontType === 'creative' ? '1.5px solid #7c3aed' : '1px solid #e5e7eb', background: c.name.fontType === 'creative' ? '#f5f3ff' : '#fff', color: c.name.fontType === 'creative' ? '#7c3aed' : '#374151', fontSize: 12, cursor: 'pointer' }}>Creative</button>
+          <button onClick={() => set('name.fontType', 'body')} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: c.name.fontType === 'body' ? '1.5px solid #7c3aed' : '1px solid #e5e7eb', background: c.name.fontType === 'body' ? '#f5f3ff' : '#fff', color: c.name.fontType === 'body' ? '#7c3aed' : '#374151', fontSize: 12, cursor: 'pointer' }}>Body Font</button>
+          <button onClick={() => set('name.fontType', 'creative')} style={{ flex: 1, padding: '8px 0', borderRadius: 6, border: c.name.fontType === 'creative' ? '1.5px solid #7c3aed' : '1px solid #e5e7eb', background: c.name.fontType === 'creative' ? '#f5f3ff' : '#fff', color: c.name.fontType === 'creative' ? '#7c3aed' : '#374151', fontSize: 12, cursor: 'pointer' }}>Creative</button>
         </div>
         {c.name.fontType === 'creative' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
@@ -405,7 +405,7 @@ export function CustomizePanel({ customization, setCustomization, canUndo, canRe
         const isOpen = openSection === sec.id;
         return (
           <div key={sec.id} style={{ borderTop: i === 0 ? '1px solid #f0f0f0' : 'none', borderBottom: '1px solid #f0f0f0' }}>
-            <button className="cursor-pointer" onClick={() => setOpenSection(isOpen ? null : sec.id)} style={{
+            <button onClick={() => setOpenSection(isOpen ? null : sec.id)} style={{
               width: '100%', padding: '14px 4px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between',
               alignItems: 'center', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#111827'
             }}>

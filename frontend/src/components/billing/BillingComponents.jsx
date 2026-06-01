@@ -18,7 +18,7 @@ export function BillingToggle({ cycle, setCycle }) {
   return (
     <div className="inline-flex p-1.5 rounded-2xl bg-slate-100 border border-slate-200 shadow-inner">
       {options.map((opt) => (
-        <button className="cursor-pointer"
+        <button
           key={opt.id}
           onClick={() => setCycle(opt.id)}
           className={`relative px-6 py-2.5 text-sm font-bold rounded-xl transition-all duration-300 ${
@@ -50,7 +50,7 @@ export function CurrencyToggle({ currency, setCurrency }) {
   return (
     <div className="flex bg-bg-card border border-border-default rounded-xl p-1">
       {['INR', 'USD'].map((c) => (
-        <button className="cursor-pointer"
+        <button
           key={c}
           onClick={() => setCurrency(c)}
           className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer ${currency === c ? 'bg-bg-elevated text-text-primary' : 'text-text-muted hover:text-text-primary'}`}

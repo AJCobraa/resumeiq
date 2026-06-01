@@ -87,7 +87,7 @@ export default function Step6Ready() {
             </div>
             <h3 className="text-lg font-bold text-foreground mb-1">Import Your Resume</h3>
             <p className="text-sm text-muted-foreground mb-6">Start with your existing PDF</p>
-            <button className="cursor-pointer"
+            <button
               onClick={() => navigate('/resumes?action=import')}
               className="w-full bg-primary text-primary-foreground font-semibold py-3 rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
             >
@@ -106,7 +106,7 @@ export default function Step6Ready() {
             </div>
             <h3 className="text-lg font-bold text-foreground mb-1">Build from Scratch</h3>
             <p className="text-sm text-muted-foreground mb-6">Create a new resume with AI</p>
-            <button className="cursor-pointer"
+            <button
               onClick={() => navigate('/resumes?action=create')}
               className="w-full bg-transparent border-2 border-foreground text-foreground font-semibold py-2.5 rounded-xl hover:bg-foreground hover:text-background transition-colors flex items-center justify-center gap-2"
             >
@@ -122,7 +122,7 @@ export default function Step6Ready() {
           animate={{ opacity: 1 }}
           transition={{ delay: 1 }}
         >
-          <button className="cursor-pointer"
+          <button
             onClick={() => navigate('/dashboard')}
             className="text-muted-foreground hover:text-foreground transition-colors text-sm font-medium"
           >

@@ -105,6 +105,8 @@ async def get_jobs(
             "isCacheHit": d.get("isCacheHit", False),
             "recommendationCount": len(d.get("recommendations", [])),
             "approvedCount": len([r for r in d.get("recommendations", []) if r.get("status") == "approved"]),
+            "missingKeywords": d.get("missingKeywords", []),
+            "strongMatches": d.get("strongMatches", []),
             "createdAt": d.get("createdAt"),
         })
     return results

@@ -201,4 +201,23 @@ export const api = {
   enrollCourse:     (courseId, durationDays) => request(`/api/courses/${courseId}/enroll`, 'POST', { duration_days: durationDays }),
   getChapter:       (courseId, chapterId) => request(`/api/courses/${courseId}/chapters/${chapterId}`),
   toggleChapter:  (courseId, chapterId) => request(`/api/courses/${courseId}/chapters/${chapterId}/toggle`, 'POST'),
+
+  // ── Study Center V2 ──────────────────────────────
+  getStudyModels:      ()              => request('/api/study-models'),
+  generateRoadmapQuestions: (body)     => request('/api/roadmaps/questions', 'POST', body),
+  generateRoadmap:     (body)          => request('/api/roadmaps', 'POST', body),
+  listRoadmaps:        ()              => request('/api/roadmaps'),
+  getRoadmap:          (id)            => request(`/api/roadmaps/${id}`),
+  updateNodeProgress:  (roadmapId, nodeId, body) => request(`/api/roadmaps/${roadmapId}/nodes/${nodeId}`, 'PATCH', body),
+  deleteRoadmap:       (id)            => request(`/api/roadmaps/${id}`, 'DELETE'),
+
+  // ── Interview Prep V2 ──────────────────────────────
+  generateInterviewSession:  (body)              => request('/api/interview/generate', 'POST', body),
+  listInterviewSessions:     ()                  => request('/api/interview/sessions'),
+  getInterviewSession:       (id)                => request(`/api/interview/sessions/${id}`),
+  evaluateAnswer:            (sessionId, body)   => request(`/api/interview/sessions/${sessionId}/evaluate-answer`, 'POST', body),
+  getVoiceToken:             (sessionId, body)   => request(`/api/interview/sessions/${sessionId}/voice-token`, 'POST', body),
+  deleteInterviewSession:    (id)                => request(`/api/interview/sessions/${id}`, 'DELETE'),
 }
+
+

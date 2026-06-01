@@ -74,7 +74,7 @@ export default function TopUpSection({
                 <p className="text-sm font-medium text-slate-400">~{workflows} workflows</p>
               </div>
 
-              <button className="cursor-pointer"
+              <button
                 disabled={!isOnPaid || !!processing}
                 onClick={() => handleTopUp(pack.pack_id)}
                 className={`w-full py-4 rounded-2xl text-sm font-black uppercase tracking-wider transition-all duration-300 cursor-pointer

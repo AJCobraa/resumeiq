@@ -62,7 +62,7 @@ export default function ChapterReader() {
         setChapter(chData)
       } catch (err) {
         error(err.message || 'Access denied')
-        navigate(`/study-center/${courseId}`)
+        navigate(`/study-prep-center/${courseId}`)
       } finally {
         setLoading(false)
       }
@@ -106,13 +106,13 @@ export default function ChapterReader() {
       {/* Top Navigation Bar */}
       <div className="bg-white border-b border-border-default h-14 flex items-center justify-between px-6 flex-shrink-0 shadow-sm z-20 relative">
         <div className="flex items-center gap-4">
-          <Link to={`/study-center/${courseId}`} className="p-1.5 rounded hover:bg-bg-elevated transition-colors" title="Back to Course">
+          <Link to={`/study-prep-center/${courseId}`} className="p-1.5 rounded hover:bg-bg-elevated transition-colors" title="Back to Course">
             <svg className="w-5 h-5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
           </Link>
           <div className="text-sm font-medium text-text-muted truncate hidden sm:block">
-            <span className="hover:text-indigo-600 cursor-pointer" onClick={() => navigate(`/study-center/${courseId}`)}>{course.title}</span> 
+            <span className="hover:text-indigo-600 cursor-pointer" onClick={() => navigate(`/study-prep-center/${courseId}`)}>{course.title}</span> 
             <span className="mx-2">/</span> 
             <span className="text-text-primary">{chapter.title}</span>
           </div>
@@ -136,7 +136,7 @@ export default function ChapterReader() {
               return (
                 <Link
                   key={ch.chapter_id}
-                  to={ch.is_locked ? '#' : `/study-center/${courseId}/chapters/${ch.chapter_id}`}
+                  to={ch.is_locked ? '#' : `/study-prep-center/${courseId}/chapters/${ch.chapter_id}`}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
                     isActive ? "bg-indigo-100 text-indigo-800 font-bold" : "text-text-primary hover:bg-white",
@@ -260,15 +260,15 @@ export default function ChapterReader() {
             </button>
             
             {chapter.next_chapter_id ? (
-              <button className="cursor-pointer"
-                onClick={() => navigate(`/study-center/${courseId}/chapters/${chapter.next_chapter_id}`)}
+              <button
+                onClick={() => navigate(`/study-prep-center/${courseId}/chapters/${chapter.next_chapter_id}`)}
                 className="flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors shadow-sm"
               >
                 Next Chapter →
               </button>
             ) : (
-              <button className="cursor-pointer"
-                onClick={() => navigate(`/study-center/${courseId}`)}
+              <button
+                onClick={() => navigate(`/study-prep-center/${courseId}`)}
                 className="flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors shadow-sm"
               >
                 Course Overview

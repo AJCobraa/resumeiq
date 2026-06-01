@@ -187,7 +187,7 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Applications</h1>
             <p className="text-slate-500 mt-1.5">Manage job matches and optimize your resume.</p>
           </div>
-          <Button className="cursor-pointer" onClick={() => setShowExtensionGuide(true)} variant="outline" size="sm" className="gap-2">
+          <Button onClick={() => setShowExtensionGuide(true)} variant="outline" size="sm" className="gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             Extension Active
           </Button>
@@ -235,7 +235,7 @@ export default function Dashboard() {
                     const portal = getPortalInfo(job.portal)
                     const statusInfo = STATUS_OPTIONS.find(s => s.value === job.status) || STATUS_OPTIONS[0]
                     return (
-                      <tr className="cursor-pointer" 
+                      <tr 
                         key={job.jobId} 
                         onClick={() => openJobDetail(job.jobId)}
                         className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
@@ -279,7 +279,7 @@ export default function Dashboard() {
                           {formatDate(job.createdAt)}
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <button className="cursor-pointer" 
+                          <button 
                             onClick={(e) => { e.stopPropagation(); handleDeleteJob(job.jobId) }}
                             className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
                           >
@@ -437,7 +437,7 @@ function JobDetailPanel({ job, resumes, onStatusChange, onRecommendation, onRean
           {job.resumeTitle === '__deleted__' ? (
             <ResumePickerReanalyze job={job} onReanalyze={onReanalyze} isReanalyzing={isReanalyzing} />
           ) : (
-            <Button className="cursor-pointer"
+            <Button
               onClick={() => onReanalyze(job)}
               disabled={isReanalyzing}
               variant="outline"
@@ -493,7 +493,7 @@ function JobDetailPanel({ job, resumes, onStatusChange, onRecommendation, onRean
             { id: 'recs', label: `AI Recommendations${pendingRecs > 0 ? ` (${pendingRecs})` : ''}` },
             { id: 'interview', label: 'Interview Coach' },
           ].map(tab => (
-            <button className="cursor-pointer"
+            <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
@@ -688,9 +688,24 @@ function JobDetailPanel({ job, resumes, onStatusChange, onRecommendation, onRean
 
         {/* ════ TAB: Interview Coach ════ */}
         {activeTab === 'interview' && (
-          <InterviewPrepPanel job={job} onUpdate={onPrepUpdate} />
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-8 text-center mt-6">
+            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+              <Sparkles className="w-8 h-8 text-indigo-500" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Interview Prep has moved!</h3>
+            <p className="text-slate-600 max-w-md mx-auto mb-6">
+              We've upgraded Interview Coach to a full round-based prep module in the Study Center.
+            </p>
+            <button
+              onClick={() => {
+                window.location.href = `/study-prep-center/interview-prep?jobId=${job.jobId}`
+              }}
+              className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold shadow-md hover:bg-indigo-700 transition-all flex items-center gap-2 mx-auto"
+            >
+              Go to Study Center <Rocket className="w-4 h-4" />
+            </button>
+          </div>
         )}
-
       </div>
     </div>
   )
@@ -770,14 +785,14 @@ function RecommendationCard({ rec, onAction, resumeDeleted = false }) {
         {/* Approve / Dismiss buttons */}
         {rec.status === 'pending' && !resumeDeleted && (
           <div className="flex items-center gap-3 pt-3 border-t border-border/30">
-            <Button className="cursor-pointer"
+            <Button
               size="sm"
               onClick={() => onAction('approve')}
               className="bg-foreground text-background hover:bg-foreground/90 rounded-full px-5 text-xs"
             >
               Approve
             </Button>
-            <Button className="cursor-pointer"
+            <Button
               size="sm"
               variant="ghost"
               onClick={() => onAction('dismiss')}

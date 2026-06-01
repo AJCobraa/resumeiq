@@ -118,28 +118,28 @@ export default function Plans() {
         {/* Temporary Toast Test Panel */}
         <div className="mt-4 p-4 bg-slate-100 dark:bg-zinc-800 rounded-xl flex gap-3 flex-wrap items-center border border-slate-200 dark:border-zinc-700/50">
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Test Toasts:</span>
-          <button className="cursor-pointer" 
+          <button 
             id="test-toast-success"
             onClick={() => toast.success('Success! Your billing changes have been premium-redesigned.')}
             className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-medium transition-colors"
           >
             Trigger Success
           </button>
-          <button className="cursor-pointer" 
+          <button 
             id="test-toast-error"
             onClick={() => toast.error('Error! The backend was unable to verify the transaction details.')}
             className="px-3 py-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-xs font-medium transition-colors"
           >
             Trigger Error
           </button>
-          <button className="cursor-pointer" 
+          <button 
             id="test-toast-warning"
             onClick={() => toast.warning('Warning! You only have 3 analysis coins left on your starter package.')}
             className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-medium transition-colors"
           >
             Trigger Warning
           </button>
-          <button className="cursor-pointer" 
+          <button 
             id="test-toast-info"
             onClick={() => toast.info('Info: A new coin package promotion is active this week.')}
             className="px-3 py-1.5 bg-sky-500 hover:bg-sky-600 text-white rounded-lg text-xs font-medium transition-colors"

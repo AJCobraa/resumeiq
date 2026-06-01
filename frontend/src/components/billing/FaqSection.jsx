@@ -21,7 +21,7 @@ export default function FaqSection() {
           const open = openFaq === i
           return (
             <div key={f.q} className="rounded-xl border border-border-default bg-bg-card overflow-hidden">
-              <button className="cursor-pointer"
+              <button
                 onClick={() => setOpenFaq(open ? null : i)}
                 className="w-full flex items-center justify-between px-5 py-4 text-left text-sm font-medium hover:bg-bg-elevated/40 transition-colors"
               >

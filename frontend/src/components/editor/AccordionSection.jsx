@@ -16,7 +16,7 @@ export function AccordionSection({ icon, iconColor = '#7c3aed', title, defaultOp
       overflow: 'hidden',
       boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
     }}>
-      <button className="cursor-pointer"
+      <button
         onClick={() => setOpen(o => !o)}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', gap: 12,
@@ -110,7 +110,7 @@ export function EntryCard({ title, subtitle, isOpen, onToggle, onRemove, onMoveU
               <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path d="M6 9l6 6 6-6" /></svg>
             </button>
           )}
-          <button className="cursor-pointer"
+          <button
             onClick={e => { e.stopPropagation(); onRemove() }} title="Remove"
             style={{ padding: 4, border: 'none', background: 'none', cursor: 'pointer', color: '#9ca3af', borderRadius: 4, display: 'flex' }}
             onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}

@@ -102,7 +102,7 @@ function ExperienceEditor({ section, onUpdate, onRemoveSection }) {
               rows={2}
               className="flex-1 px-3 py-2 bg-bg-primary border border-border-default rounded-[6px] text-sm text-text-primary placeholder-text-muted focus:border-accent-blue focus:outline-none resize-none"
             />
-            <button className="cursor-pointer" onClick={() => removeBullet(i)} className="mt-2 text-text-muted hover:text-red cursor-pointer">
+            <button onClick={() => removeBullet(i)} className="mt-2 text-text-muted hover:text-red cursor-pointer">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -291,14 +291,14 @@ function ProjectsEditor({ section, onUpdate, onRemoveSection }) {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs font-medium text-text-muted">Bullets</label>
-              <button className="cursor-pointer" onClick={() => addBullet(i)} className="text-xs text-accent-orange hover:text-accent-orange/80 cursor-pointer">+ Bullet</button>
+              <button onClick={() => addBullet(i)} className="text-xs text-accent-orange hover:text-accent-orange/80 cursor-pointer">+ Bullet</button>
             </div>
             {(item.bullets || []).map((b, bi) => (
               <div key={b.bulletId} className="flex items-start gap-2 mb-2">
                 <span className="text-text-muted text-xs mt-2.5">•</span>
                 <textarea value={b.text} onChange={(e) => updateBullet(i, bi, e.target.value)} placeholder="Achievement..." rows={2}
                   className="flex-1 px-3 py-2 bg-bg-primary border border-border-default rounded-[6px] text-sm text-text-primary placeholder-text-muted focus:border-accent-blue focus:outline-none resize-none" />
-                <button className="cursor-pointer" onClick={() => removeBullet(i, bi)} className="mt-2 text-text-muted hover:text-red cursor-pointer">
+                <button onClick={() => removeBullet(i, bi)} className="mt-2 text-text-muted hover:text-red cursor-pointer">
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -398,7 +398,7 @@ function AchievementsEditor({ section, onUpdate, onRemoveSection }) {
               rows={2}
               className="flex-1 px-3 py-2 bg-bg-primary border border-border-default rounded-[6px] text-sm text-text-primary placeholder-text-muted focus:border-accent-blue focus:outline-none resize-none"
             />
-            <button className="cursor-pointer" onClick={() => removeBullet(i)} className="mt-2 text-text-muted hover:text-red cursor-pointer">
+            <button onClick={() => removeBullet(i)} className="mt-2 text-text-muted hover:text-red cursor-pointer">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -489,7 +489,7 @@ export default function SectionEditor({ sections, onChange }) {
             { type: 'certifications', label: '🏅 Certifications', color: 'accent-blue' },
             { type: 'achievements', label: '🏆 Achievements', color: 'accent-orange' },
           ].map(({ type, label }) => (
-            <button className="cursor-pointer"
+            <button
               key={type}
               onClick={() => addSection(type)}
               className="px-3 py-1.5 text-xs font-medium bg-bg-elevated border border-border-default rounded-[6px] hover:border-accent-blue hover:bg-accent-blue/5 transition-colors cursor-pointer"

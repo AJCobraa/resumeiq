@@ -59,7 +59,7 @@ export function SkillsAccordion({ sections, allSections, onChange }) {
               fontSize: 12, outline: 'none', fontFamily: 'inherit',
             }}
           />
-          <button className="cursor-pointer"
+          <button
             onClick={() => removeCategory(i)}
             style={{ padding: 6, border: 'none', background: 'none', cursor: 'pointer', color: '#d1d5db', marginTop: 2 }}
             onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}

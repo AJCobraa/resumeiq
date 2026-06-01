@@ -59,3 +59,26 @@ class EnrollResponse(BaseModel):
     status: str
     coins_paid: int
     remaining_balance: int
+
+
+# ── Study Center V2 Schemas ──────────────────────────────────────────
+
+class RoadmapQuestionsRequest(BaseModel):
+    skill_name: str
+    role_context: Optional[str] = None
+    experience_level: str
+
+class RoadmapGenerateRequest(BaseModel):
+    skill_name: str
+    model_key: str
+    roadmap_type: str
+    experience_level: str
+    source_job_id: Optional[str] = None
+    source_gap_id: Optional[str] = None
+    role_context: Optional[str] = None
+    gap_status: Optional[str] = None
+    answers: Optional[dict] = None
+
+class NodeProgressRequest(BaseModel):
+    status: str
+
