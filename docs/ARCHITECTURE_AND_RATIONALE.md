@@ -1489,3 +1489,70 @@ In Chrome Extension Manifest V3, content scripts run in an isolated JavaScript c
   - `ChapterReader.jsx`: Content reader using `react-markdown` and `remark-gfm` with custom `DiagramBlock` for Mermaid and ReactFlow diagram placeholders.
 - **Design System:** Designed with Stitch. Implemented using standard Tailwind classes (indigo/purple gradient aesthetics, clean layout) following ByteByteGo inspiration.
 - **API Helper:** Added 5 methods for fetching courses, chapters, and marking progress.
+
+---
+
+## Section 42 — Roadmap Canvas Redesign: roadmap.sh-Style Custom SVG Renderer
+
+**Problem:** The original `RoadmapCanvas.jsx` used ReactFlow with basic white card nodes — functional but visually poor. Users expected a mind-map-style layout matching roadmap.sh, with curved connections, yellow pill nodes, left/right branching sub-topics, and a rich detail panel.
+
+**Decision:** Replace ReactFlow entirely with a **custom SVG + HTML canvas renderer** that gives us pixel-level control over the visual language, and upgrade the AI prompt to output the rich node fields the panel requires.
+
+### Backend Changes
+
+**`backend/services/roadmap_prompts.py` — `build_roadmap_prompt()`:**
+
+The prompt schema was expanded. Each node now outputs:
+- `what` — plain English explanation (2-3 sentences)
+- `why` — why this topic matters in the roadmap
+- `mastery_check` — one-line self-check statement
+- `exercise` — a hands-on mini-project
+- `difficulty_note` — string for hard nodes, `null` for normal ones
+- `level` — `"beginner"` | `"intermediate"` | `"advanced"`
+- `resources` — now an **object** (not array) with typed sub-keys:
+  - `video`, `official_docs`, `article`, `practice`, `paid_course`
+
+**Why object instead of array?** Typed keys make the frontend rendering trivial — no need to filter by type. The panel can directly access `resources.video` without loops. Both old (array) and new (object) formats are handled by `normaliseResources()` in the panel component.
+
+**Layout positioning instruction added:** MILESTONE nodes are explicitly told to sit at `x=0` (center spine), TOPIC nodes alternate left (negative x) and right (positive x) of their parent. This produces the roadmap.sh column layout without post-processing.
+
+### Frontend Changes
+
+#### Removed Dependency
+- `@xyflow/react` is no longer imported anywhere. The package remains in `package.json` but is unused. It can be removed in a future cleanup pass.
+
+#### New: `components/study_center/RoadmapGraph.jsx`
+Custom SVG canvas with:
+- **Pan:** `mousedown` + `mousemove` via CSS `transform: translate()`
+- **Zoom:** `wheel` event with pinch-point scaling around cursor position
+- **Fit-to-view:** Computed on mount by finding node bounds and scaling to 88% of viewport
+- **Bezier edges via `<svg>`:** `getCurvePath()` generates cubic bezier paths. Horizontal connections (same-row) bend upward; vertical connections use S-curves. REQUIRED edges are solid indigo with arrowheads; SUGGESTED edges are animated dashed blue.
+- **Node pills:** `NodePill` renders as `<div>` absolutely positioned over the SVG. Types: `rg-node-pill--milestone` (indigo), `--topic` (yellow), `--subtopic` (white). Level dot badges (green/purple/dark) appear inside each pill.
+- **Phase labels:** Positioned above the first node in each phase cluster.
+
+**Why SVG edges + HTML nodes (hybrid)?** Pure SVG nodes suffer from limited text rendering (no word-wrap, no emoji). Pure HTML nodes can't draw curved connection lines. The hybrid approach is standard in all node graph tools (including ReactFlow itself).
+
+#### New: `components/study_center/roadmap-graph.css`
+Standalone CSS module (not Tailwind) for:
+- Dot-grid canvas background
+- Node hover scale + drop-shadow
+- Dashed edge animation (`stroke-dashoffset` keyframe)
+- Panel slide-in animation (`translateX(100%) → 0`)
+- All resource tag color variants
+
+**Why not Tailwind?** SVG stroke properties and CSS animation on SVG path elements are not well-covered by Tailwind utility classes. Explicit CSS gives precise control over `stroke-dasharray`, `stroke-dashoffset`, and `marker` definitions.
+
+#### Rewritten: `components/study_center/RoadmapNodePanel.jsx`
+- **Two tabs:** "Resources" and "Details"
+- **Resources tab:** What it is + typed resource links (Official/Video/Article/Practice/Paid tags)
+- **Details tab:** Why it matters + Mastery Check + Exercise
+- **Status dropdown:** Three states (Pending / In Progress / Done) with colored chips
+- **Difficulty note:** Amber alert box for hard nodes
+- **Backward compatible:** `normaliseResources()` handles both old array format and new typed-object format — existing roadmaps display correctly without regeneration
+
+#### Rewritten: `pages/RoadmapCanvas.jsx`
+- Removed all ReactFlow imports and node/edge state
+- Uses `nodeMap` (plain object keyed by node ID) instead of ReactFlow node array
+- Progress bar now shows `X/Y nodes` format with gradient fill
+- Header uses inline styles (no Tailwind classes) for precise control matching the Stitch-generated design
+

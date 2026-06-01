@@ -1,221 +1,257 @@
+/**
+ * RoadmapCanvas.jsx
+ *
+ * Top-level page for viewing an individual roadmap.
+ * Uses the custom RoadmapGraph SVG renderer (no ReactFlow dependency).
+ * Manages: data loading, progress state, node selection, and header UI.
+ */
+
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ReactFlow, Controls, Background, useNodesState, useEdgesState, MarkerType } from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
 import { api } from '../lib/api'
+import RoadmapGraph from '../components/study_center/RoadmapGraph'
 import RoadmapNodePanel from '../components/study_center/RoadmapNodePanel'
 import { ChevronLeft, Loader2, Award, AlertCircle } from 'lucide-react'
-
-// Custom Node Component
-const CustomNode = ({ data }) => {
-  const isComplete = data.user_status === 'DONE'
-  const isMissing = data.gap_status === 'missing'
-  const isPartial = data.gap_status === 'partial'
-  
-  const bgClass = data.node_type === 'MILESTONE' ? 'bg-indigo-900 text-white' : 'bg-white text-gray-900'
-  const borderClass = isMissing ? 'border-red-500' : isPartial ? 'border-amber-500' : isComplete ? 'border-green-500' : 'border-gray-300'
-  const shadowClass = data.node_type === 'MILESTONE' ? 'shadow-lg' : 'shadow-sm'
-  const opacityClass = data.importance === 'OPTIONAL' ? 'opacity-80' : 'opacity-100'
-  const dashClass = data.importance === 'OPTIONAL' ? 'border-dashed border-2' : data.importance === 'REQUIRED' ? 'border-solid border-2' : 'border-solid border'
-
-  return (
-    <div className={`px-4 py-3 rounded-xl min-w-[200px] ${bgClass} ${borderClass} ${shadowClass} ${opacityClass} ${dashClass}`}>
-      <div className="flex justify-between items-start mb-1">
-        <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">
-          {data.importance}
-        </span>
-        {isComplete && <div className="w-3 h-3 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}
-      </div>
-      <div className="font-bold text-sm leading-tight mb-1">{data.title}</div>
-      {data.estimated_hours && (
-        <div className="text-[10px] opacity-70 font-medium">{data.estimated_hours} hrs</div>
-      )}
-    </div>
-  )
-}
-
-const nodeTypes = {
-  custom: CustomNode,
-}
 
 export default function RoadmapCanvas() {
   const { roadmapId } = useParams()
   const navigate = useNavigate()
-  
+
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [selectedNodeData, setSelectedNodeData] = useState(null)
-  
-  const [nodes, setNodes, onNodesChange] = useNodesState([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [error, setError] = useState(null)
+  const [selectedNode, setSelectedNode] = useState(null)
 
+  // ── Load roadmap data ─────────────────────────────────────
   const loadData = useCallback(async () => {
     try {
+      setLoading(true)
+      setError(null)
       const res = await api.getRoadmap(roadmapId)
       setData(res)
-      
-      // Transform data into React Flow format
-      const rData = res.roadmap_data || {}
-      const rawNodes = rData.nodes || {}
-      const rawEdges = rData.edges || []
-      const phases = rData.phases || []
-      
-      const flowNodes = Object.values(rawNodes).map(node => {
-        const phase = phases.find(p => p.id === node.phase_id)
-        return {
-          id: node.id,
-          type: 'custom',
-          position: { x: node.position_x || 0, y: node.position_y || 0 },
-          data: { ...node, phase_label: phase ? phase.label : 'Unknown Phase' },
-        }
-      })
-      
-      const flowEdges = rawEdges.map(edge => ({
-        id: edge.id,
-        source: edge.from_node_id,
-        target: edge.to_node_id,
-        animated: edge.edge_type === 'SUGGESTED_BEFORE',
-        style: { 
-          strokeWidth: edge.edge_type === 'REQUIRED_BEFORE' ? 2 : 1,
-          stroke: edge.edge_type === 'REQUIRED_BEFORE' ? '#4f46e5' : '#9ca3af',
-          strokeDasharray: edge.edge_type === 'ALTERNATIVE_TO' ? '5,5' : 'none'
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: edge.edge_type === 'REQUIRED_BEFORE' ? '#4f46e5' : '#9ca3af',
-        },
-      }))
-      
-      setNodes(flowNodes)
-      setEdges(flowEdges)
     } catch (err) {
-      console.error(err)
-      alert('Failed to load roadmap')
+      setError(err.message || 'Failed to load roadmap')
     } finally {
       setLoading(false)
     }
-  }, [roadmapId, setNodes, setEdges])
+  }, [roadmapId])
 
   useEffect(() => {
     loadData()
   }, [loadData])
 
-  const onNodeClick = (event, node) => {
-    setSelectedNodeData(node.data)
-  }
-
-  const handleStatusChange = async (nodeId, newStatus) => {
+  // ── Handle node status change ─────────────────────────────
+  const handleStatusChange = useCallback(async (nodeId, newStatus) => {
     try {
       await api.updateNodeProgress(roadmapId, nodeId, { status: newStatus })
-      
-      // Update local state
-      setNodes(nds => nds.map(n => {
-        if (n.id === nodeId) {
-          n.data = { ...n.data, user_status: newStatus }
+
+      // Optimistically update local state
+      setData(prev => {
+        if (!prev?.roadmap_data?.nodes) return prev
+        const updated = { ...prev }
+        updated.roadmap_data = {
+          ...prev.roadmap_data,
+          nodes: {
+            ...prev.roadmap_data.nodes,
+            [nodeId]: {
+              ...prev.roadmap_data.nodes[nodeId],
+              user_status: newStatus,
+            },
+          },
         }
-        return n
-      }))
-      
-      if (selectedNodeData && selectedNodeData.id === nodeId) {
-        setSelectedNodeData(prev => ({ ...prev, user_status: newStatus }))
-      }
+        return updated
+      })
+
+      // Update selected node if it's the one being changed
+      setSelectedNode(prev =>
+        prev?.id === nodeId ? { ...prev, user_status: newStatus } : prev
+      )
     } catch (err) {
-      console.error(err)
-      alert('Failed to update progress')
+      console.error('Failed to update progress:', err)
     }
+  }, [roadmapId])
+
+  // ── Node click ────────────────────────────────────────────
+  const handleNodeClick = useCallback(nodeData => {
+    setSelectedNode(nodeData)
+  }, [])
+
+  // ── Progress computation ──────────────────────────────────
+  const progress = useMemo(() => {
+    const nodes = Object.values(data?.roadmap_data?.nodes || {})
+    if (!nodes.length) return { percent: 0, done: 0, total: 0 }
+    const done = nodes.filter(n => n.user_status === 'DONE').length
+    return { percent: Math.round((done / nodes.length) * 100), done, total: nodes.length }
+  }, [data])
+
+  // ── Enrich selectedNode with phase_label ──────────────────
+  const enrichedSelectedNode = useMemo(() => {
+    if (!selectedNode || !data?.roadmap_data) return null
+    const phases = data.roadmap_data.phases || []
+    const phase = phases.find(p => p.id === selectedNode.phase_id)
+    return { ...selectedNode, phase_label: phase?.label }
+  }, [selectedNode, data])
+
+  // ── Loading / error states ────────────────────────────────
+  if (loading) {
+    return (
+      <div style={{
+        height: 'calc(100vh - 64px)', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', background: '#f9fafb',
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <Loader2 style={{ width: 36, height: 36, color: '#4f46e5', animation: 'spin 1s linear infinite', margin: '0 auto 12px' }} />
+          <p style={{ color: '#6b7280', fontSize: 14, fontWeight: 500 }}>Loading your roadmap…</p>
+        </div>
+      </div>
+    )
   }
 
-  const progressInfo = useMemo(() => {
-    if (!nodes.length) return { percent: 0, completed: 0, total: 0 }
-    const total = nodes.length
-    const completed = nodes.filter(n => n.data.user_status === 'DONE').length
-    return { percent: Math.round((completed / total) * 100), completed, total }
-  }, [nodes])
-
-  if (loading) {
-    return <div className="h-screen w-full flex items-center justify-center bg-gray-50"><Loader2 className="w-8 h-8 text-primary-500 animate-spin" /></div>
+  if (error) {
+    return (
+      <div style={{
+        height: 'calc(100vh - 64px)', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', background: '#f9fafb',
+      }}>
+        <div style={{ textAlign: 'center', padding: 40 }}>
+          <AlertCircle style={{ width: 40, height: 40, color: '#ef4444', margin: '0 auto 12px' }} />
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: '#111827', marginBottom: 8 }}>
+            Failed to load roadmap
+          </h3>
+          <p style={{ color: '#6b7280', marginBottom: 20, fontSize: 14 }}>{error}</p>
+          <button
+            onClick={loadData}
+            style={{
+              background: '#4f46e5', color: 'white', border: 'none', borderRadius: 10,
+              padding: '10px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer',
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (!data) return null
 
+  const roadmapTitle = data.skill_name
+    ? `${data.skill_name} Mastery`
+    : data.roadmap_data?.title || 'Learning Roadmap'
+
+  const isGapRoadmap = data.roadmap_type === 'SKILL_GAP'
+
   return (
-    <div className="h-[calc(100vh-64px)] w-full flex flex-col bg-gray-50 relative overflow-hidden">
-      {/* Header */}
-      <div className="h-16 bg-white border-b border-gray-200 px-4 flex items-center justify-between z-10 shrink-0">
-        <div className="flex items-center gap-4">
-          <button 
+    <div style={{
+      height: 'calc(100vh - 64px)',
+      display: 'flex',
+      flexDirection: 'column',
+      background: '#ffffff',
+      overflow: 'hidden',
+    }}>
+      {/* ── Header ─────────────────────────────────────────── */}
+      <header style={{
+        height: 64,
+        background: '#ffffff',
+        borderBottom: '1px solid #e5e7eb',
+        padding: '0 20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexShrink: 0,
+        zIndex: 10,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+      }}>
+        {/* Left: back + title */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
             onClick={() => navigate('/study-prep-center/roadmaps')}
-            className="p-2 -ml-2 text-gray-500 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 36, height: 36, borderRadius: 10, border: '1px solid #e5e7eb',
+              background: 'white', cursor: 'pointer', color: '#6b7280',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => { e.target.style.background = '#f9fafb'; e.target.style.color = '#111827' }}
+            onMouseLeave={e => { e.target.style.background = 'white'; e.target.style.color = '#6b7280' }}
           >
-            <ChevronLeft className="w-5 h-5" />
+            <ChevronLeft size={18} />
           </button>
+
           <div>
-            <h1 className="font-bold text-gray-900">{data.skill_name} Mastery</h1>
-            <p className="text-xs text-gray-500 capitalize">{data.roadmap_type.replace('_', ' ')} Roadmap</p>
+            <h1 style={{
+              fontSize: 16, fontWeight: 800, color: '#0f172a',
+              letterSpacing: '-0.02em', lineHeight: 1, margin: 0,
+            }}>
+              {roadmapTitle}
+            </h1>
+            <p style={{
+              fontSize: 11, color: '#9ca3af', margin: 0, marginTop: 2,
+              fontWeight: 600, textTransform: 'capitalize',
+            }}>
+              {isGapRoadmap ? 'Skill Gap Roadmap' : 'Custom Roadmap'}
+              {' · '}
+              {data.experience_level} level
+            </p>
           </div>
         </div>
-        
-        <div className="flex items-center gap-4">
-          <div className="flex flex-col items-end">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Progress</span>
-            <div className="flex items-center gap-3">
-              <div className="w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-green-500 transition-all duration-500 ease-out"
-                  style={{ width: `${progressInfo.percent}%` }}
-                />
+
+        {/* Right: progress + badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {/* Progress */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {/* Track */}
+              <div style={{
+                width: 140, height: 6, background: '#f3f4f6', borderRadius: 9999, overflow: 'hidden',
+              }}>
+                <div style={{
+                  height: '100%',
+                  width: `${progress.percent}%`,
+                  background: progress.percent === 100
+                    ? 'linear-gradient(90deg, #22c55e, #16a34a)'
+                    : 'linear-gradient(90deg, #4f46e5, #7c3aed)',
+                  borderRadius: 9999,
+                  transition: 'width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                }} />
               </div>
-              <span className="text-sm font-bold text-gray-900 w-10 text-right">{progressInfo.percent}%</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', minWidth: 36 }}>
+                {progress.percent}%
+              </span>
             </div>
+            <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 500, marginTop: 2 }}>
+              {progress.done}/{progress.total} nodes complete
+            </span>
           </div>
-          {progressInfo.percent === 100 && (
-            <div className="bg-yellow-100 text-yellow-700 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-bold text-sm">
-              <Award className="w-4 h-4" /> Mastery Achieved
+
+          {/* Mastery badge */}
+          {progress.percent === 100 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: '#fef9c3', border: '1px solid #fde047',
+              color: '#713f12', borderRadius: 9999, padding: '6px 14px',
+              fontSize: 13, fontWeight: 700,
+              animation: 'rg-pop-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',
+            }}>
+              <Award size={15} /> Mastery Achieved!
             </div>
           )}
         </div>
-      </div>
+      </header>
 
-      {/* Canvas */}
-      <div className="flex-1 w-full relative">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={onNodeClick}
-          nodeTypes={nodeTypes}
-          fitView
-          minZoom={0.2}
-          maxZoom={1.5}
-          attributionPosition="bottom-left"
-        >
-          <Background color="#e5e7eb" gap={16} />
-          <Controls className="bg-white border-gray-200 shadow-sm rounded-lg overflow-hidden" />
-        </ReactFlow>
+      {/* ── Canvas area ────────────────────────────────────── */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <RoadmapGraph
+          roadmapData={data.roadmap_data}
+          onNodeClick={handleNodeClick}
+          selectedNodeId={selectedNode?.id}
+        />
 
-        {/* Legend Overlay */}
-        <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm border border-gray-200 p-4 rounded-xl shadow-sm z-10 w-64 text-sm pointer-events-none">
-          <h4 className="font-bold text-gray-900 mb-3 text-xs uppercase tracking-wider">Legend</h4>
-          <div className="space-y-2">
-            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded border-2 border-solid border-gray-400 bg-white" /> Required</div>
-            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded border-2 border-dashed border-gray-400 bg-white" /> Optional</div>
-            <div className="flex items-center gap-2"><div className="w-4 h-4 rounded border border-gray-400 bg-indigo-900" /> Milestone</div>
-            <div className="flex items-center gap-2 mt-4"><div className="w-4 h-4 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" /> Completed</div>
-            {data.roadmap_type === 'SKILL_GAP' && (
-              <>
-                <div className="flex items-center gap-2 mt-4"><div className="w-4 h-4 rounded border border-red-500 bg-white" /> Missing from Resume</div>
-                <div className="flex items-center gap-2"><div className="w-4 h-4 rounded border border-amber-500 bg-white" /> Partial Match</div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Side Panel Overlay */}
-        {selectedNodeData && (
-          <RoadmapNodePanel 
-            node={selectedNodeData} 
-            onClose={() => setSelectedNodeData(null)} 
+        {/* Node Detail Panel */}
+        {enrichedSelectedNode && (
+          <RoadmapNodePanel
+            node={enrichedSelectedNode}
+            onClose={() => setSelectedNode(null)}
             onStatusChange={handleStatusChange}
           />
         )}

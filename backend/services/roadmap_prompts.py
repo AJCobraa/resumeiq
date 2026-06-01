@@ -69,6 +69,8 @@ def build_roadmap_prompt(
 ) -> str:
     """
     Builds the prompt for generating an interactive learning roadmap for a specific skill.
+    Outputs rich node fields: what, why, mastery_check, exercise, difficulty_note, level,
+    and structured resource sub-fields (video, official_docs, article, practice, paid_course).
     """
     context_str = f"Role context: {role_context}\n" if role_context else ""
     gap_str = f"The candidate's current status for this skill is: {gap_status}\n" if gap_status else ""
@@ -81,19 +83,29 @@ SKILL TO LEARN: {skill_name}
 TARGET AUDIENCE: {experience_level}
 {context_str}{gap_str}{answers_str}
 INSTRUCTIONS:
-1. Generate a complete learning roadmap tailored to the target audience's experience level and their specific answers to the tailoring questions.
-   - Beginners need foundational concepts.
-   - Experienced users should bypass basics and focus on advanced patterns, internals, and scale.
-2. If role context or answers are provided, emphasize topics most relevant to them.
-3. Structure the roadmap into 3-4 sequential phases.
-4. Generate exactly 25-40 nodes total across all phases.
-5. Create logical prerequisite edges between nodes.
-6. For spatial layout, assign position_x and position_y integers to each node:
-   - Phase 1 nodes should be near y=0
-   - Phase 2 nodes near y=300
-   - Phase 3 nodes near y=600
-   - Phase 4 (if any) near y=900
-   - Spread nodes horizontally (x-axis) with roughly 200px spacing between parallel topics.
+1. Generate an extremely granular, highly detailed learning roadmap for the target audience.
+   - Break down every topic into highly specific, granular subtopics.
+   - If experience_level is 'senior' or 'advanced', skip foundational subtopics and add production-level, architecture, and advanced nodes.
+2. Structure the roadmap hierarchically using exactly 3 levels of depth:
+   - MILESTONE: Major phase or category (e.g., "Python Foundations"). These form the central spine.
+   - TOPIC: Broad concepts within a milestone (e.g., "Type Hinting", "Async Programming").
+   - SUBTOPIC: Highly granular, specific items belonging to a topic.
+3. Target Node Distribution:
+   - 4-5 MILESTONE nodes
+   - 2-3 TOPIC nodes per MILESTONE (8-15 total)
+   - 4-6 SUBTOPIC nodes per TOPIC (32-90 total)
+   - Total: aim for 50-65 nodes. The vast majority of nodes should be SUBTOPICs.
+4. EDGE RULES (No orphaned nodes allowed):
+   - Every node except the first MILESTONE must have at least one incoming edge.
+   - Every MILESTONE -> its direct TOPICs (edge_type: REQUIRED_BEFORE).
+   - Every TOPIC -> its direct SUBTOPICs (edge_type: REQUIRED_BEFORE).
+   - Add 3-5 cross-phase SUGGESTED_BEFORE edges between related topics.
+5. Node Attribute Guidelines:
+   - "level": Assign based on phase (Phase 1: mostly "beginner", Phase 2: "beginner/intermediate", Phase 3-4: "intermediate/advanced").
+   - "estimated_hours": Use realistic integers. SUBTOPIC: 1-4, TOPIC: 5-15, MILESTONE: 0.
+   - "importance": Mark ~20% of subtopics as RECOMMENDED and ~10% as OPTIONAL — these are nice-to-have extras.
+   - "resources": Do NOT invent URLs for videos, articles, courses, or practice! LLMs tend to hallucinate these. Output a `search_query` instead. For `official_docs`, you may output a `url` but restrict it to known stable roots (e.g. docs.python.org).
+6. For spatial layout, assign position_y integers to establish vertical order, and position_x for horizontal grouping.
 
 Return ONLY valid JSON in this exact structure, with no markdown fences or preamble:
 {{
@@ -107,22 +119,50 @@ Return ONLY valid JSON in this exact structure, with no markdown fences or pream
       "id": "node-slug-id",
       "title": "Topic Title",
       "phase_id": "phase-1",
-      "node_type": "MILESTONE" | "TOPIC" | "SUBTOPIC",
-      "importance": "REQUIRED" | "RECOMMENDED" | "OPTIONAL",
+      "node_type": "MILESTONE",
+      "importance": "REQUIRED",
+      "level": "beginner",
       "description": "2-3 sentences explaining what this is and why it matters.",
+      "what": "Plain English explanation of this topic in 2-3 sentences. What is it exactly?",
+      "why": "Why does this matter? How does it fit into the bigger picture of mastering {skill_name}?",
+      "mastery_check": "You can explain X and demonstrate Y without referring to docs.",
+      "exercise": "Build or implement: [specific hands-on mini-project to validate understanding].",
+      "difficulty_note": "Optional: notes on why this is hard or how long it usually takes.",
       "estimated_hours": 2,
       "gap_status": {json.dumps(gap_status)},
       "position_x": 200,
       "position_y": 50,
-      "resources": [
-        {{
-          "title": "Resource Title",
-          "type": "ARTICLE" | "VIDEO" | "DOCUMENTATION" | "COURSE",
-          "is_paid": false,
-          "url": "https://actual-url-or-search-query",
-          "platform": "Platform Name (e.g., YouTube, Official Docs)"
+      "resources": {{
+        "video": {{
+          "title": "Best YouTube video title for this topic",
+          "search_query": "redis crash course traversy media",
+          "source": "Channel Name (e.g. Traversy Media, Fireship)",
+          "free": true
+        }},
+        "official_docs": {{
+          "title": "Official Documentation Title",
+          "url": "https://docs.python.org/...",
+          "free": true
+        }},
+        "article": {{
+          "title": "Best Article or Blog Post Title",
+          "search_query": "understanding redis connection pooling blog",
+          "source": "Platform (e.g. freeCodeCamp, MDN, Dev.to)",
+          "free": true
+        }},
+        "practice": {{
+          "title": "Interactive Practice Platform",
+          "search_query": "leetcode redis practice",
+          "source": "Platform (e.g. LeetCode, KodeKloud, Replit)",
+          "free": true
+        }},
+        "paid_course": {{
+          "title": "Best Paid Course Title",
+          "search_query": "udemy redis complete guide",
+          "platform": "Udemy",
+          "free": false
         }}
-      ]
+      }}
     }}
   }},
   "edges": [
@@ -130,10 +170,20 @@ Return ONLY valid JSON in this exact structure, with no markdown fences or pream
       "id": "edge-1",
       "from_node_id": "source-node-slug",
       "to_node_id": "target-node-slug",
-      "edge_type": "REQUIRED_BEFORE" | "SUGGESTED_BEFORE" | "ALTERNATIVE_TO"
+      "edge_type": "REQUIRED_BEFORE"
     }}
   ]
-}}"""
+}}
+
+IMPORTANT RULES:
+- "level" must be one of: "beginner", "intermediate", "advanced"
+- "node_type" must be one of: "MILESTONE" (main topic hub), "TOPIC" (sub-topic), "SUBTOPIC" (leaf detail)
+- "importance" must be one of: "REQUIRED", "RECOMMENDED", "OPTIONAL"
+- "edge_type" must be one of: "REQUIRED_BEFORE", "SUGGESTED_BEFORE", "ALTERNATIVE_TO"
+- "difficulty_note" should be a string for especially hard nodes (e.g. "Most learners spend 1-2 weeks before this clicks. Don't rush."), or null for normal nodes.
+- "what", "why", "mastery_check", "exercise" MUST be populated for every node — never null or empty.
+- All resource URLs should be real, well-known URLs. For paid_course, prefer Udemy.
+- If a resource type is not applicable for a very basic node, still provide the best available alternative."""
 
 
 def build_interview_prep_v2_prompt(
