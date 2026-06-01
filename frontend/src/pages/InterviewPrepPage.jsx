@@ -90,6 +90,8 @@ export default function InterviewPrepPage() {
   const [sourceTab, setSourceTab] = useState('job') // 'job' | 'jd'
   const [selectedJob, setSelectedJob] = useState(null)
   const [jdText, setJdText] = useState('')
+  const [jdTitle, setJdTitle] = useState('')
+  const [jdCompany, setJdCompany] = useState('')
 
   // Wizard state
   const [wizardStep, setWizardStep] = useState(1) // 1-4
@@ -135,8 +137,10 @@ export default function InterviewPrepPage() {
   const jdNearLimit = jdCharCount > 2500
 
   // For Job mode, just having a selectedJob is enough (resume is tied to job analysis)
-  // For JD mode, need text and a selected resume
-  const canProceedStep1 = sourceTab === 'job' ? !!selectedJob : (jdText.trim().length >= 20 && !jdOverLimit && !!selectedResume)
+  // For JD mode, need text, title, company, and a selected resume
+  const canProceedStep1 = sourceTab === 'job' 
+    ? !!selectedJob 
+    : (jdText.trim().length >= 20 && !jdOverLimit && !!selectedResume && !!jdTitle.trim() && !!jdCompany.trim())
   const canProceedStep2 = selectedRounds.length > 0
   const canGenerate = model && !generating && !jdOverLimit
 
@@ -176,6 +180,8 @@ export default function InterviewPrepPage() {
         payload.job_id = selectedJob.jobId
       } else {
         payload.jd_text = jdText.trim()
+        payload.jd_title = jdTitle.trim()
+        payload.jd_company = jdCompany.trim()
       }
       
       const session = await api.generateInterviewSession(payload)
@@ -270,6 +276,8 @@ export default function InterviewPrepPage() {
                       <>
                         {jobs.slice(0, visibleJobsCount).map(job => {
                           const isSelected = selectedJob?.jobId === job.jobId
+                          const usedResume = resumes.find(r => r.resumeId === job.resumeId)
+                          
                           return (
                             <button
                               key={job.jobId}
@@ -286,6 +294,11 @@ export default function InterviewPrepPage() {
                                     {job.jobTitle || 'Untitled Role'}
                                   </p>
                                   <p className="text-sm text-slate-500 font-medium">{job.company}</p>
+                                  {usedResume && (
+                                    <p className="text-xs text-indigo-600 font-bold mt-1.5 flex items-center gap-1.5">
+                                      <FileText className="w-3.5 h-3.5" /> Resume: {usedResume.resumeTitle || 'Untitled Resume'}
+                                    </p>
+                                  )}
                                 </div>
                                 <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold ${
                                   isSelected ? 'bg-indigo-600 text-white' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
@@ -309,13 +322,43 @@ export default function InterviewPrepPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="flex flex-col h-full gap-4">
-                    <div className="flex-1 relative">
+                  <div className="flex flex-col h-full gap-4 overflow-y-auto pr-2 custom-scrollbar max-h-[500px]">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                          Target Position *
+                        </label>
+                        <input
+                          type="text"
+                          value={jdTitle}
+                          onChange={(e) => setJdTitle(e.target.value)}
+                          placeholder="e.g. Senior Frontend Engineer"
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 outline-none focus:border-indigo-500 transition-colors shadow-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                          Company Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={jdCompany}
+                          onChange={(e) => setJdCompany(e.target.value)}
+                          placeholder="e.g. Google"
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 outline-none focus:border-indigo-500 transition-colors shadow-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex-1 relative flex flex-col">
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                        Job Description *
+                      </label>
                       <textarea
                         value={jdText}
                         onChange={e => setJdText(e.target.value)}
                         placeholder="Paste the Job Description here... We'll analyze the exact requirements to build the mock rounds."
-                        className={`w-full h-[350px] px-5 py-4 rounded-2xl border-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 resize-none outline-none transition-all ${
+                        className={`w-full min-h-[250px] flex-1 px-5 py-4 rounded-2xl border-2 text-sm font-medium text-slate-900 placeholder:text-slate-400 resize-none outline-none transition-all ${
                           jdOverLimit
                             ? 'border-red-300 bg-red-50 focus:border-red-400'
                             : jdNearLimit

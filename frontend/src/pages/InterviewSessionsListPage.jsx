@@ -160,38 +160,7 @@ export default function InterviewSessionsListPage() {
               </div>
             </div>
 
-            <div className="glass-card rounded-3xl p-8 border border-slate-200/60 shadow-sm flex-1">
-              <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-blue-500" /> Recent Activity
-              </h3>
-              
-              <div className="flex flex-col gap-5 relative">
-                {/* Vertical line connecting timeline */}
-                <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-slate-100"></div>
-                
-                <div className="flex items-start gap-4 relative z-10">
-                  <div className="w-8 h-8 rounded-full bg-blue-50 border-2 border-white text-blue-500 flex items-center justify-center shrink-0 shadow-sm">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">Platform Accessed</p>
-                    <p className="text-xs text-slate-500">Today</p>
-                  </div>
-                </div>
-                
-                {sessions.length > 0 && (
-                  <div className="flex items-start gap-4 relative z-10">
-                    <div className="w-8 h-8 rounded-full bg-indigo-50 border-2 border-white text-indigo-500 flex items-center justify-center shrink-0 shadow-sm">
-                      <Zap className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">Simulation Generated</p>
-                      <p className="text-xs text-slate-500">Recently</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+
 
           </div>
         </div>

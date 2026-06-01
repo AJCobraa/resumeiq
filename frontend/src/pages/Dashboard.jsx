@@ -5,7 +5,7 @@ import { useToast } from '../components/ui/Toast'
 import { formatDate, getScoreColor, getPortalInfo, truncate } from '../lib/utils'
 import { getFriendlyAiErrorMessage } from '../lib/errorUtils'
 import InterviewPrepPanel from '../components/dashboard/InterviewPrepPanel'
-import { ClipboardList, Target, Users, Sparkles, Rocket } from 'lucide-react'
+import { ClipboardList, Target, Users, Sparkles, Rocket, Brain, Activity, Zap } from 'lucide-react'
 
 /* UI Components — Assume these exist in the paths above */
 import Card from '../components/ui/Card'
@@ -688,22 +688,41 @@ function JobDetailPanel({ job, resumes, onStatusChange, onRecommendation, onRean
 
         {/* ════ TAB: Interview Coach ════ */}
         {activeTab === 'interview' && (
-          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-8 text-center mt-6">
-            <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-              <Sparkles className="w-8 h-8 text-indigo-500" />
+          <div className="relative overflow-hidden bg-gradient-to-br from-[#0f0f14] to-[#1a1a24] border border-slate-800 rounded-3xl p-8 text-center mt-6 shadow-2xl">
+            {/* Background glowing orb */}
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-600/20 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="relative z-10">
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-500/30">
+                <Brain className="w-8 h-8 text-white" />
+              </div>
+              <h3 className="text-2xl font-extrabold text-white mb-3 tracking-tight">AI-Powered Interview Simulation</h3>
+              <p className="text-slate-400 max-w-lg mx-auto mb-8 text-sm leading-relaxed">
+                Step into a high-fidelity mock interview tailored precisely for <strong className="text-white">{job.company || 'this role'}</strong>. Our engine analyzes the job description against your resume to dynamically generate multi-round technical, behavioral, and system design questions targeting your exact skill gaps.
+              </p>
+              
+              <div className="flex flex-wrap justify-center gap-4 mb-8">
+                <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 text-xs font-semibold text-slate-300">
+                  <Activity className="w-3.5 h-3.5 text-indigo-400" /> Real-time feedback
+                </div>
+                <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 text-xs font-semibold text-slate-300">
+                  <Target className="w-3.5 h-3.5 text-purple-400" /> Company calibrated
+                </div>
+                <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 text-xs font-semibold text-slate-300">
+                  <Zap className="w-3.5 h-3.5 text-amber-400" /> Deep technical probing
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  window.location.href = `/study-prep-center/interview-prep?jobId=${job.jobId}`
+                }}
+                className="px-8 py-4 bg-white text-[#0f0f14] rounded-xl font-black shadow-[0_0_40px_rgba(255,255,255,0.1)] hover:shadow-[0_0_60px_rgba(255,255,255,0.2)] hover:scale-105 transition-all flex items-center gap-2 mx-auto"
+              >
+                Launch Simulator <Rocket className="w-5 h-5 ml-1" />
+              </button>
             </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Interview Prep has moved!</h3>
-            <p className="text-slate-600 max-w-md mx-auto mb-6">
-              We've upgraded Interview Coach to a full round-based prep module in the Study Center.
-            </p>
-            <button
-              onClick={() => {
-                window.location.href = `/study-prep-center/interview-prep?jobId=${job.jobId}`
-              }}
-              className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold shadow-md hover:bg-indigo-700 transition-all flex items-center gap-2 mx-auto"
-            >
-              Go to Study Center <Rocket className="w-4 h-4" />
-            </button>
           </div>
         )}
       </div>

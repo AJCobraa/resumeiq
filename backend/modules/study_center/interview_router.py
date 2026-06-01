@@ -44,6 +44,8 @@ VALID_ROUNDS = {"technical", "system_design", "dsa", "behavioral", "lld", "resum
 class GenerateInterviewRequest(BaseModel):
     job_id: Optional[str] = None
     jd_text: Optional[str] = None
+    jd_title: Optional[str] = None
+    jd_company: Optional[str] = None
     resume_id: str
     model_key: str = "gemma-4-31b"
     selected_rounds: List[str] = Field(default_factory=lambda: ["technical", "behavioral", "resume_deep_dive"])
@@ -141,8 +143,13 @@ async def generate_interview_session(
         found_keywords = jd.get("strongMatches", [])
     elif body.jd_text:
         jd_text_stored = body.jd_text.strip()
-        # Extract metadata from raw JD text using AI
-        extract_prompt = f"""Extract the following from this job description. Return ONLY valid JSON.
+        job_title = body.jd_title.strip() if body.jd_title else "Software Engineer"
+        company = body.jd_company.strip() if body.jd_company else "Tech Company"
+
+        # If we are missing title or company, optionally extract (though the frontend now requires both)
+        if not body.jd_title or not body.jd_company:
+            # Extract metadata from raw JD text using AI
+            extract_prompt = f"""Extract the following from this job description. Return ONLY valid JSON.
 JOB DESCRIPTION:
 {jd_text_stored}
 
@@ -154,12 +161,14 @@ Return:
   "found_keywords": []
 }}
 Note: missing_keywords and found_keywords should both be empty arrays — these are determined separately."""
-        try:
-            extracted = await call_model_json(extract_prompt, user_id=uid, operation="parse_resume_pdf")
-            job_title = extracted.get("job_title", "Software Engineer")
-            company = extracted.get("company", "Tech Company")
-        except Exception:
-            pass  # Fall back to defaults if extraction fails
+            try:
+                extracted = await call_model_json(extract_prompt, user_id=uid, operation="parse_resume_pdf")
+                if not body.jd_title:
+                    job_title = extracted.get("job_title", "Software Engineer")
+                if not body.jd_company:
+                    company = extracted.get("company", "Tech Company")
+            except Exception:
+                pass  # Fall back to defaults if extraction fails
 
     # ── Step 2: Verify resume ownership ──
     result = await db.execute(select(Resume).where(Resume.resume_id == body.resume_id, Resume.user_id == uid))
